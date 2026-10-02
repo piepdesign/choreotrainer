@@ -3,6 +3,7 @@ import { db, uid, deleteRecording, deleteChoreo } from './db.js';
 import { h, fmt, fmtRecDate, fmtDuration, relDate, parseTime, debounce, inlineEdit, fitInput, classTitle, classMeta, PALETTE, textOn } from './util.js';
 import { analyzeBeat } from './beat.js';
 import { songPicker, songKeyOf } from './song.js';
+import { alignToSong } from './align.js';
 import { recTitle } from './hub.js';
 import { go, toast } from './app.js';
 
@@ -33,6 +34,8 @@ export async function renderTrain(root, recId) {
   const sessions = await db.byIndex('sessions', 'choreoId', choreo.id);
   const blob = await db.get('videos', recId);
   if (!blob) { root.append(h('p.empty', 'Das Video zu dieser Aufnahme fehlt im Speicher dieses Browsers.')); return; }
+  const songKey = `song:${choreo.id}`; // Songdatei gehört zur Choreo, gilt für alle Aufnahmen
+  let songBlob = (await db.get('videos', songKey)) || null;
 
   const url = URL.createObjectURL(blob);
   const color = cls?.color || PALETTE[3];
@@ -41,6 +44,7 @@ export async function renderTrain(root, recId) {
   const P = Object.assign({
     mirror: false, rate: 1, volume: 1, muted: false, brightness: 100, contrast: 100,
     countOn: false, click: false, bpm: null, anchor: 0, loopIn: null, loopOut: null, loopOn: false,
+    audio: 'video', // 'song': Video stumm, Songdatei läuft an der passenden Stelle mit
   }, rec.player);
 
   // nach dem Löschen nichts mehr zurückschreiben, sonst taucht die Aufnahme wieder auf
@@ -64,10 +68,53 @@ export async function renderTrain(root, recId) {
   video.addEventListener('click', () => togglePlay());
   const dur = () => (isFinite(video.duration) && video.duration) || rec.duration || 0;
 
+  // ── Songdatei synchron zum Video ──
+  // Position im Song = Startpunkt + Videozeit. Tempo, Lautstärke und Sprünge folgen dem Video.
+  const songAudio = new Audio();
+  songAudio.preload = 'auto';
+  songAudio.preservesPitch = true;
+  let songUrl = null;
+  function loadSongAudio() {
+    if (songUrl) URL.revokeObjectURL(songUrl);
+    songUrl = songBlob ? URL.createObjectURL(songBlob) : null;
+    if (songUrl) songAudio.src = songUrl; else songAudio.removeAttribute('src');
+  }
+  loadSongAudio();
+  songAudio.addEventListener('loadedmetadata', () => {
+    // Manuell eingetragener Song ohne Länge: Länge aus der Datei übernehmen (für die Song-Zeitleiste)
+    if (song && !song.duration && isFinite(songAudio.duration)) {
+      song.duration = songAudio.duration;
+      db.put('choreos', choreo);
+      renderStatic();
+    }
+  });
+  const songMode = () => P.audio === 'song' && !!songBlob && rec.songOffset != null;
+  function syncSong(force = false) {
+    if (!songMode()) { if (!songAudio.paused) songAudio.pause(); return; }
+    songAudio.volume = P.volume;
+    songAudio.muted = P.muted;
+    const target = rec.songOffset + video.currentTime;
+    const outside = target < 0 || (isFinite(songAudio.duration) && target >= songAudio.duration);
+    if (outside || video.paused) { if (!songAudio.paused) songAudio.pause(); if (!outside && force) songAudio.currentTime = target; return; }
+    // Kleine Abweichungen weich ausgleichen: Song minimal schneller/langsamer (max. ±6 %, Tonhöhe
+    // bleibt). Springen nur bei großen Abständen, denn nach jedem Sprung hängt Audio ~50 ms hinterher.
+    const err = target - songAudio.currentTime; // > 0: Song hinkt hinterher
+    if (force || Math.abs(err) > 0.25) {
+      songAudio.currentTime = target;
+      songAudio.playbackRate = P.rate;
+    } else {
+      const nudge = Math.abs(err) < 0.008 ? 0 : Math.max(-0.06, Math.min(0.06, err * 0.8));
+      songAudio.playbackRate = P.rate * (1 + nudge);
+    }
+    if (songAudio.paused) songAudio.play().catch(() => {});
+  }
+  for (const ev of ['play', 'seeked', 'ratechange']) video.addEventListener(ev, () => syncSong(true));
+  video.addEventListener('pause', () => songAudio.pause());
+
   function applyVideo() {
     video.playbackRate = P.rate;
     video.volume = P.volume;
-    video.muted = P.muted;
+    video.muted = P.muted || songMode(); // im Song-Modus ist der Videoton aus
     video.classList.toggle('mirror', P.mirror);
     // Filter nur bei echter Änderung: ein Filter auf <video> lässt Chrome am Mac flackern
     video.style.filter = P.brightness !== 100 || P.contrast !== 100 ? `brightness(${P.brightness}%) contrast(${P.contrast}%)` : '';
@@ -159,10 +206,18 @@ export async function renderTrain(root, recId) {
   const bFull = ctl('Vollbild', { title: 'Vollbild (F)', onclick: toggleFull });
   stage.addEventListener('dblclick', toggleFull);
   const bMark = ctl('+ Marker', { title: 'Marker setzen', onclick: e => popover(e.currentTarget, markPop) });
+  const toggleAudio = () => {
+    if (!songBlob) { toast('Erst unter SONG eine Songdatei laden'); return; }
+    if (P.audio !== 'song' && rec.songOffset == null) { toast('Erst den Startpunkt im Song setzen (Startpunkt erkennen)'); return; }
+    P.audio = P.audio === 'song' ? 'video' : 'song';
+    update();
+    syncSong(true);
+  };
+  const bAudio = ctl('', { title: 'Ton: Video oder Song (A)', onclick: toggleAudio });
   const timeView = h('span.timeview', '');
   const controls = h('div.controls', { style: { position: 'relative' } },
     bPlay, h('span.ctl-sep'), bMirror, bRate, bVol, bImg, h('span.ctl-sep'), bIn, bOut, bLoop, bClear,
-    h('span.ctl-sep'), bCount, bBpm, h('span.ctl-sep'), bMark, bFull, timeView);
+    h('span.ctl-sep'), bCount, bBpm, h('span.ctl-sep'), bAudio, bMark, bFull, timeView);
 
   function update() {
     applyVideo();
@@ -177,6 +232,9 @@ export async function renderTrain(root, recId) {
     bClear.hidden = P.loopIn == null && P.loopOut == null;
     bCount.classList.toggle('on', P.countOn);
     bBpm.textContent = P.bpm ? `${Math.round(P.bpm * 10) / 10} BPM` : 'BPM ?';
+    bAudio.hidden = !songBlob;
+    bAudio.textContent = songMode() ? 'Ton: Song' : 'Ton: Video';
+    bAudio.classList.toggle('on', songMode());
     renderStatic();
     persist();
   }
@@ -395,6 +453,7 @@ export async function renderTrain(root, recId) {
     setText(vTime, fmt(t, true));
     setText(timeView, `${fmt(t, true)} / ${fmt(d, true)}`);
     setText(bPlay, video.paused ? '▶' : '❚❚');
+    if (songMode() && !video.paused) syncSong();
     if (song?.duration && rec.songOffset != null) {
       const st = rec.songOffset + t;
       sPh.style.left = `${(st / song.duration) * 100}%`;
@@ -444,6 +503,7 @@ export async function renderTrain(root, recId) {
       e: () => addMarker('end'),
       n: () => addMarker('memo'),
       h: () => addMarker('highlight'),
+      a: () => toggleAudio(),
       f: () => toggleFull(),
     };
     if (map[k]) { e.preventDefault(); map[k](); }
@@ -535,8 +595,48 @@ export async function renderTrain(root, recId) {
       rec.songOffset = offset;
       offsetIn.value = fmt(offset, true);
       update();
+      syncSong(true);
     },
+    align: prior => (songBlob ? alignToSong(blob, songBlob, { prior }) : null),
   });
+
+  // Songdatei laden / entfernen
+  const songFileIn = h('input', { type: 'file', accept: 'audio/*,.mp3,.m4a,.aac,.wav,.flac,.aiff', hidden: true });
+  const songFileRow = h('div', { style: { marginTop: '12px' } });
+  async function setSongFile(file) {
+    if (!file) return;
+    if (!/^audio\//.test(file.type) && !/\.(mp3|m4a|aac|wav|flac|aiff?)$/i.test(file.name)) { toast('Bitte eine Audiodatei wählen'); return; }
+    await db.put('videos', file, songKey);
+    songBlob = file;
+    loadSongAudio();
+    renderSongFile();
+    update();
+    picker.detectStart(); // Startpunkt direkt per Abgleich bestimmen
+  }
+  function renderSongFile() {
+    songFileRow.hidden = !song;
+    songFileRow.replaceChildren(songFileIn, songBlob
+      ? h('div.actions',
+        h('span.label', `♪ ${songBlob.name || 'Songdatei'}`),
+        h('button.linkbtn', { type: 'button', onclick: () => songFileIn.click() }, 'Ersetzen'),
+        h('button.linkbtn', {
+          type: 'button',
+          onclick: async () => {
+            if (!confirm('Songdatei aus dieser Choreo entfernen?')) return;
+            await db.del('videos', songKey);
+            songBlob = null;
+            P.audio = 'video';
+            loadSongAudio();
+            renderSongFile();
+            update();
+          },
+        }, 'Entfernen'))
+      : h('div',
+        h('button.btn.small', { type: 'button', onclick: () => songFileIn.click() }, 'Songdatei laden'),
+        h('div.label', { style: { marginTop: '6px' } }, 'mp3, m4a, wav · zum Trainieren auf den Song und für einen exakten Startpunkt. Auch per Drag & Drop.')));
+  }
+  songFileIn.addEventListener('change', () => setSongFile(songFileIn.files[0]));
+  renderSongFile();
 
   const statText = () => {
     const secs = sessions.reduce((a, s) => a + s.seconds, 0) + (session?.seconds || 0);
@@ -545,6 +645,7 @@ export async function renderTrain(root, recId) {
   const statLine = h('div.label', statText());
 
   const recIndex = recs.findIndex(r => r.id === rec.id);
+  let songSection;
   const titleEdits = [];
   const titleEdit = () => {
     const el = inlineEdit(recTitle(rec, recIndex), async v => {
@@ -567,9 +668,10 @@ export async function renderTrain(root, recId) {
       h('section', h('span.label', 'Wie sitzt sie?'), ratingBox, ratingHint, h('div', { style: { marginTop: '8px' } }, statLine)),
       h('section', h('span.label', 'Marker'), markerList),
       h('section', h('span.label', 'Notizen'), notesIn),
-      h('section', h('span.label', 'Song'),
+      songSection = h('section', h('span.label', 'Song'),
         picker.el,
-        song ? h('label.field', { style: { marginTop: '10px' } }, h('span', 'Video beginnt im Song bei'), offsetIn) : null),
+        song ? h('label.field', { style: { marginTop: '10px' } }, h('span', 'Video beginnt im Song bei'), offsetIn) : null,
+        songFileRow),
       h('section', h('span.label', 'Aufnahmen'),
         h('ul.recs', recs.map((r, i) => h('li',
           r.id === rec.id
@@ -597,7 +699,7 @@ export async function renderTrain(root, recId) {
         h('div.keys', [
           ['␣', 'Play/Pause'], ['← →', '±2 s (⇧ ±0,2)'], ['M', 'Spiegeln'], ['[ ]', 'Tempo'],
           ['I / O', 'Loop In/Out'], ['L', 'Loop'], ['C', '8er-Count'], ['T', 'Tap-Tempo'],
-          ['1', 'Hier ist die 1'], ['S / E', 'Start/Ende'], ['N', 'Gedanke'], ['H', 'Highlight'], ['F', 'Vollbild'],
+          ['1', 'Hier ist die 1'], ['S / E', 'Start/Ende'], ['N', 'Gedanke'], ['H', 'Highlight'], ['F', 'Vollbild'], ['A', 'Ton Video/Song'],
         ].map(([k, d]) => h('div', h('kbd', k), ' ', d))))),
   ));
 
@@ -605,6 +707,9 @@ export async function renderTrain(root, recId) {
     if (!rec.duration && video.duration) rec.duration = video.duration;
     renderStatic();
   });
+  // Songdatei per Drag & Drop auf den Song-Bereich
+  songSection.addEventListener('dragover', e => { if (song) e.preventDefault(); });
+  songSection.addEventListener('drop', e => { if (!song) return; e.preventDefault(); setSongFile(e.dataTransfer.files[0]); });
   update();
   renderRating();
   renderMarkers();
@@ -618,12 +723,14 @@ export async function renderTrain(root, recId) {
     document.removeEventListener('pointerdown', onDocClick);
     document.removeEventListener('visibilitychange', onHide);
     video.pause();
+    songAudio.pause();
     await saveSession();
     if (!deleted) {
       rec.player = { ...P };
       await db.put('recordings', rec);
     }
     URL.revokeObjectURL(url);
+    if (songUrl) URL.revokeObjectURL(songUrl);
     ac?.close();
   };
 }

@@ -1,7 +1,7 @@
 // Song-Auswahl: Suche (Deezer) + Erkennung aus dem Video (Shazam). Genutzt im Upload und in der Trainingsansicht.
 import { h, fmt, debounce } from './util.js';
 import { searchSongs, songDetails } from './deezer.js';
-import { recognizeSong } from './recognize.js';
+import { recognizeSong, scanTrack, median, enrich } from './recognize.js';
 
 const norm = s => String(s || '').trim().toLowerCase();
 export const songKeyOf = s => (s.source === 'deezer' ? `dz:${s.id}` : `m:${norm(s.artist)}|${norm(s.title)}`);
@@ -14,7 +14,8 @@ const sameSong = (a, b) => {
 };
 
 // getBlob(): aktuelles Video oder null · onChange(song, offset|null) · onOffset(offset): nur Startpunkt
-export function songPicker({ song = null, getBlob, onChange, onOffset }) {
+// align(prior): optionaler Abgleich mit der Songdatei → { offset, confidence } oder null
+export function songPicker({ song = null, getBlob, onChange, onOffset, align = null }) {
   let current = song;
   let editing = !song;
   let results = [];
@@ -26,7 +27,22 @@ export function songPicker({ song = null, getBlob, onChange, onOffset }) {
   const recBtn = h('button.btn.small', { type: 'button', onclick: () => recognize(false) }, 'Aus Video erkennen');
   const startBtn = h('button.btn.small', { type: 'button', onclick: () => detectStart() }, 'Startpunkt erkennen');
   const recStatus = h('span.label');
-  const el = h('div', search, picked, h('div.actions', { style: { marginTop: '10px' } }, recBtn, startBtn, recStatus));
+  const altBox = h('div.actions', { style: { marginTop: '6px' } });
+  const el = h('div', search, picked, h('div.actions', { style: { marginTop: '10px' } }, recBtn, startBtn, recStatus), altBox);
+
+  // Weitere Treffer aus dem Scan zur Auswahl anbieten (z. B. Original vs. Sample-Quelle)
+  function showAlternatives(r) {
+    altBox.replaceChildren(...(r?.alternatives || []).slice(0, 3).map(a => h('button.linkbtn', {
+      type: 'button',
+      title: 'Stattdessen diesen Song übernehmen',
+      onclick: async () => {
+        altBox.replaceChildren();
+        recStatus.textContent = 'Übernehme …';
+        await set(await enrich({ title: a.title, subtitle: a.artist, key: a.key }), a.offset);
+        recStatus.textContent = a.offset != null ? `Video beginnt bei ${fmt(a.offset, true)} im Song` : '';
+      },
+    }, `Oder: ${[a.artist, a.title].filter(Boolean).join(' — ')} (${a.hits}/${r.segments})`)));
+  }
 
   function render() {
     search.hidden = !editing;
@@ -97,7 +113,8 @@ export function songPicker({ song = null, getBlob, onChange, onOffset }) {
       else if (auto && (current || input.value.trim())) recStatus.textContent = `Erkannt: ${r.song.artist} — ${r.song.title} (nicht übernommen)`;
       else {
         await set(r.song, r.offset);
-        recStatus.textContent = r.offset != null ? `Erkannt · Video beginnt bei ${fmt(r.offset, true)} im Song` : 'Erkannt';
+        recStatus.textContent = `Erkannt in ${r.hits}/${r.segments} Abschnitten` + (r.offset != null ? ` · Video beginnt bei ${fmt(r.offset, true)} im Song` : '');
+        showAlternatives(r);
       }
     } catch (e) {
       console.warn(e);
@@ -107,21 +124,44 @@ export function songPicker({ song = null, getBlob, onChange, onOffset }) {
     }
   }
 
-  // Nur ermitteln, wo das Video im (bereits gewählten) Song beginnt. Der Song bleibt unverändert.
+  // Startpunkt für den EINGETRAGENEN Song suchen. Treffer anderer Songs zählen nicht (bei Samples
+  // wäre deren Zeitposition sinnlos). Mit Songdatei: Abgleich der Tonspuren, Shazam nur als Grobwert.
   async function detectStart() {
     const blob = getBlob();
     if (!blob || !current) return;
     startBtn.disabled = recBtn.disabled = true;
+    altBox.replaceChildren();
     try {
-      const r = await recognizeSong(blob, msg => { recStatus.textContent = msg; });
-      if (!r) recStatus.textContent = 'Startpunkt nicht gefunden · bitte von Hand eintragen';
-      else if (r.offset == null) recStatus.textContent = 'Song erkannt, aber ohne Zeitangabe · bitte von Hand eintragen';
-      else if (!sameSong(r.song, current)
-        && !confirm(`Erkannt wurde „${[r.song.artist, r.song.title].filter(Boolean).join(' — ')}“, eingetragen ist „${current.title}“.\n\nStartpunkt ${fmt(r.offset, true)} trotzdem übernehmen?`)) {
-        recStatus.textContent = 'Nicht übernommen';
+      let shazam = null, hits = 0, segments = 0, others = [], scanError = null, hasFile = false;
+      try {
+        const scan = await scanTrack(blob, msg => { recStatus.textContent = msg; });
+        segments = scan.segments;
+        const mine = scan.candidates.filter(c => sameSong({ title: c.track.title }, current));
+        hits = mine.reduce((a, c) => a + c.hits, 0);
+        shazam = median(mine.flatMap(c => c.offsets));
+        others = scan.candidates.filter(c => !mine.includes(c));
+      } catch (e) {
+        scanError = e;
+      }
+      // align() liefert null, solange keine Songdatei geladen ist
+      if (align) recStatus.textContent = 'Gleiche mit Songdatei ab …';
+      const r = align ? await align(shazam) : null;
+      hasFile = r !== null;
+      if (scanError && !hasFile) throw scanError; // ohne Songdatei gibt es keinen anderen Weg
+      if (r) {
+        if (shazam != null || r.confidence >= 1.15) {
+          onOffset(r.offset);
+          recStatus.textContent = `Video beginnt bei ${fmt(r.offset, true)} im Song (Abgleich mit Songdatei)`;
+          return;
+        }
+      }
+      if (shazam != null) {
+        onOffset(Math.max(0, shazam));
+        recStatus.textContent = `Video beginnt bei ${fmt(Math.max(0, shazam), true)} im Song (${hits}/${segments} Abschnitte)`;
       } else {
-        onOffset(r.offset);
-        recStatus.textContent = `Video beginnt bei ${fmt(r.offset, true)} im Song`;
+        const heard = others[0] ? ` Gehört wurde: ${[others[0].track.subtitle, others[0].track.title].filter(Boolean).join(' — ')}.` : '';
+        const hint = align && !hasFile ? 'Lade unten die Songdatei, dann klappt es per Abgleich. Oder trag den ' : hasFile ? 'Auch der Abgleich mit der Songdatei war unsicher (anderer Song oder verlangsamt?). Trag den ' : 'Trag den ';
+        recStatus.textContent = `„${current.title}“ nicht in der Tonspur gefunden.${heard} ${hint}Startpunkt von Hand ein.`;
       }
     } catch (e) {
       console.warn(e);
@@ -132,5 +172,5 @@ export function songPicker({ song = null, getBlob, onChange, onOffset }) {
   }
 
   render();
-  return { el, get: () => current, typed: () => input.value.trim(), recognize, refresh: render };
+  return { el, get: () => current, typed: () => input.value.trim(), recognize, detectStart, refresh: render };
 }

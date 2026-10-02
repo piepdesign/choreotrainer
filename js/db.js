@@ -53,6 +53,7 @@ export async function deleteRecording(id) {
 export async function deleteChoreo(id) {
   for (const r of await db.byIndex('recordings', 'choreoId', id)) await deleteRecording(r.id);
   for (const s of await db.byIndex('sessions', 'choreoId', id)) await db.del('sessions', s.id);
+  await db.del('videos', `song:${id}`); // Songdatei der Choreo
   await db.del('choreos', id);
 }
 

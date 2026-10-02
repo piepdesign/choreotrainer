@@ -8,6 +8,7 @@ let runtime;
 
 function loadVibra() {
   if (runtime) return runtime;
+  if (window.Module?.ccall && window.Module.HEAPU8) return (runtime = Promise.resolve()); // schon geladen
   runtime = new Promise((resolve, reject) => {
     window.Module = { locateFile: p => `vendor/vibra/${p}`, onRuntimeInitialized: resolve };
     const s = document.createElement('script');
@@ -61,35 +62,84 @@ async function ask(sig) {
   return data;
 }
 
-// → { song, offset } oder null. offset = Position im Song, an der das Video beginnt
-export async function recognizeSong(blob, onProgress = () => {}) {
+// Ganze Tonspur in überlappenden Abschnitten abfragen. Ein einzelner Abschnitt kann täuschen:
+// Songs mit Samples (z. B. Kingpin ↔ J Dilla „In The Night“) werden je nach Stelle als Original
+// oder als Sample-Quelle erkannt. → Treffer je Song sammeln, mit Zeitposition je Abschnitt.
+export async function scanTrack(blob, onProgress = () => {}) {
   onProgress('Lade Erkennung …');
   await loadVibra();
   onProgress('Lese Tonspur …');
   const audio = await new OfflineAudioContext(1, 1, SR).decodeAudioData(await blob.arrayBuffer());
   const pcm = audio.getChannelData(0);
   const dur = audio.duration;
+  const step = Math.min(12, Math.max(5, dur / 20));
+  const starts = [];
+  for (let t = 0; t <= Math.max(0, dur - SNIPPET * 0.6); t += step) starts.push(Math.min(t, Math.max(0, dur - SNIPPET)));
 
-  // mehrere Ausschnitte probieren, Mitte zuerst (Anfang ist oft Ansage/Stille)
-  const starts = [0.4, 0.15, 0.65, 0.85, 0]
-    .map(p => Math.max(0, Math.min(dur - SNIPPET, p * dur)))
-    .filter((s, i, a) => a.findIndex(x => Math.abs(x - s) < 3) === i);
-
-  for (const [i, start] of starts.entries()) {
-    onProgress(`Erkenne Song … ${i + 1}/${starts.length}`);
+  const byKey = new Map();
+  let done = 0, answered = 0, lastError = null;
+  const failed = [];
+  const one = async start => {
     const slice = pcm.subarray(Math.floor(start * SR), Math.floor(Math.min(dur, start + SNIPPET) * SR));
-    const data = await ask(signature(slice));
+    let data;
+    try {
+      data = await ask(signature(slice));
+      if (data.retryms) throw new Error('Shazam bremst');
+    } catch (e) { lastError = e; failed.push(start); return; }
+    answered++;
+    onProgress(`Scanne Tonspur … ${++done}/${starts.length}`);
     const track = data.track;
-    if (!track?.title) continue;
-    const matchOffset = data.matches?.[0]?.offset;
-    const offset = typeof matchOffset === 'number' ? Math.max(0, matchOffset - start) : null;
-    return { song: await enrich(track), offset };
+    if (!track?.title) return;
+    const key = String(track.key || `${track.subtitle}|${track.title}`);
+    const entry = byKey.get(key) || { track, hits: 0, offsets: [] };
+    entry.hits++;
+    const m = data.matches?.[0]?.offset;
+    if (typeof m === 'number') entry.offsets.push(m - start);
+    byKey.set(key, entry);
+  };
+  // drei Anfragen gleichzeitig, um den Durchreicher nicht zu überlasten
+  for (let k = 0; k < starts.length; k += 3) await Promise.all(starts.slice(k, k + 3).map(one));
+  // Abgelehnte Abschnitte (Shazam bremst bei vielen Anfragen kurz hintereinander) einmal nachholen,
+  // nach kurzer Pause und einzeln. Sonst zählen sie als „nicht erkannt“ und verzerren die Mehrheit.
+  if (failed.length) {
+    const retry = failed.splice(0);
+    onProgress('Shazam bremst kurz, frage erneut …');
+    await new Promise(r => setTimeout(r, 1500));
+    for (const start of retry) await one(start);
   }
-  return null;
+  if (!answered && lastError) throw lastError;
+
+  const candidates = [...byKey.values()].sort((a, b) => b.hits - a.hits);
+  return { candidates, segments: answered };
+}
+
+// Median ist robust gegen einzelne Ausreißer-Treffer
+export const median = xs => {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  return s[Math.floor(s.length / 2)];
+};
+
+// → { song, offset, alternatives } oder null. Gewinner = Song mit den meisten Abschnitts-Treffern.
+export async function recognizeSong(blob, onProgress = () => {}) {
+  const { candidates, segments } = await scanTrack(blob, onProgress);
+  if (!candidates.length) return null;
+  const best = candidates[0];
+  const offset = median(best.offsets);
+  return {
+    song: await enrich(best.track),
+    offset: offset == null ? null : Math.max(0, offset),
+    hits: best.hits,
+    segments,
+    alternatives: candidates.slice(1).map(c => {
+      const o = median(c.offsets);
+      return { title: c.track.title, artist: c.track.subtitle || '', key: c.track.key, hits: c.hits, offset: o == null ? null : Math.max(0, o) };
+    }),
+  };
 }
 
 // Shazam-Treffer mit Deezer abgleichen, damit Länge/BPM/Cover wie bei der manuellen Suche vorliegen
-async function enrich(track) {
+export async function enrich(track) {
   const title = track.title;
   const artist = track.subtitle || '';
   const fallback = { source: 'shazam', id: String(track.key || ''), title, artist, cover: track.images?.coverart || '', duration: null, bpm: null };
