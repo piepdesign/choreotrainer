@@ -38,9 +38,35 @@ function fft(re, im) {
   }
 }
 
+// Prüft eine Songdatei, bevor sie gespeichert wird. → null (ok) oder verständliche Fehlermeldung
+export async function checkAudio(file) {
+  const head = new Uint8Array(await file.slice(0, 512).arrayBuffer());
+  const text = new TextDecoder().decode(head).trimStart().toLowerCase();
+  if (text.startsWith('<!doctype') || text.startsWith('<html') || text.startsWith('<?xml') || text.startsWith('{')) {
+    return `„${file.name}“ ist keine Audiodatei, sondern eine Webseite (${Math.round(file.size / 1024)} KB). Vermutlich ist der Download fehlgeschlagen.`;
+  }
+  try {
+    const audio = await new OfflineAudioContext(1, 1, SR).decodeAudioData(await file.arrayBuffer());
+    if (audio.duration < 5) return `„${file.name}“ ist nur ${audio.duration.toFixed(1)} s lang, das ist kein ganzer Song.`;
+    return null;
+  } catch {
+    return `„${file.name}“ kann der Browser nicht lesen. Möglich: Apple Lossless (ALAC), AIFF, kopiergeschützt (.m4p) oder beschädigt. Bitte als mp3, m4a (AAC), wav oder flac laden.`;
+  }
+}
+
+async function decode(blob, label) {
+  try {
+    return await new OfflineAudioContext(1, 1, SR).decodeAudioData(await blob.arrayBuffer());
+  } catch {
+    throw new Error(label === 'song'
+      ? 'Die Songdatei lässt sich nicht lesen. Bitte unter SONG ersetzen (mp3, m4a, wav oder flac).'
+      : 'Die Tonspur des Videos lässt sich nicht lesen.');
+  }
+}
+
 // → Float32Array[bands] mit normierter Onset-Stärke je Frame
-async function features(blob) {
-  const audio = await new OfflineAudioContext(1, 1, SR).decodeAudioData(await blob.arrayBuffer());
+async function features(blob, label) {
+  const audio = await decode(blob, label);
   const x = audio.getChannelData(0);
   const frames = Math.max(0, Math.floor((x.length - N) / HOP));
   const win = new Float32Array(N).map((_, i) => 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / N));
@@ -99,7 +125,7 @@ function corr(V, S, L, minOverlap) {
 // prior: grober Startpunkt (z. B. von Shazam). Dann wird nur in ±3 s darum gesucht und verfeinert.
 export async function alignToSong(videoBlob, songBlob, { prior = null, onProgress = () => {} } = {}) {
   onProgress('Lese Tonspuren …');
-  const [v, s] = await Promise.all([features(videoBlob), features(songBlob)]);
+  const [v, s] = await Promise.all([features(videoBlob, 'video'), features(songBlob, 'song')]);
   onProgress('Gleiche ab …');
   const Vc = downsample(v.bands, COARSE), Sc = downsample(s.bands, COARSE);
   const lenV = Vc[0].length, lenS = Sc[0].length;

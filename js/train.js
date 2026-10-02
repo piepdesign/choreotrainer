@@ -3,7 +3,7 @@ import { db, uid, deleteRecording, deleteChoreo } from './db.js';
 import { h, fmt, fmtRecDate, fmtDuration, relDate, parseTime, debounce, inlineEdit, fitInput, classTitle, classMeta, PALETTE, textOn } from './util.js';
 import { analyzeBeat } from './beat.js';
 import { songPicker, songKeyOf } from './song.js';
-import { alignToSong } from './align.js';
+import { alignToSong, checkAudio } from './align.js';
 import { recTitle } from './hub.js';
 import { go, toast } from './app.js';
 
@@ -606,6 +606,10 @@ export async function renderTrain(root, recId) {
   async function setSongFile(file) {
     if (!file) return;
     if (!/^audio\//.test(file.type) && !/\.(mp3|m4a|aac|wav|flac|aiff?)$/i.test(file.name)) { toast('Bitte eine Audiodatei wählen'); return; }
+    // Erst prüfen, ob wirklich Ton drin ist (z. B. als .mp3 gespeicherte Webseite nach Download-Fehler)
+    songFileRow.querySelector('.label')?.replaceChildren('Prüfe Songdatei …');
+    const problem = await checkAudio(file);
+    if (problem) { toast(problem, 8000); renderSongFile(); return; }
     await db.put('videos', file, songKey);
     songBlob = file;
     loadSongAudio();
