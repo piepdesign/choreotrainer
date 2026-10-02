@@ -14,7 +14,7 @@ export async function analyzeBeat(blob, priorBpm) {
   if (env.length < FPS * 8) throw new Error('Audio zu kurz');
 
   const coarse = coarseTempo(env, priorBpm);
-  let { bpm, phase } = refine(env, coarse);
+  let { bpm, phase } = pickMetrical(env, coarse);
 
   // Deezer-BPM nur übernehmen, wenn sie zur Aufnahme passt (Kurse spielen Songs oft verlangsamt)
   if (priorBpm) {
@@ -91,6 +91,23 @@ function coarseTempo(env, prior) {
   const d = y0 - 2 * y1 + y2;
   const lag = best + (d ? (0.5 * (y0 - y2)) / d : 0);
   return (60 * FPS) / lag;
+}
+
+// Autokorrelation verwechselt gern Dreiergruppen oder halbe/doppelte Zeit mit dem Grundschlag
+// (z. B. 78 statt 117 BPM bei Hip-Hop mit Swing). Darum Verwandte des Ergebnisses prüfen und den
+// nehmen, bei dem pro Schlag im Mittel die meiste Onset-Energie auf dem Raster liegt.
+function pickMetrical(env, bpm0) {
+  let best = null;
+  for (const f of [1, 1.5, 2 / 3, 2, 0.5]) {
+    const b = bpm0 * f;
+    if (b < 60 || b > 190) continue;
+    const r = refine(env, b, 0.015);
+    const beats = Math.max(1, Math.floor((env.length - r.phase) / ((60 * FPS) / r.bpm)));
+    const weight = Math.exp(-0.5 * (Math.log2(r.bpm / 110) / 0.8) ** 2);
+    const score = (r.score / beats) * weight;
+    if (!best || score > best.score) best = { bpm: r.bpm, phase: r.phase, score };
+  }
+  return refine(env, best.bpm, 0.01);
 }
 
 // Feinsuche: Tempo ±spread und Phase, maximiert die Onset-Energie auf dem Beat-Raster
