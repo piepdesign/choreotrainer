@@ -135,7 +135,12 @@ export async function renderTrain(root, recId) {
   sTrack.append(sStatic, sPh);
   const sTime = h('span.time', '');
   const songRow = h('div.tl-row', h('span.label', 'Song'), sTrack, sTime);
-  const timeline = h('div.timeline', h('div.tl-row', h('span.label', 'Video'), vTrack, vTime), songRow);
+  // 8er-Zeile: jede Acht ein Feld. Klick = diese Acht loopen, Ziehen oder ⇧-Klick = mehrere,
+  // Klick auf die aktive Auswahl = Loop aus.
+  const eTrack = h('div.track.eights');
+  const eInfo = h('span.time', '');
+  const eightRow = h('div.tl-row', h('span.label', '8er'), eTrack, eInfo);
+  const timeline = h('div.timeline', h('div.tl-row', h('span.label', 'Video'), vTrack, vTime), eightRow, songRow);
 
   scrub(vTrack, r => { video.currentTime = r * dur(); });
   scrub(sTrack, r => {
@@ -145,6 +150,77 @@ export async function renderTrain(root, recId) {
   });
 
   const markerTime = type => rec.markers.find(m => m.type === type)?.t ?? null;
+
+  // ── Achten ──
+  // Liste der Achten im Video: [{ i, a, b }] (a/b in Sekunden, auf die Videolänge beschnitten)
+  function eights() {
+    if (!P.bpm) return [];
+    const E = (8 * 60) / P.bpm, d = dur();
+    if (!d || E < 1) return [];
+    const out = [];
+    // Ein angeschnittenes Stück vor der ersten „1“ ist Auftakt und bekommt keine Nummer
+    for (let n = Math.floor(-P.anchor / E), i = 1; P.anchor + n * E < d; n++) {
+      const a = Math.max(0, P.anchor + n * E), b = Math.min(d, P.anchor + (n + 1) * E);
+      if (b - a <= 0.15) continue;
+      const pickup = P.anchor + n * E < 0;
+      out.push({ i: pickup ? null : i++, a, b });
+    }
+    return out;
+  }
+  let eSel = null; // { from, to } Indizes während des Ziehens
+  function renderEights() {
+    const list = eights();
+    eightRow.hidden = !list.length;
+    if (!list.length) return;
+    const d = dur();
+    const { a: la, b: lb } = loopRange();
+    const looped = P.loopOn && (P.loopIn != null || P.loopOut != null);
+    const lo = eSel ? Math.min(eSel.from, eSel.to) : null, hi = eSel ? Math.max(eSel.from, eSel.to) : null;
+    eTrack.replaceChildren(...list.map((x, k) => {
+      const inLoop = looped && x.a >= la - 0.05 && x.b <= lb + 0.05;
+      const picking = eSel && k >= lo && k <= hi;
+      return h(`div.cell${inLoop ? '.sel' : ''}${picking ? '.pick' : ''}`, {
+        'data-k': k,
+        style: { left: `${(x.a / d) * 100}%`, width: `${((x.b - x.a) / d) * 100}%` },
+        title: `${x.i ? `Acht ${x.i}` : 'Auftakt'} · ${fmt(x.a, true)}–${fmt(x.b, true)}`,
+      }, x.i && (x.b - x.a) / d > 0.035 ? String(x.i) : '');
+    }));
+    const selCells = list.filter(x => looped && x.a >= la - 0.05 && x.b <= lb + 0.05);
+    const lbl = x => x.i ?? 'Auftakt';
+    eInfo.textContent = selCells.length ? (selCells.length === 1 ? (selCells[0].i ? `Acht ${selCells[0].i}` : 'Auftakt') : `Achten ${lbl(selCells[0])}–${lbl(selCells.at(-1))}`) : '';
+  }
+  const cellAt = e => {
+    const el = document.elementFromPoint(e.clientX, eTrack.getBoundingClientRect().top + 4);
+    return el?.closest?.('.cell') ? Number(el.closest('.cell').dataset.k) : null;
+  };
+  let eAnchor = null;
+  eTrack.addEventListener('pointerdown', e => {
+    const k = cellAt(e);
+    if (k == null || e.button !== 0) return;
+    eTrack.setPointerCapture?.(e.pointerId);
+    const from = e.shiftKey && eAnchor != null ? eAnchor : k;
+    eSel = { from, to: k };
+    renderEights();
+  });
+  eTrack.addEventListener('pointermove', e => {
+    if (!eSel) return;
+    if (!(e.buttons & 1)) { eSel = null; renderEights(); return; }
+    const k = cellAt(e);
+    if (k != null && k !== eSel.to) { eSel.to = k; renderEights(); }
+  });
+  eTrack.addEventListener('pointerup', () => {
+    if (!eSel) return;
+    const list = eights();
+    const lo = Math.min(eSel.from, eSel.to), hi = Math.max(eSel.from, eSel.to);
+    eSel = null;
+    if (!list[lo] || !list[hi]) { renderEights(); return; }
+    const a = list[lo].a, b = list[hi].b;
+    const same = P.loopOn && P.loopIn != null && Math.abs(P.loopIn - a) < 0.05 && Math.abs(P.loopOut - b) < 0.05;
+    if (same) { P.loopIn = P.loopOut = null; P.loopOn = false; } // erneuter Klick = Loop aus
+    else { P.loopIn = a; P.loopOut = b; P.loopOn = true; video.currentTime = a; eAnchor = lo; }
+    update();
+  });
+  eTrack.addEventListener('pointercancel', () => { eSel = null; renderEights(); });
   const loopRange = () => ({
     a: P.loopIn ?? markerTime('start') ?? 0,
     b: P.loopOut ?? markerTime('end') ?? dur(),
@@ -164,6 +240,7 @@ export async function renderTrain(root, recId) {
     }
     for (const m of rec.markers) parts.push(h(`div.mk.${m.type}`, { style: { left: pct(m.t) }, title: `${MARKER_TYPES[m.type].label} ${fmt(m.t, true)} ${m.text || ''}` }));
     vStatic.replaceChildren(...parts);
+    renderEights();
 
     // Song-Zeitleiste
     songRow.hidden = !song;
@@ -188,17 +265,19 @@ export async function renderTrain(root, recId) {
 
   // ── Bedienleiste ──
   const ctl = (label, attrs = {}) => h('button.ctl', { type: 'button', ...attrs }, label);
-  const bPlay = ctl('▶', { class: 'ctl play', title: 'Play/Pause (Leertaste)', onclick: () => togglePlay() });
+  // Feste Breite für Schalter mit wechselndem Text (Mono-Schrift: Zeichen × Laufweite), damit nichts springt
+  const fixed = (el, chars) => { el.classList.add('fixed'); el.style.width = `calc(${chars}ch + ${chars * 0.08}em + 20px)`; return el; };
+  const bPlay = ctl('▶', { class: 'ctl play fixed', title: 'Play/Pause (Leertaste)', onclick: () => togglePlay() });
   const bMirror = ctl('Spiegeln', { title: 'Spiegeln (M)', onclick: () => { P.mirror = !P.mirror; update(); } });
-  const bRate = ctl('', { title: 'Tempo ([ / ])', onclick: e => popover(e.currentTarget, ratePop) });
-  const bVol = ctl('', { title: 'Lautstärke', onclick: e => popover(e.currentTarget, volPop) });
+  const bRate = fixed(ctl('', { title: 'Tempo ([ / ])', onclick: e => popover(e.currentTarget, ratePop) }), 5);
+  const bVol = fixed(ctl('', { title: 'Lautstärke', onclick: e => popover(e.currentTarget, volPop) }), 7);
   const bImg = ctl('Bild', { title: 'Helligkeit/Kontrast', onclick: e => popover(e.currentTarget, imgPop) });
   const bIn = ctl('In', { title: 'Loop-Anfang setzen (I)', onclick: () => setIn() });
   const bOut = ctl('Out', { title: 'Loop-Ende setzen (O)', onclick: () => setOut() });
   const bLoop = ctl('Loop', { title: 'Loop an/aus (L)', onclick: () => { P.loopOn = !P.loopOn; update(); } });
   const bClear = ctl('×', { title: 'In/Out löschen', onclick: () => { P.loopIn = P.loopOut = null; P.loopOn = false; update(); } });
   const bCount = ctl('8er', { title: '8er-Count an/aus (C)', onclick: () => { P.countOn = !P.countOn; update(); } });
-  const bBpm = ctl('', { title: 'Takt einstellen', onclick: e => popover(e.currentTarget, countPop) });
+  const bBpm = fixed(ctl('', { title: 'Takt einstellen', onclick: e => popover(e.currentTarget, countPop) }), 9);
   const toggleFull = () => {
     if (document.fullscreenElement) document.exitFullscreen();
     else (stage.requestFullscreen || stage.webkitRequestFullscreen)?.call(stage);
@@ -213,7 +292,7 @@ export async function renderTrain(root, recId) {
     update();
     syncSong(true);
   };
-  const bAudio = ctl('', { title: 'Ton: Video oder Song (A)', onclick: toggleAudio });
+  const bAudio = fixed(ctl('', { title: 'Ton: Video oder Song (A)', onclick: toggleAudio }), 10);
   const timeView = h('span.timeview', '');
   const controls = h('div.controls', { style: { position: 'relative' } },
     bPlay, h('span.ctl-sep'), bMirror, bRate, bVol, bImg, h('span.ctl-sep'), bIn, bOut, bLoop, bClear,
@@ -709,6 +788,8 @@ export async function renderTrain(root, recId) {
 
   video.addEventListener('loadedmetadata', () => {
     if (!rec.duration && video.duration) rec.duration = video.duration;
+    // Querformat füllt die Breite, Hochformat wird in der Höhe begrenzt
+    stage.classList.toggle('portrait', video.videoHeight > video.videoWidth);
     renderStatic();
   });
   // Songdatei per Drag & Drop auf den Song-Bereich
@@ -745,17 +826,25 @@ function setText(el, v) {
 }
 
 // Klick/Ziehen auf einer Zeitleiste → Position 0..1
+// Springen nur bei Klick oder Ziehen mit gedrückter Taste. Bloßes Hovern ändert nichts, auch wenn
+// das Loslassen verloren geht (außerhalb des Fensters, Zeigerfang verloren).
 function scrub(track, onRatio) {
+  let dragging = false;
   const at = e => {
     const r = track.getBoundingClientRect();
     onRatio(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)));
   };
+  const stop = () => { dragging = false; };
   track.addEventListener('pointerdown', e => {
-    track.setPointerCapture(e.pointerId);
+    if (e.button !== 0) return;
+    dragging = true;
+    track.setPointerCapture?.(e.pointerId);
     at(e);
-    const move = ev => at(ev);
-    const up = () => { track.removeEventListener('pointermove', move); track.removeEventListener('pointerup', up); };
-    track.addEventListener('pointermove', move);
-    track.addEventListener('pointerup', up);
   });
+  track.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    if (!(e.buttons & 1)) { stop(); return; } // Taste nicht mehr gedrückt
+    at(e);
+  });
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) track.addEventListener(ev, stop);
 }

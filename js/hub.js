@@ -1,5 +1,5 @@
 // Hub (Übersicht) und Class-Ansicht
-import { db, deleteChoreo, deleteClass, deleteRecording, storageEstimate } from './db.js';
+import { db, deleteChoreo, deleteClass, deleteRecording } from './db.js';
 import { h, fmt, fmtRecDate, fmtDuration, relDate, classTitle, classMeta, stripe, inlineEdit, PALETTE, textOn, WEEKDAYS, byClassOrder, CLASS_TITLES, CLASS_LEVELS } from './util.js';
 import { state, go, toast } from './app.js';
 
@@ -178,7 +178,7 @@ export async function renderHub(root) {
   const last = sessions.reduce((m, s) => Math.max(m, s.start), 0);
   const rated = choreos.map(latestRating).filter(Boolean);
   const avg = rated.length ? (rated.reduce((a, b) => a + b, 0) / rated.length).toFixed(1).replace('.', ',') : '—';
-  const est = await storageEstimate();
+  const streak = practiceStreak(sessions);
 
   const recent = [...choreos]
     .sort((a, b) => (b.lastPracticed || b.created) - (a.lastPracticed || a.created))
@@ -201,7 +201,7 @@ export async function renderHub(root) {
       stat('Übungszeit gesamt', fmtDuration(total)),
       stat('Ø Sitzt (1–5)', avg),
       stat('Choreos', `${choreos.length}`),
-      stat('Speicher', est ? `${(est.usage / 1e9).toFixed(2).replace('.', ',')} GB` : '—'),
+      stat('Serie', streak ? `${streak} ${streak === 1 ? 'Tag' : 'Tage'}` : '—'),
     ),
     h('div.columns',
       h('div',
@@ -297,6 +297,34 @@ function sortableStripes(classes, render) {
   return box;
 }
 
+// Tage in Folge mit Übung, bis heute oder gestern (heute noch nicht geübt zählt nicht als Abbruch)
+function practiceStreak(sessions) {
+  const days = new Set(sessions.filter(s => s.seconds >= 30).map(s => new Date(s.start).toDateString()));
+  const d = new Date();
+  if (!days.has(d.toDateString())) d.setDate(d.getDate() - 1);
+  let n = 0;
+  while (days.has(d.toDateString())) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+
+// Nächster Termin einer Class aus Wochentag + Uhrzeit → Text wie „heute 19:30 · in 3 h“
+export function nextClass(cls, now = new Date()) {
+  const wd = WEEKDAYS.indexOf(cls?.weekday);
+  if (wd < 0) return null;
+  const [hh, mm] = (cls.time || '00:00').split(':').map(Number);
+  const t = new Date(now);
+  t.setHours(hh || 0, mm || 0, 0, 0);
+  const today = (now.getDay() + 6) % 7; // Mo = 0
+  let add = (wd - today + 7) % 7;
+  if (add === 0 && t <= now) add = 7; // heute schon vorbei → nächste Woche
+  t.setDate(t.getDate() + add);
+  const mins = Math.round((t - now) / 60000);
+  const when = add === 0 ? 'heute' : add === 1 ? 'morgen' : cls.weekday;
+  const at = cls.time ? ` ${cls.time}` : '';
+  const rel = mins < 60 ? `in ${mins} min` : mins < 24 * 60 ? `in ${Math.floor(mins / 60)} h${mins % 60 ? ` ${mins % 60} min` : ''}` : `in ${Math.round(mins / 1440)} Tagen`;
+  return `${when}${at} · ${rel}`;
+}
+
 function stat(label, value) {
   return h('div.stat', h('span.label', label), h('b', value));
 }
@@ -309,6 +337,7 @@ function choreoCard(c, cls, recs, urls) {
     thumb,
     h('h3', c.title || c.song?.title || 'Ohne Song'),
     h('div.label', `${cls ? classTitle(cls) : ''} · ${relDate(c.lastPracticed || c.created)}`),
+    cls && nextClass(cls) ? h('div.label.next', `Nächste Class ${nextClass(cls)}`) : null,
     h('div', { style: { marginTop: '4px' } }, dots(latestRating(c)), h('span.label', `  ${recs.length} Aufn.`)));
 }
 

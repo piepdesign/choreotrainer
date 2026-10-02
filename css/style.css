@@ -107,6 +107,9 @@ a.mini { display: block; }
 .songlist li { display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .songlist img, .songlist .nocover { width: 40px; height: 40px; object-fit: cover; background: var(--panel); display: block; }
 .songlist .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.songlist li > div { min-width: 0; } /* sonst sprengen lange Titel die Spalte */
+.songlist li > div .label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .label.next { color: var(--fg); margin-top: 2px; }
 
 .stripes { margin: 0 calc(-1 * var(--gutter)); }
 .stripe {
@@ -193,7 +196,8 @@ textarea:focus { border-color: var(--fg); }
 .crumbs h1 { font-size: clamp(18px, 2vw, 24px); margin: 0; flex-basis: 100%; text-transform: uppercase; }
 
 .stage { position: relative; background: #000; display: grid; place-items: center; overflow: hidden; }
-.stage video { width: 100%; max-height: calc(100vh - 290px); min-height: 240px; display: block; transition: transform .2s; }
+.stage video { width: 100%; height: auto; min-height: 240px; display: block; transition: transform .2s; }
+.stage.portrait video { width: auto; max-width: 100%; max-height: calc(100vh - 290px); margin: 0 auto; }
 .stage:fullscreen video { max-height: 100vh; height: 100vh; }
 .stage video.mirror { transform: scaleX(-1); }
 .count {
@@ -240,6 +244,17 @@ textarea:focus { border-color: var(--fg); }
 .song-offset input { width: 64px; padding: 2px 0; }
 
 .controls { display: flex; flex-wrap: wrap; gap: 4px 2px; align-items: center; margin-top: 10px; border-top: 1px solid var(--fg); padding-top: 8px; }
+.ctl.fixed { text-align: center; white-space: nowrap; overflow: hidden; }
+.track.eights { height: 20px; cursor: pointer; user-select: none; }
+.track.eights::before { display: none; }
+.track.eights .cell {
+  position: absolute; top: 1px; bottom: 1px; border: 1px solid var(--line); border-left-width: 0;
+  font-size: 9px; line-height: 16px; text-align: center; color: var(--muted); overflow: hidden;
+}
+.track.eights .cell:first-child { border-left-width: 1px; }
+.track.eights .cell:hover { background: var(--panel); color: var(--fg); }
+.track.eights .cell.sel { background: var(--cc, var(--accent)); color: #000; border-color: var(--cc, var(--accent)); }
+.track.eights .cell.pick { background: var(--fg); color: var(--bg); }
 .ctl {
   padding: 6px 9px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; border: 1px solid transparent;
   font-variant-numeric: tabular-nums; position: relative;
