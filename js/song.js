@@ -34,7 +34,8 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
   // Reihenfolge wie im Ablauf: 1 Song erkennen/suchen · 2 Startpunkt im Song
   const startStep = h('div.song-step',
     h('span.label.step-label', 'Video beginnt im Song bei'),
-    h('div.actions.start-row', startField, startBtn),
+    startField,
+    h('div.actions', startBtn),
     startStatus);
   const el = h('div.song-steps',
     h('div.song-step', search, picked, h('div.actions', recBtn), recStatus, altBox),

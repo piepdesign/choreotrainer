@@ -529,8 +529,10 @@ a.stat-link:hover { background: var(--surface-2); }
 .song-step .step-label { display: block; margin-bottom: 2px; }
 .song-status:empty { display: none; }
 .song-status { margin-top: 6px; }
-.start-row { align-items: center; flex-wrap: nowrap; }
-.start-row .offset-in { width: 90px; flex: none; }
+.song-step .offset-in { width: 90px; display: block; }
+/* Song-Panel: in jedem Schritt der Knopf unter dem Inhalt, alle gleich breit */
+.side .song-step .btn { width: 100%; justify-content: center; text-align: center; }
+.side .song-step .btn + .label { margin-top: 6px; }
 .stage:not(.fill) video { object-position: 50% 50% !important; }
 
 /* Profil: Filter, Sortierung, Erklärtexte */
@@ -580,3 +582,13 @@ a.stat-link:hover { background: var(--surface-2); }
 .pick-ghost { position: fixed; z-index: 100; pointer-events: none; margin: 0; box-shadow: 0 8px 24px rgba(0, 0, 0, .18); background: var(--surface) !important; cursor: grabbing; }
 .zone-empty { display: none; margin: 0; flex: 1 1 100%; align-self: center; padding: 22px 0; text-align: center; font-size: 12px; color: var(--muted); }
 .stat-zone:not(:has(.pick-tile)) .zone-empty { display: block; }
+
+/* Heatmap: Navigation, kommende Tage */
+.heat-nav { display: flex; align-items: center; gap: 2px; margin-bottom: 10px; }
+.heat-nav .ctl:disabled { opacity: .35; cursor: default; }
+.heat-range { margin-left: auto; }
+.hm.future { fill: var(--surface-2); opacity: .45; }
+
+/* Wortmarke im Ladebildschirm: gleicher Aufbau wie die Animation, kleiner, ohne Einblenden */
+.intro-mark.static { font-size: clamp(30px, 6vw, 72px) !important; }
+.intro-mark.static .line span, .intro-mark.static sup { animation: none; opacity: 1; transform: none; filter: none; }

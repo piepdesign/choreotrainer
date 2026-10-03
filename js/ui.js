@@ -81,7 +81,7 @@ export function icon(name) {
 // Präferenzen (Intro und Profil gleich): Ansicht als Umschalter, Musikprovider als Kacheln mit Logo,
 // Statistiken als Kacheln wie in der Base. values: { theme, provider, baseStats } · onChange(patch)
 // statValues: { id: { value } } bzw. Promise darauf, für echte Werte in den Kacheln
-export function preferences(values, onChange, statValues = null) {
+export function preferences(values, onChange, statValues = null, { baseLabel = true } = {}) {
   const block = (title, control) => h('div.pref-block', h('h3.p-sub', title), control);
   // Einzelauswahl; render(neu) setzt die Markierung
   const single = (cls, options, value, content) => {
@@ -93,7 +93,7 @@ export function preferences(values, onChange, statValues = null) {
     render(value);
     return el;
   };
-  const chips = statPicker(values.baseStats || [], statValues, list => onChange({ baseStats: list }));
+  const chips = statPicker(values.baseStats || [], statValues, list => onChange({ baseStats: list }), { baseLabel });
   return h('div.prefs',
     block('Musikprovider', single('provider-tiles', PROVIDERS, values.provider,
       ([id, name]) => [h('i.brand', { html: brandSvg(id) }), h('span', name)])),
@@ -104,7 +104,7 @@ export function preferences(values, onChange, statValues = null) {
 // Statistik-Kacheln wie in der Base. Oben die gezeigten, unten die übrigen.
 // Klick verschiebt eine Kachel in die andere Fläche (oben ans Ende). Ziehen setzt sie an jede Stelle,
 // auch zwischen zwei andere; der Rest ordnet sich beim Ziehen sofort neu an.
-export function statPicker(selected, values, onChange) {
+export function statPicker(selected, values, onChange, { baseLabel = true } = {}) {
   let vals = values && !values.then ? values : {};
   const label = id => BASE_STATS.find(x => x[0] === id)?.[1] || id;
   const tile = id => h('div.stat.pick-tile', { 'data-id': id }, h('span.label', label(id)), h('b', vals[id]?.value ?? '—'));
@@ -127,7 +127,7 @@ export function statPicker(selected, values, onChange) {
     const r = t.getBoundingClientRect();
     return y < r.top || (y <= r.bottom && x < r.left + r.width / 2);
   }) || zone.querySelector('.zone-empty');
-  const box = h('div.stat-picker', h('span.label.zone-label', 'In deiner Base'), shown, h('span.label.zone-label', 'Weitere'), rest);
+  const box = h('div.stat-picker', baseLabel ? h('span.label.zone-label', 'In deiner Base') : null, shown, h('span.label.zone-label', 'Weitere'), rest);
   box.addEventListener('pointerdown', e => {
     const t = e.target.closest('.pick-tile');
     if (!t || e.button !== 0) return;

@@ -101,12 +101,19 @@ function heatmap(sessions, choreoTitle, colorOf) {
   const level = sec => (sec <= 0 ? 0 : sec < 600 ? 1 : sec < 1200 ? 2 : sec < 2400 ? 3 : 4);
   const monthNames = ['JAN', 'FEB', 'MÄR', 'APR', 'MAI', 'JUN', 'JUL', 'AUG', 'SEP', 'OKT', 'NOV', 'DEZ'];
   // In echter Pixelbreite zeichnen, damit die Beschriftung klein und gleich groß bleibt (kein Mitskalieren)
-  // Volle Breite: so viele Wochen, wie bei ~16 px Zellen hineinpassen (13 bis 53), Zellen genau auf Breite gestreckt
+  // Volle Breite: so viele Wochen, wie bei ~16 px Zellen hineinpassen (13 bis 53), Zellen genau auf Breite gestreckt.
+  // Die betrachtete Woche (Start: diese Woche) steht in der Mitte, davor Vergangenheit, danach Zukunft.
+  let shift = 0; // Wochen relativ zu heute (Navigation)
+  let range = '';
   function draw(width) {
     const weeks = Math.max(13, Math.min(53, Math.floor((width - left) / (target + gap))));
     const step = (width - left) / weeks;
     const cellW = step - gap, cell = Math.min(cellW, 22), vstep = cell + gap; // Höhe gedeckelt, Breite füllt
-    const first = thisWeek - (weeks - 1) * 7 * DAY;
+    const center = thisWeek + shift * 7 * DAY;
+    const first = center - Math.floor((weeks - 1) / 2) * 7 * DAY;
+    const fmtM = t => `${monthNames[new Date(t).getMonth()]} ${new Date(t).getFullYear()}`;
+    range = `${fmtM(first)} – ${fmtM(first + (weeks * 7 - 1) * DAY)}`;
+    const curIdx = Math.round((thisWeek - first) / (7 * DAY));
     const W = width, H = top + 7 * vstep;
     const months = [];
     const nodes = [];
@@ -116,7 +123,10 @@ function heatmap(sessions, choreoTitle, colorOf) {
       if (!months.length || months.at(-1).m !== m) months.push({ m, x: left + w * step });
       for (let d = 0; d < 7; d++) {
         const day = dayKey(ws + d * DAY + DAY / 2);
-        if (day > Date.now()) continue;
+        if (day > Date.now()) {
+          nodes.push(svg('rect', { x: left + w * step, y: top + d * vstep, width: cellW, height: cell, rx: 2, class: 'hm future' }));
+          continue;
+        }
         const e = byDay.get(day);
         const sec = e?.sec || 0;
         const date = new Date(day).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
@@ -134,21 +144,29 @@ function heatmap(sessions, choreoTitle, colorOf) {
     return svg('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, class: 'heatmap' },
       shown.map(m => svg('text', { x: m.x, y: 12, class: 'axis' }, monthNames[m.m])),
       ['M', 'D', 'M', 'D', 'F', 'S', 'S'].map((d, k) => svg('text', { x: 0, y: top + k * vstep + cell / 2 + 4, class: 'axis' }, d)),
-      // Rahmen um die aktuelle Woche
-      svg('rect', { x: left + (weeks - 1) * step - 2, y: top - 2, width: cellW + 4, height: 7 * vstep + 1, rx: 3, class: 'curweek' }),
+      // Rahmen um die aktuelle Woche (nur wenn sichtbar)
+      curIdx >= 0 && curIdx < weeks ? svg('rect', { x: left + curIdx * step - 2, y: top - 2, width: cellW + 4, height: 7 * vstep + 1, rx: 3, class: 'curweek' }) : null,
       nodes);
   }
   const plot = h('div.heat-plot');
+  const rangeEl = h('span.label.heat-range');
   let lastW = 0;
+  const redraw = () => { plot.replaceChildren(draw(lastW)); rangeEl.textContent = range; todayBtn.disabled = shift === 0; };
   const ro = new ResizeObserver(() => {
     if (!plot.isConnected) { ro.disconnect(); return; }
     const w = plot.clientWidth;
     if (Math.abs(w - lastW) < 4) return;
     lastW = w;
-    plot.replaceChildren(draw(w));
+    redraw();
   });
   ro.observe(plot);
+  // Navigation: Monat = 4 Wochen, Jahr = 52 Wochen
+  const nav = (label, title, weeks) => h('button.ctl', { type: 'button', title, onclick: () => { shift += weeks; redraw(); } }, label);
+  const todayBtn = h('button.ctl', { type: 'button', title: 'Zurück zu heute', onclick: () => { shift = 0; redraw(); } }, 'Heute');
   return h('div.chart.heat',
+    h('div.heat-nav',
+      nav('«', 'Ein Jahr zurück', -52), nav('‹', 'Einen Monat zurück', -4), todayBtn, nav('›', 'Einen Monat vor', 4), nav('»', 'Ein Jahr vor', 52),
+      rangeEl),
     plot,
     h('div.legend',
       h('span.label', 'Weniger'),

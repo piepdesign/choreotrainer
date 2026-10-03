@@ -426,7 +426,7 @@ export async function renderTrain(root, recId) {
         small('−10 ms', () => { P.anchor -= 0.01; P.manualBeat = true; update(); }),
         small('+10 ms', () => { P.anchor += 0.01; P.manualBeat = true; update(); })),
       h('div.btns',
-        small('Hier ist die 1 (1)', () => setOne()),
+        small('Anfangscount setzen (1)', () => setOne()),
         small('Tap (T)', () => tap())),
       h('div.btns',
         small(P.click ? 'Klick an' : 'Klick aus', () => { P.click = !P.click; update(); refreshPop(); }, P.click),
@@ -440,7 +440,7 @@ export async function renderTrain(root, recId) {
         small(C.plus ? 'Halbe „+“ an' : 'Halbe „+“ aus', () => { C.plus = !C.plus; saveCountView(C); update(); refreshPop(); }, C.plus),
         small(C.show ? 'Zähler sichtbar' : 'Zähler ausgeblendet', () => { C.show = !C.show; saveCountView(C); update(); refreshPop(); }, C.show)),
       h('div.note', 'Ausgeblendet zählt der Count weiter (z. B. nur mit Klick).'),
-      h('div.note', 'Zählt nicht richtig? Bei der „1“ einer Acht pausieren und „Hier ist die 1“ drücken. Oder ab einer „1“ mindestens viermal im Takt T tippen.',
+      h('div.note', 'Zählt nicht richtig? Bei der „1“ einer Acht pausieren und „Anfangscount setzen“ drücken. Oder ab einer „1“ mindestens viermal im Takt T tippen.',
         song?.bpm ? ` Deezer kennt ${Math.round(song.bpm)} BPM für das Original.` : ''),
     ];
   };
@@ -779,7 +779,7 @@ export async function renderTrain(root, recId) {
         }, 'Entfernen')))
       : h('div',
         h('span.label.step-label', 'Songdatei (optional)'),
-        h('button.btn.small', { type: 'button', onclick: () => songFileIn.click() }, 'Songdatei laden'),
+        h('div.actions', h('button.btn.small', { type: 'button', onclick: () => songFileIn.click() }, 'Songdatei laden')),
         h('div.label', { style: { marginTop: '6px' } }, 'mp3, m4a, wav · zum Trainieren auf den Song.')));
   }
   songFileIn.addEventListener('change', () => setSongFile(songFileIn.files[0]));

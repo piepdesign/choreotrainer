@@ -34,11 +34,12 @@ export async function runIntro() {
   };
 
   // 1 · Wortmarke: Buchstaben weich einblenden, danach 1 s stehen lassen
+  // Wortmarke: in Animation und Ladebildschirm gleich aufgebaut (zwei Zeilen, © 0,55 em), nur die Größe unterscheidet sich
   const letters = (text, offset) => [...text].map((ch, i) => h('span', { style: { animationDelay: `${(i + offset) * 50}ms` } }, ch));
-  await show(h('div.intro-step.center',
-    h('h1.wide.intro-mark',
-      h('span.line', letters('CHOREO—', 0)),
-      h('span.line', letters('TRAINER', 7), h('sup', '©')))), { navVisible: false });
+  const mark = cls => h(`h1.wide.intro-mark${cls}`,
+    h('span.line', letters('CHOREO—', 0)),
+    h('span.line', letters('TRAINER', 7), h('sup', '©')));
+  await show(h('div.intro-step.center', mark('')), { navVisible: false });
   await wait(13 * 50 + 750 + 1000);
 
   const state = { name: settings().name || '', provider: settings().provider, theme: settings().theme, baseStats: [...settings().baseStats] };
@@ -79,7 +80,7 @@ export async function runIntro() {
           h('h1.wide', 'DEINE PRÄFERENZEN'),
           h('p.intro-lead', '(Alles später im Profil änderbar)'),
           preferences(state, patch => { Object.assign(state, patch); if (patch.theme) applyTheme(patch.theme); refreshNav(); },
-            loadAll().then(baseStats)));
+            loadAll().then(baseStats), { baseLabel: false }));
       },
       canGo: () => !!state.provider,
       skippable: true,
@@ -118,7 +119,7 @@ export async function runIntro() {
   // 5 · Übergang, mind. 3 s, damit alles lädt und der Text gelesen werden kann
   await show(h('div.intro-step.center',
     h('p.intro-lead', `Einen Moment ${state.name.toUpperCase()}, dein`),
-    h('h1.wide', 'CHOREO—TRAINER', h('sup', '©')),
+    mark('.static'),
     h('p.intro-lead', 'wird vorbereitet …'),
     h('div.intro-bar', h('i'))), { navVisible: false });
   await saveSettings({ introDone: true });
