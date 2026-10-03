@@ -53,7 +53,7 @@ export function baseStats({ classes, choreos, recordings, sessions, recsByChoreo
     last: { value: relDate(last) },
     week: { value: fmtDuration(week) },
     total: { value: fmtDuration(total) },
-    status: { value: avg },
+    status: { value: avg === '—' ? avg : `${avg} / 5` },
     choreos: { value: String(choreos.length) },
     duration: {
       value: known.length ? fmtMin(known.reduce((a, b) => a + b, 0)) : '—',

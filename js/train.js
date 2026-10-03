@@ -131,18 +131,16 @@ export async function renderTrain(root, recId) {
   const vTrack = h('div.track');
   const vFill = h('div.fill'), vPh = h('div.ph'), vStatic = h('div');
   vTrack.append(vStatic, vFill, vPh);
-  const vTime = h('span.time', '0:00.0');
   const sTrack = h('div.track');
   const sPh = h('div.ph'), sStatic = h('div');
   sTrack.append(sStatic, sPh);
-  const sTime = h('span.time', '');
-  const songRow = h('div.tl-row', h('span.label', 'Song'), sTrack, sTime);
+  const songRow = h('div.tl-row', h('span.label', 'Song'), sTrack);
   // 8er-Zeile: jede Acht ein Feld. Klick = diese Acht loopen, Ziehen oder ⇧-Klick = mehrere,
   // Klick auf die aktive Auswahl = Loop aus.
   const eTrack = h('div.track.eights');
-  const eInfo = h('span.time', '');
-  const eightRow = h('div.tl-row', h('span.label', '8er'), eTrack, eInfo);
-  const timeline = h('div.timeline', h('div.tl-row', h('span.label', 'Video'), vTrack, vTime), eightRow, songRow);
+  // Auswahl der Achten steht als Tooltip an der Zeile (Zeitangaben nur noch unten in der Bedienleiste)
+  const eightRow = h('div.tl-row', h('span.label', '8er'), eTrack);
+  const timeline = h('div.timeline', h('div.tl-row', h('span.label', 'Video'), vTrack), eightRow, songRow);
 
   scrub(vTrack, r => { video.currentTime = r * dur(); });
   scrub(sTrack, r => {
@@ -189,7 +187,7 @@ export async function renderTrain(root, recId) {
     }));
     const selCells = list.filter(x => looped && x.a >= la - 0.05 && x.b <= lb + 0.05);
     const lbl = x => x.i ?? 'Auftakt';
-    eInfo.textContent = selCells.length ? (selCells.length === 1 ? (selCells[0].i ? `Acht ${selCells[0].i}` : 'Auftakt') : `Achten ${lbl(selCells[0])}–${lbl(selCells.at(-1))}`) : '';
+    eTrack.title = selCells.length ? (selCells.length === 1 ? (selCells[0].i ? `Acht ${selCells[0].i}` : 'Auftakt') : `Achten ${lbl(selCells[0])}–${lbl(selCells.at(-1))}`) : '';
   }
   const cellAt = e => {
     const el = document.elementFromPoint(e.clientX, eTrack.getBoundingClientRect().top + 4);
@@ -250,7 +248,6 @@ export async function renderTrain(root, recId) {
     if (rec.songOffset == null || !song.duration) {
       sStatic.replaceChildren();
       sPh.hidden = true;
-      sTime.textContent = '';
       sTrack.title = 'Startpunkt im Song rechts unter SONG eintragen';
       return;
     }
@@ -306,13 +303,17 @@ export async function renderTrain(root, recId) {
   const applyPan = () => { video.style.objectPosition = `50% ${P.fitY ?? 50}%`; };
   applyPan();
   let panned = false;
+  video.draggable = false;
+  video.addEventListener('dragstart', e => e.preventDefault());
   stage.addEventListener('pointerdown', e => {
     if (fit !== 'width' || e.button !== 0 || document.fullscreenElement === stage) return;
+    if (e.target.closest('.count, button')) return;
     const y0 = e.clientY, start = P.fitY ?? 50;
     const vw = video.videoWidth, vh = video.videoHeight;
     // Überstand = wie viel Bild oben/unten abgeschnitten ist
     const over = vw && vh ? Math.max(0, (stage.clientWidth / vw) * vh - stage.clientHeight) : 0;
     if (over < 2) return;
+    e.preventDefault(); // keine Textauswahl / natives Ziehen des Videos
     panned = false;
     const move = ev => {
       const dy = ev.clientY - y0;
@@ -583,14 +584,13 @@ export async function renderTrain(root, recId) {
     }
 
     vFill.style.width = vPh.style.left = `${(t / d) * 100}%`;
-    setText(vTime, fmt(t, true));
-    setText(timeView, `${fmt(t, true)} / ${fmt(d, true)}`);
+    const songPos = song?.duration && rec.songOffset != null ? ` · Song ${fmt(rec.songOffset + t)}` : '';
+    setText(timeView, `${fmt(t, true)} / ${fmt(d, true)}${songPos}`);
     setText(bPlay, video.paused ? '▶' : '❚❚');
     if (songMode() && !video.paused) syncSong();
     if (song?.duration && rec.songOffset != null) {
       const st = rec.songOffset + t;
       sPh.style.left = `${(st / song.duration) * 100}%`;
-      setText(sTime, `${fmt(st)} / ${fmt(song.duration)}`);
     }
 
     if (P.countOn && P.bpm) {
@@ -916,7 +916,7 @@ export async function renderTrain(root, recId) {
     panelBtn,
     h('h1.wide', inlineEdit((choreo.title || song?.title || 'Ohne Song').toUpperCase(), async v => { choreo.title = v; await db.put('choreos', choreo); }), song?.artist ? h('span.muted', { style: { fontWeight: 600 } }, ` — ${song.artist.toUpperCase()}`) : ''));
   const mainCol = h('div.train-main', crumbs, stage, timeline, controls);
-  const trainEl = h(`div.train${panelState.open ? '' : '.panel-closed'}`, { style: { '--cc': `#${color}` } }, mainCol, side);
+  const trainEl = h(`div.train${panelState.open ? '' : '.panel-closed'}`, { style: { '--cc': `#${color}`, '--cc-text': textOn(color) } }, mainCol, side);
   const setPanel = open => {
     trainEl.classList.toggle('panel-closed', !open);
     panelIcon(open);
@@ -938,12 +938,15 @@ export async function renderTrain(root, recId) {
     if (!stacked) {
       const used = crumbs.offsetHeight + timeline.offsetHeight + controls.offsetHeight + 28;
       const avail = Math.max(180, mainCol.clientHeight - used);
-      // Breite füllen: volle Höhe nutzen, Video wird beschnitten. Komplett zeigen: so groß wie es ganz passt.
-      hgt = fit === 'width' ? avail : Math.min(hgt, avail);
+      // Breite füllen: Video so breit wie die Spalte, was über die verfügbare Höhe hinausgeht, wird oben/unten
+      // beschnitten (und lässt sich verschieben). Vorher wurde die Fläche auf volle Höhe gezogen, dann schnitt
+      // „cover“ bei Querformat links/rechts ab und es gab nichts zu verschieben.
+      hgt = Math.min(hgt, avail);
     }
     stage.style.height = `${Math.round(hgt)}px`;
     // Fläche so breit wie das Video, mittig (keine schwarzen Seitenbalken, wenn die Höhe begrenzt)
     stage.style.width = fit === 'width' ? `${w}px` : `${Math.min(w, Math.round(hgt * ratio))}px`;
+    stage.classList.toggle('can-pan', fit === 'width' && w / ratio - hgt > 2);
     // Panel schließt unten mit der Bedienleiste ab
     side.style.height = stacked ? '' : `${Math.round(controls.getBoundingClientRect().bottom - mainCol.getBoundingClientRect().top)}px`;
   }

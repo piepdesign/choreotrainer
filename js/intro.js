@@ -5,6 +5,8 @@ import { h } from './util.js';
 import { settings, saveSettings, applyTheme, BASE_STATS } from './settings.js';
 import { classManager } from './classform.js';
 import { preferences } from './ui.js';
+import { loadAll } from './hub.js';
+import { baseStats } from './stats.js';
 import { db } from './db.js';
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -69,7 +71,8 @@ export async function runIntro() {
         return h('div.intro-step',
           h('h1.wide', 'DEINE PRÄFERENZEN'),
           h('p.intro-lead', '(Alles später im Profil änderbar)'),
-          preferences(state, patch => { Object.assign(state, patch); if (patch.theme) applyTheme(patch.theme); refreshNav(); }));
+          preferences(state, patch => { Object.assign(state, patch); if (patch.theme) applyTheme(patch.theme); refreshNav(); },
+            loadAll().then(baseStats)));
       },
       canGo: () => !!state.provider,
       skippable: true,

@@ -5,7 +5,7 @@ export const BASE_STATS = [
   ['last', 'Zuletzt geübt'],
   ['week', 'Übungszeit Woche'],
   ['total', 'Übungszeit gesamt'],
-  ['status', 'Ø Status (1–5)'],
+  ['status', 'Ø Status'],
   ['choreos', 'Choreos'],
   ['duration', 'Dauer gesamt'],
   ['streak', 'Serie'],

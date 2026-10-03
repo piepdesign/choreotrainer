@@ -12,7 +12,7 @@ export function h(tag, attrs, ...children) {
   for (const [k, v] of Object.entries(attrs || {})) {
     if (v == null || v === false) continue;
     if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
-    else if (k === 'style' && typeof v === 'object') Object.assign(node.style, v);
+    else if (k === 'style' && typeof v === 'object') for (const [p, x] of Object.entries(v)) { if (p.startsWith('--')) node.style.setProperty(p, x); else if (x != null) node.style[p] = x; }
     else if (k === 'html') node.innerHTML = v;
     else node.setAttribute(k, v === true ? '' : v);
   }
@@ -156,12 +156,14 @@ export function inlineEdit(text, onSave, { href = null, clickToEdit = !href, pla
   return wrap;
 }
 
+// right: Text oder Liste von Texten (eigene Spalten, ebenfalls zeilenübergreifend bündig)
 // Class als Zellen: Titel · Wochentag · Uhrzeit · Coach. In Listen (.stripes, .cm-list) stehen die
 // Zellen per Subgrid zeilenübergreifend bündig untereinander.
 export function classCells(c) {
   return [
     h('span.cc-title', classTitle(c).toUpperCase()),
     ...[c.weekday, c.time, c.coach].map(v => h('span.cc-meta', v ? String(v).toUpperCase() : '')),
+    h('span.cc-gap'), // dehnbarer Abstand, danach die rechten Angaben
   ];
 }
 
@@ -171,5 +173,5 @@ export function stripe(c, right, onclick) {
     href: onclick ? null : `#/class/${c.id}`,
     style: { background: `#${color}`, color: textOn(color) },
     onclick,
-  }, ...classCells(c), h('span.cc-right', right ?? ''));
+  }, ...classCells(c), ...[].concat(right ?? '').map(r => h('span.cc-right', r)));
 }

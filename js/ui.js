@@ -79,8 +79,9 @@ export function icon(name) {
 }
 
 // Präferenzen (Intro und Profil gleich): Ansicht als Umschalter, Musikprovider als Kacheln mit Logo,
-// Statistiken als An/Aus-Chips. values: { theme, provider, baseStats } · onChange(patch)
-export function preferences(values, onChange) {
+// Statistiken als Kacheln wie in der Base. values: { theme, provider, baseStats } · onChange(patch)
+// statValues: { id: { value } } bzw. Promise darauf, für echte Werte in den Kacheln
+export function preferences(values, onChange, statValues = null) {
   const block = (title, control) => h('div.pref-block', h('h3.p-sub', title), control);
   // Einzelauswahl; render(neu) setzt die Markierung
   const single = (cls, options, value, content) => {
@@ -92,22 +93,82 @@ export function preferences(values, onChange) {
     render(value);
     return el;
   };
-  const cur = new Set(values.baseStats || []);
-  const chips = h('div.stat-chips', BASE_STATS.map(([id, label]) => {
-    const btn = h(`button.stat-chip${cur.has(id) ? '.on' : ''}`, {
-      type: 'button', role: 'switch', 'aria-checked': String(cur.has(id)),
-      onclick: () => {
-        if (cur.has(id)) cur.delete(id); else cur.add(id);
-        btn.classList.toggle('on', cur.has(id));
-        btn.setAttribute('aria-checked', String(cur.has(id)));
-        onChange({ baseStats: BASE_STATS.map(x => x[0]).filter(x => cur.has(x)) });
-      },
-    }, h('i.check'), label);
-    return btn;
-  }));
+  const chips = statPicker(values.baseStats || [], statValues, list => onChange({ baseStats: list }));
   return h('div.prefs',
     block('Musikprovider', single('provider-tiles', PROVIDERS, values.provider,
       ([id, name]) => [h('i.brand', { html: brandSvg(id) }), h('span', name)])),
-    block('Ansicht', single('segmented', [['system', 'Wie System'], ['light', 'Hell'], ['dark', 'Dunkel']], values.theme, ([, label]) => label)),
-    block('Statistiken', chips));
+    block('Statistiken', chips),
+    block('Ansicht', single('segmented', [['system', 'Wie System'], ['light', 'Hell'], ['dark', 'Dunkel']], values.theme, ([, label]) => label)));
+}
+
+// Statistik-Kacheln wie in der Base. Oben die gezeigten, unten die übrigen.
+// Klick verschiebt eine Kachel in die andere Fläche (oben ans Ende). Ziehen setzt sie an jede Stelle,
+// auch zwischen zwei andere; der Rest ordnet sich beim Ziehen sofort neu an.
+export function statPicker(selected, values, onChange) {
+  let vals = values && !values.then ? values : {};
+  const label = id => BASE_STATS.find(x => x[0] === id)?.[1] || id;
+  const tile = id => h('div.stat.pick-tile', { 'data-id': id }, h('span.label', label(id)), h('b', vals[id]?.value ?? '—'));
+  const shown = h('div.stats.stat-zone.zone-in');
+  const rest = h('div.stats.stat-zone.zone-out');
+  const hintIn = h('p.zone-empty', 'Hierher ziehen oder unten anklicken');
+  const hintOut = h('p.zone-empty', 'Alle Statistiken sind in deiner Base');
+  let sel = selected.filter(id => BASE_STATS.some(x => x[0] === id));
+  function render() {
+    shown.replaceChildren(...sel.map(tile), hintIn);
+    rest.replaceChildren(...BASE_STATS.map(x => x[0]).filter(id => !sel.includes(id)).map(tile), hintOut);
+  }
+  const commit = () => {
+    sel = [...shown.querySelectorAll('.pick-tile')].map(t => t.dataset.id);
+    render();
+    onChange(sel);
+  };
+  // Einfügestelle: erste Kachel, vor der der Zeiger liegt (Lesereihenfolge, zeilenweise)
+  const before = (zone, x, y, self) => [...zone.querySelectorAll('.pick-tile')].filter(t => t !== self).find(t => {
+    const r = t.getBoundingClientRect();
+    return y < r.top || (y <= r.bottom && x < r.left + r.width / 2);
+  }) || zone.querySelector('.zone-empty');
+  const box = h('div.stat-picker', h('span.label.zone-label', 'In deiner Base'), shown, h('span.label.zone-label', 'Weitere'), rest);
+  box.addEventListener('pointerdown', e => {
+    const t = e.target.closest('.pick-tile');
+    if (!t || e.button !== 0) return;
+    e.preventDefault();
+    const x0 = e.clientX, y0 = e.clientY;
+    let ghost = null;
+    const move = ev => {
+      if (!ghost) {
+        if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return;
+        const r = t.getBoundingClientRect();
+        ghost = t.cloneNode(true);
+        ghost.classList.add('pick-ghost');
+        Object.assign(ghost.style, { width: `${r.width}px`, height: `${r.height}px`, left: `${r.left}px`, top: `${r.top}px` });
+        ghost.dx = x0 - r.left; ghost.dy = y0 - r.top;
+        document.body.append(ghost);
+        t.classList.add('pick-hole');
+        document.body.classList.add('is-sorting');
+      }
+      ghost.style.left = `${ev.clientX - ghost.dx}px`;
+      ghost.style.top = `${ev.clientY - ghost.dy}px`;
+      // Fläche unter dem Zeiger: oben einsortieren, unten zurücklegen
+      const rIn = shown.getBoundingClientRect(), rOut = rest.getBoundingClientRect();
+      const zone = ev.clientY < (rIn.bottom + rOut.top) / 2 ? shown : rest;
+      const ref = before(zone, ev.clientX, ev.clientY, t);
+      if (t.nextSibling !== ref || t.parentNode !== zone) zone.insertBefore(t, ref);
+    };
+    const up = () => {
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+      removeEventListener('pointercancel', up);
+      document.body.classList.remove('is-sorting');
+      if (ghost) { ghost.remove(); t.classList.remove('pick-hole'); commit(); return; }
+      // Klick: in die andere Fläche, oben ans Ende
+      if (t.parentNode === shown) rest.prepend(t); else shown.insertBefore(t, hintIn);
+      commit();
+    };
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+    addEventListener('pointercancel', up);
+  });
+  render();
+  if (values?.then) values.then(v => { vals = v || {}; render(); }).catch(() => {});
+  return box;
 }

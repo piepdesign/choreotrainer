@@ -82,7 +82,7 @@ function hbars(items, unit = 'min') {
     h('span.hb-val', `${i.value} ${unit}`))));
 }
 
-// Kalender-Heatmap: 26 Wochen × 7 Tage, aktuelle Woche markiert
+// Kalender-Heatmap: so viele Wochen, wie in die Breite passen, × 7 Tage, aktuelle Woche markiert
 // Farbe = Class, die an dem Tag am meisten geübt wurde, Deckkraft = Minuten
 function heatmap(sessions, choreoTitle, colorOf) {
   const byDay = new Map();
@@ -96,16 +96,18 @@ function heatmap(sessions, choreoTitle, colorOf) {
     byDay.set(k, e);
   }
   const mainColor = e => [...(e?.byColor || [])].sort((a, b) => b[1] - a[1])[0]?.[0];
-  const weeks = 26, gap = 3, left = 30, top = 22;
+  const gap = 3, left = 30, top = 22, target = 16; // Zielgröße einer Zelle
   const thisWeek = weekStart();
-  const first = thisWeek - (weeks - 1) * 7 * DAY;
   const level = sec => (sec <= 0 ? 0 : sec < 600 ? 1 : sec < 1200 ? 2 : sec < 2400 ? 3 : 4);
   const monthNames = ['JAN', 'FEB', 'MÄR', 'APR', 'MAI', 'JUN', 'JUL', 'AUG', 'SEP', 'OKT', 'NOV', 'DEZ'];
   // In echter Pixelbreite zeichnen, damit die Beschriftung klein und gleich groß bleibt (kein Mitskalieren)
+  // Volle Breite: so viele Wochen, wie bei ~16 px Zellen hineinpassen (13 bis 53), Zellen genau auf Breite gestreckt
   function draw(width) {
-    const cell = Math.max(8, Math.min(22, Math.floor((width - left) / weeks) - gap));
-    const step = cell + gap;
-    const W = left + weeks * step, H = top + 7 * step;
+    const weeks = Math.max(13, Math.min(53, Math.floor((width - left) / (target + gap))));
+    const step = (width - left) / weeks;
+    const cellW = step - gap, cell = Math.min(cellW, 22), vstep = cell + gap; // Höhe gedeckelt, Breite füllt
+    const first = thisWeek - (weeks - 1) * 7 * DAY;
+    const W = width, H = top + 7 * vstep;
     const months = [];
     const nodes = [];
     for (let w = 0; w < weeks; w++) {
@@ -120,7 +122,7 @@ function heatmap(sessions, choreoTitle, colorOf) {
         const date = new Date(day).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
         const col = sec ? mainColor(e) : null;
         nodes.push(svg('rect', {
-          x: left + w * step, y: top + d * step, width: cell, height: cell, rx: 2,
+          x: left + w * step, y: top + d * vstep, width: cellW, height: cell, rx: 2,
           class: `hm l${level(sec)}${ws === thisWeek ? ' cur' : ''}`,
           style: col ? `fill:#${col}` : null,
           'data-tip': sec ? `${date}: ${min(sec) || '<1'} min · ${[...e.choreos].join(', ')}` : `${date}: nicht geübt`,
@@ -131,16 +133,16 @@ function heatmap(sessions, choreoTitle, colorOf) {
     const shown = months.filter((m, i) => i === months.length - 1 || months[i + 1].x - m.x >= 30);
     return svg('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, class: 'heatmap' },
       shown.map(m => svg('text', { x: m.x, y: 12, class: 'axis' }, monthNames[m.m])),
-      ['M', 'D', 'M', 'D', 'F', 'S', 'S'].map((d, k) => svg('text', { x: 0, y: top + k * step + cell / 2 + 4, class: 'axis' }, d)),
+      ['M', 'D', 'M', 'D', 'F', 'S', 'S'].map((d, k) => svg('text', { x: 0, y: top + k * vstep + cell / 2 + 4, class: 'axis' }, d)),
       // Rahmen um die aktuelle Woche
-      svg('rect', { x: left + (weeks - 1) * step - 2, y: top - 2, width: cell + 4, height: 7 * step + 1, rx: 3, class: 'curweek' }),
+      svg('rect', { x: left + (weeks - 1) * step - 2, y: top - 2, width: cellW + 4, height: 7 * vstep + 1, rx: 3, class: 'curweek' }),
       nodes);
   }
   const plot = h('div.heat-plot');
   let lastW = 0;
   const ro = new ResizeObserver(() => {
     if (!plot.isConnected) { ro.disconnect(); return; }
-    const w = Math.min(plot.clientWidth, 980);
+    const w = plot.clientWidth;
     if (Math.abs(w - lastW) < 4) return;
     lastW = w;
     plot.replaceChildren(draw(w));
@@ -355,11 +357,12 @@ export async function renderProfile(root, section) {
 
   // ── Classes ──
   const classSec = sect('classes', 'CLASSES',
-    h('div.stripes', classes.map(c => {
+    // rechte Angaben als eigene Spalten; Wochentag/Uhrzeit stehen schon links, daher nur „in 4 Tagen“
+    h('div.stripes', { style: { '--rc': 3 } }, classes.map(c => {
       const mine = choreos.filter(x => x.classId === c.id);
       const sec = real.filter(x => mine.some(m => m.id === x.choreoId)).reduce((t, x) => t + x.seconds, 0);
-      const nc = nextClass(c);
-      return stripe(c, `${mine.length} CHOREO${mine.length === 1 ? '' : 'S'} · ${fmtDuration(sec).toUpperCase()}${nc ? ' · ' + nc.toUpperCase() : ''}`);
+      const nc = nextClass(c)?.split(' · ').at(-1) || '';
+      return stripe(c, [`${mine.length} CHOREO${mine.length === 1 ? '' : 'S'}`, fmtDuration(sec).toUpperCase(), nc.toUpperCase()]);
     })),
     h('details.p-add', h('summary.linkbtn', 'Classes verwalten'), classManager(() => go('#/profile/classes', { keep: true }))));
 
@@ -377,7 +380,7 @@ export async function renderProfile(root, section) {
 
   // ── Präferenzen und Konto ──
   const prefs = sect('prefs', 'PRÄFERENZEN',
-    preferences(s, async patch => { if (patch.theme) applyTheme(patch.theme); await saveSettings(patch); }));
+    preferences(s, async patch => { if (patch.theme) applyTheme(patch.theme); await saveSettings(patch); }, baseStats(all)));
 
   const nameIn = h('input.caps', { type: 'text', value: (s.name || '').toUpperCase(), placeholder: 'DEIN NAME' });
   const saveName = async () => { if (!nameIn.value.trim()) return; await saveSettings({ name: nameIn.value.trim().toUpperCase() }); toast('Name gespeichert'); go('#/profile/account', { keep: true }); };
