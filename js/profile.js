@@ -434,9 +434,9 @@ export async function renderProfile(root, section) {
     h('div.acc',
       // Name + Tester*in in einer Kachel; Tester*in wirkt sofort (Knopf unten rechts für Bug-Meldungen und Ideen)
       accRow('Profil', [
-        h('div.field', h('span', 'Name'), h('div.acc-inline', nameIn, h('button.btn.small', { type: 'button', onclick: saveName }, 'Speichern'))),
+        h('label.field', h('span', 'Name'), nameIn),
         h('div.field.acc-tester', h('span', 'Tester*in'), testerSeg()),
-      ], null),
+      ], h('button.btn.small', { type: 'button', onclick: saveName }, 'Speichern')),
       accRow('Neustart', [h('p.acc-lead', 'Setzt zurück:'), h('ul.acc-list', h('li', 'Name'), h('li', 'Präferenzen'), h('li', 'Panel-Anordnung')),
           h('p.acc-note', 'Das Intro startet neu. Classes, Choreos, Videos und Statistiken bleiben erhalten.')],
         h('button.btn.small', {

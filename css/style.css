@@ -662,5 +662,4 @@ body.intro-open .tester-fab { display: none; }
 .tester-fab.open .fab-main { transform: rotate(-8deg); }
 .fab-main svg, .fab-action svg { display: block; }
 .acc-tester { margin-top: 14px; }
-.acc-inline { display: flex; gap: 10px; align-items: center; }
-.acc-inline input { flex: 1; min-width: 0; }
+.pref-hint { margin: -6px 0 12px; font-size: 12px; line-height: 1.5; color: var(--muted); }

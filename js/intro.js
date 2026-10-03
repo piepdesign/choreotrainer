@@ -99,7 +99,7 @@ export async function runIntro() {
           h('h1.wide', 'DEINE PRÄFERENZEN'),
           h('p.intro-lead', '(Alles später im Profil änderbar)'),
           preferences(state, patch => { Object.assign(state, patch); if (patch.theme) applyTheme(patch.theme); refreshNav(); },
-            loadAll().then(baseStats), { baseLabel: false, tester: true }));
+            loadAll().then(baseStats), { baseLabel: false, tester: true, hints: true }));
       },
       canGo: () => !!state.provider,
       skippable: true,

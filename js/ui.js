@@ -106,8 +106,16 @@ export function icon(name) {
 // Präferenzen (Intro und Profil gleich): Ansicht als Umschalter, Musikprovider als Kacheln mit Logo,
 // Statistiken als Kacheln wie in der Base. values: { theme, provider, baseStats } · onChange(patch)
 // statValues: { id: { value } } bzw. Promise darauf, für echte Werte in den Kacheln
-export function preferences(values, onChange, statValues = null, { baseLabel = true, tester = false } = {}) {
-  const block = (title, control) => h('div.pref-block', h('h3.p-sub', title), control);
+export function preferences(values, onChange, statValues = null, { baseLabel = true, tester = false, hints = false } = {}) {
+  // hints: im Intro ein Satz unter jedem Titel, was die Einstellung bewirkt
+  const HINTS = {
+    'Musikprovider': 'Hier öffnen sich erkannte Songs: in der App, wenn sie installiert ist, sonst im Browser.',
+    'Song-Cover Hörprobe': 'Fährst du mit der Maus über ein Song-Cover, spielt eine 30-Sekunden-Hörprobe in dieser Lautstärke.',
+    'Tester*in': 'Blendet unten rechts einen Knopf ein, über den du Bugs und Ideen direkt per Mail meldest.',
+    'Statistiken': 'Diese Kennzahlen zeigt deine Base. Klicke oder ziehe Kacheln hinein oder heraus.',
+    'Ansicht': 'Hell, dunkel oder automatisch passend zu deinem System.',
+  };
+  const block = (title, control) => h('div.pref-block', h('h3.p-sub', title), hints ? h('p.pref-hint', HINTS[title]) : null, control);
   // Einzelauswahl; render(neu) setzt die Markierung
   // Einzelauswahl als Kacheln (Musikprovider, Ansicht); key = Name der Einstellung
   const single = (key, options, value, content) => {
