@@ -7,6 +7,7 @@ import { alignToSong, checkAudio } from './align.js';
 import { recTitle } from './hub.js';
 import { go, toast } from './app.js';
 import { settings, saveSettings, PANEL_SECTIONS } from './settings.js';
+import { icon } from './ui.js';
 
 const MARKER_TYPES = {
   start: { label: 'START', color: 'var(--fg)', key: 'S' },
@@ -284,6 +285,23 @@ export async function renderTrain(root, recId) {
     else (stage.requestFullscreen || stage.webkitRequestFullscreen)?.call(stage);
   };
   const bFull = ctl('Vollbild', { title: 'Vollbild (F)', onclick: toggleFull });
+  // Video: Breite füllen (Bild wird oben/unten beschnitten) oder komplett zeigen
+  let fit = settings().videoFit === 'width' ? 'width' : 'all';
+  const bFitW = h('button.ctl.icon-ctl', { type: 'button', title: 'Breite füllen', 'aria-label': 'Breite füllen', html: icon('fitWidth') });
+  const bFitA = h('button.ctl.icon-ctl', { type: 'button', title: 'Komplett zeigen', 'aria-label': 'Komplett zeigen', html: icon('fitAll') });
+  const setFit = v => {
+    fit = v;
+    bFitW.classList.toggle('on', v === 'width');
+    bFitA.classList.toggle('on', v === 'all');
+    stage.classList.toggle('fill', v === 'width');
+    saveSettings({ videoFit: v });
+    fitStage();
+  };
+  bFitW.addEventListener('click', () => setFit('width'));
+  bFitA.addEventListener('click', () => setFit('all'));
+  bFitW.classList.toggle('on', fit === 'width');
+  bFitA.classList.toggle('on', fit === 'all');
+  stage.classList.toggle('fill', fit === 'width');
   stage.addEventListener('dblclick', toggleFull);
   const bMark = ctl('+ Marker', { title: 'Marker setzen', onclick: e => popover(e.currentTarget, markPop) });
   const toggleAudio = () => {
@@ -297,7 +315,7 @@ export async function renderTrain(root, recId) {
   const timeView = h('span.timeview', '');
   const controls = h('div.controls', { style: { position: 'relative' } },
     bPlay, h('span.ctl-sep'), bMirror, bRate, bVol, bImg, h('span.ctl-sep'), bIn, bOut, bLoop, bClear,
-    h('span.ctl-sep'), bCount, bBpm, h('span.ctl-sep'), bAudio, bMark, bFull, timeView);
+    h('span.ctl-sep'), bCount, bBpm, h('span.ctl-sep'), bAudio, bMark, h('span.ctl-sep'), bFitW, bFitA, bFull, timeView);
 
   function update() {
     applyVideo();
@@ -787,17 +805,18 @@ export async function renderTrain(root, recId) {
   for (const key of panelState.order.filter(k => SECTIONS[k])) {
     const [label, body] = SECTIONS[key];
     const collapsed = panelState.collapsed.includes(key);
-    const handle = h('span.drag-handle', { title: 'Ziehen zum Umsortieren', 'aria-hidden': 'true' }, '⠿');
+    const handle = h('span.drag-handle', { 'aria-hidden': 'true', html: icon('grip') });
     const headBtn = h('button.panel-toggle', { type: 'button', 'aria-expanded': String(!collapsed) }, h('span.label', label), h('span.chev', '▾'));
     const sec = h(`section.panel-sec${collapsed ? '.collapsed' : ''}`, { 'data-k': key },
       h('div.panel-head', handle, headBtn),
       h('div.panel-body', ...body));
     headBtn.addEventListener('click', () => {
+      if (sec.dataset.dragged) { delete sec.dataset.dragged; return; } // nach dem Ziehen nicht zuklappen
       sec.classList.toggle('collapsed');
       headBtn.setAttribute('aria-expanded', String(!sec.classList.contains('collapsed')));
       savePanel();
     });
-    sortableSection(sec, handle);
+    sortableSection(sec, sec.querySelector('.panel-head'));
     sectionEls[key] = sec;
     side.append(sec);
   }
@@ -808,32 +827,45 @@ export async function renderTrain(root, recId) {
     collapsed: [...side.querySelectorAll('.panel-sec.collapsed')].map(x => x.dataset.k),
   } });
   // Abschnitt am Griff ziehen und zwischen den anderen ablegen
-  function sortableSection(sec, handle) {
-    handle.addEventListener('pointerdown', e => {
+  // Ganzer Abschnittskopf ist Griff: erst ab 6 px Bewegung wird gezogen, sonst bleibt es ein Klick (auf/zu)
+  function sortableSection(sec, head) {
+    head.title = 'Klicken: auf/zu · Ziehen: umsortieren';
+    head.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
-      e.preventDefault();
-      try { handle.setPointerCapture(e.pointerId); } catch { /* ohne Zeigerfang weiter */ }
-      sec.classList.add('dragging');
+      const y0 = e.clientY;
+      let active = false;
       const move = ev => {
         if (!(ev.buttons & 1)) { up(); return; }
+        if (!active) {
+          if (Math.abs(ev.clientY - y0) < 6) return;
+          active = true;
+          sec.classList.add('dragging');
+          document.body.classList.add('dragging-now');
+        }
+        ev.preventDefault();
         const others = [...side.querySelectorAll('.panel-sec:not(.dragging)')];
         const after = others.find(o => ev.clientY < o.getBoundingClientRect().top + o.offsetHeight / 2);
-        side.insertBefore(sec, after || null);
+        if (after !== sec.nextElementSibling) side.insertBefore(sec, after || null);
       };
       const up = () => {
-        handle.removeEventListener('pointermove', move);
-        handle.removeEventListener('pointerup', up);
-        handle.removeEventListener('pointercancel', up);
+        removeEventListener('pointermove', move);
+        removeEventListener('pointerup', up);
+        removeEventListener('pointercancel', up);
+        if (!active) return;
         sec.classList.remove('dragging');
+        document.body.classList.remove('dragging-now');
+        sec.dataset.dragged = '1';
+        setTimeout(() => delete sec.dataset.dragged, 0);
         savePanel();
       };
-      handle.addEventListener('pointermove', move);
-      handle.addEventListener('pointerup', up);
-      handle.addEventListener('pointercancel', up);
+      addEventListener('pointermove', move);
+      addEventListener('pointerup', up);
+      addEventListener('pointercancel', up);
     });
   }
 
-  const panelBtn = h('button.ctl.panel-btn', { type: 'button', title: 'Seitenpanel ein/aus (P)' });
+  const panelBtn = h('button.ctl.icon-ctl.panel-btn', { type: 'button', title: 'Seitenpanel ein/aus (P)', 'aria-label': 'Seitenpanel ein/aus' });
+  const panelIcon = open => { panelBtn.innerHTML = icon(open ? 'panelOpen' : 'panelClosed'); panelBtn.classList.toggle('on', open); };
   const crumbs = h('div.crumbs',
     h('a.tag', { href: `#/class/${cls.id}`, style: { background: `#${color}`, color: textOn(color) } }, classTitle(cls).toUpperCase()),
     h('span.label', classMeta(cls)),
@@ -844,12 +876,12 @@ export async function renderTrain(root, recId) {
   const trainEl = h(`div.train${panelState.open ? '' : '.panel-closed'}`, { style: { '--cc': `#${color}` } }, mainCol, side);
   const setPanel = open => {
     trainEl.classList.toggle('panel-closed', !open);
-    panelBtn.textContent = open ? 'Panel ›' : '‹ Panel';
+    panelIcon(open);
     savePanel();
     fitStage();
   };
   panelBtn.addEventListener('click', () => setPanel(trainEl.classList.contains('panel-closed')));
-  panelBtn.textContent = panelState.open ? 'Panel ›' : '‹ Panel';
+  panelIcon(panelState.open);
   togglePanel = () => setPanel(trainEl.classList.contains('panel-closed'));
   root.append(trainEl);
 
@@ -862,11 +894,15 @@ export async function renderTrain(root, recId) {
     let hgt = w / ratio;
     if (!stacked) {
       const used = crumbs.offsetHeight + timeline.offsetHeight + controls.offsetHeight + 28;
-      hgt = Math.min(hgt, Math.max(180, mainCol.clientHeight - used));
+      const avail = Math.max(180, mainCol.clientHeight - used);
+      // Breite füllen: volle Höhe nutzen, Video wird beschnitten. Komplett zeigen: so groß wie es ganz passt.
+      hgt = fit === 'width' ? avail : Math.min(hgt, avail);
     }
     stage.style.height = `${Math.round(hgt)}px`;
     // Fläche so breit wie das Video, mittig (keine schwarzen Seitenbalken, wenn die Höhe begrenzt)
-    stage.style.width = `${Math.min(w, Math.round(hgt * ratio))}px`;
+    stage.style.width = fit === 'width' ? `${w}px` : `${Math.min(w, Math.round(hgt * ratio))}px`;
+    // Panel schließt unten mit der Bedienleiste ab
+    side.style.height = stacked ? '' : `${Math.round(controls.getBoundingClientRect().bottom - mainCol.getBoundingClientRect().top)}px`;
   }
   const ro = new ResizeObserver(() => fitStage());
   ro.observe(mainCol);

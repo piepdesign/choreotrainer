@@ -27,6 +27,10 @@ let trail = [];
 try { trail = JSON.parse(sessionStorage.getItem('ct-trail')) || []; } catch { /* leer starten */ }
 let replaceNext = false;
 let keepScroll = false;
+let restoreY = null; // Scrollposition beim Zurückgehen
+const scrolls = {}; // Hash → zuletzt gesehene Scrollposition
+let current = null;
+const save = () => { try { sessionStorage.setItem('ct-trail', JSON.stringify(trail)); } catch { /* egal */ } };
 
 function remember(hash) {
   if (replaceNext && trail.length) trail[trail.length - 1] = hash;
@@ -34,25 +38,40 @@ function remember(hash) {
   else if (trail[trail.length - 1] !== hash) trail.push(hash);
   replaceNext = false;
   trail = trail.slice(-50);
-  try { sessionStorage.setItem('ct-trail', JSON.stringify(trail)); } catch { /* egal */ }
+  save();
   backBtn.hidden = hash === '#/';
 }
 
 export function back() {
-  location.hash = trail[trail.length - 2] || '#/';
+  const prev = trail[trail.length - 2] || '#/';
+  restoreY = scrolls[prev] ?? null;
+  location.hash = prev;
+}
+
+// Adresse ohne Neuaufbau ändern (z. B. Abschnitt im Profil), Verlauf zieht mit
+export function replaceHash(hash) {
+  history.replaceState(null, '', hash);
+  if (trail.length) trail[trail.length - 1] = hash; else trail.push(hash);
+  if (current) scrolls[hash] = scrollY;
+  current = hash;
+  save();
 }
 backBtn.addEventListener('click', back);
 
 async function route() {
   if (cleanup) { try { await cleanup(); } catch (e) { console.error(e); } cleanup = null; }
+  if (current) scrolls[current] = scrollY;
   const hash = location.hash || '#/';
   for (const [re, fn, nav] of routes) {
     const m = hash.match(re);
     if (!m) continue;
-    remember(hash.match(/^#?\/?$/) ? '#/' : hash);
+    current = hash.match(/^#?\/?$/) ? '#/' : hash;
+    remember(current);
     document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === nav));
     const y = keepScroll ? scrollY : 0;
+    const back = restoreY;
     keepScroll = false;
+    restoreY = null;
     view.replaceChildren();
     try {
       cleanup = (await fn(m)) || null;
@@ -61,6 +80,8 @@ async function route() {
       view.replaceChildren(h('p.empty', `Fehler: ${e.message}`));
     }
     window.scrollTo(0, y);
+    // zurück: dort weiter, wo man war (nach dem Aufbau, auch gegen Abschnitts-Sprünge der Seite)
+    if (back != null) requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, back)));
     return;
   }
   location.hash = '#/';

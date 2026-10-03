@@ -2,6 +2,7 @@
 import { db, uid } from './db.js';
 import { h, fmt, parseTime, isoDate, classTitle, classMeta, PALETTE, textOn, WEEKDAYS, byClassOrder, CLASS_TITLES, CLASS_LEVELS } from './util.js';
 import { songPicker, songKeyOf } from './song.js';
+import { classPickers } from './ui.js';
 import { dropzone } from './hub.js';
 import { state, go, toast } from './app.js';
 
@@ -24,17 +25,15 @@ export async function renderUpload(root, kind, refId) {
 
   // ── Class ──
   const f = {
-    category: h('input', { type: 'text', list: 'dl-cat', placeholder: 'Hip Hop' }),
-    level: h('input', { type: 'text', list: 'dl-lvl', placeholder: 'Lvl 2' }),
+    ...classPickers(classes, { styles: CLASS_TITLES, levels: CLASS_LEVELS }),
     weekday: h('select', h('option', { value: '' }, '—'), WEEKDAYS.map(d => h('option', d))),
     time: h('input', { type: 'time' }),
-    coach: h('input', { type: 'text', list: 'dl-coach', placeholder: 'Name' }),
   };
   const fill = c => { for (const k of Object.keys(f)) f[k].value = c?.[k] || ''; };
   const chips = h('div.chips', classes.map(c => h('button.chip', {
     type: 'button', style: { background: `#${c.color}`, color: textOn(c.color) },
     onclick: e => { fill(c); chips.querySelectorAll('.chip').forEach(x => x.classList.remove('sel')); e.currentTarget.classList.add('sel'); },
-  }, `${classTitle(c)} ${classMeta(c)}`.toUpperCase())));
+  }, `${classTitle(c)}${classMeta(c) ? ' · ' + classMeta(c) : ''}`.toUpperCase())));
   if (preClass) fill(preClass);
   const field = (label, input) => h('label.field', h('span', label), input);
 
@@ -75,9 +74,6 @@ export async function renderUpload(root, kind, refId) {
   }
 
   root.append(
-    h('datalist', { id: 'dl-cat' }, [...new Set([...CLASS_TITLES, ...classes.map(c => c.category)])].filter(Boolean).map(v => h('option', { value: v }))),
-    h('datalist', { id: 'dl-lvl' }, [...new Set([...CLASS_LEVELS, ...classes.map(c => c.level)])].filter(Boolean).map(v => h('option', { value: v }))),
-    h('datalist', { id: 'dl-coach' }, [...new Set(classes.map(c => c.coach))].filter(Boolean).map(v => h('option', { value: v }))),
     h('div.section-head', { style: { marginTop: '18px' } },
       h('h2.wide', preChoreo ? 'NEUE AUFNAHME' : 'UPLOAD'),
       preChoreo ? h('span.label', `zu ${preChoreo.song?.title || 'Choreo'}`) : null),
@@ -86,7 +82,7 @@ export async function renderUpload(root, kind, refId) {
       h('div',
         h('div.fieldset', h('span.label', 'Class'),
           classes.length ? chips : null,
-          h('div.row', field('Kategorie', f.category), field('Level', f.level)),
+          h('div.row', field('Style', f.category), field('Level', f.level)),
           h('div.row', { style: { marginTop: '12px' } }, field('Wochentag', f.weekday), field('Uhrzeit', f.time), field('Coach', f.coach))),
         h('div.fieldset', h('span.label', 'Song'),
           picker.el,
@@ -102,7 +98,7 @@ export async function renderUpload(root, kind, refId) {
     let song = picker.get();
     if (!song && picker.typed()) song = { source: 'manual', title: picker.typed(), artist: '' };
     const cls = Object.fromEntries(Object.entries(f).map(([k, el]) => [k, el.value.trim()]));
-    if (!cls.category) { toast('Bitte mindestens die Kategorie der Class angeben'); f.category.focus(); return; }
+    if (!cls.category) { toast('Bitte mindestens den Style der Class angeben'); f.category.focus(); return; }
 
     saveBtn.disabled = true;
     saveBtn.textContent = 'Speichere …';

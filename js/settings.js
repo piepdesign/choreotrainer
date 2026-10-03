@@ -11,7 +11,7 @@ export const BASE_STATS = [
   ['streak', 'Serie'],
   ['classes', 'Classes'],
   ['recordings', 'Aufnahmen'],
-  ['sessions', 'Trainingseinheiten'],
+  ['sessions', 'Einheiten'],
 ];
 export const DEFAULT_STATS = ['last', 'week', 'total', 'status', 'choreos', 'duration'];
 
@@ -25,6 +25,7 @@ const DEFAULTS = {
   openIn: 'app', // app (installiertes Programm, sonst Browser) | web
   baseStats: DEFAULT_STATS,
   panel: { open: true, order: PANEL_SECTIONS, collapsed: [] },
+  videoFit: 'all',
 };
 
 let cache = null;

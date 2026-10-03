@@ -1,5 +1,6 @@
 // Classes ohne Video anlegen, bearbeiten, löschen. Genutzt im Intro und im Profil.
 import { db, uid, deleteClass } from './db.js';
+import { classPickers } from './ui.js';
 import { h, PALETTE, textOn, WEEKDAYS, CLASS_TITLES, CLASS_LEVELS, classTitle, classMeta, byClassOrder } from './util.js';
 
 const norm = s => String(s || '').trim().toLowerCase();
@@ -15,7 +16,7 @@ export function classManager(onChange) {
     list.replaceChildren(...classes.map(c => {
       const n = choreos.filter(x => x.classId === c.id).length;
       return h('div.cm-row', { style: { background: `#${c.color}`, color: textOn(c.color) } },
-        h('span.cm-name', `${classTitle(c)}${classMeta(c) ? '  ' + classMeta(c) : ''}`.toUpperCase()),
+        h('span.cm-name', `${classTitle(c)}${classMeta(c) ? ' · ' + classMeta(c) : ''}`.toUpperCase()),
         h('span.cm-actions',
           h('button.linkbtn', { type: 'button', onclick: () => form.edit(c) }, 'Bearbeiten'),
           h('button.linkbtn', {
@@ -43,12 +44,12 @@ export function classManager(onChange) {
 // Formular. onSaved(cls) nach Anlegen/Speichern. el.edit(cls) lädt eine Class zum Bearbeiten.
 export function classForm(onSaved) {
   const f = {
-    category: h('input', { type: 'text', list: 'dl-cf-cat', placeholder: 'Hip Hop' }),
-    level: h('input', { type: 'text', list: 'dl-cf-lvl', placeholder: 'Lvl 2' }),
+    ...classPickers([], { styles: CLASS_TITLES, levels: CLASS_LEVELS }),
     weekday: h('select', h('option', { value: '' }, '—'), WEEKDAYS.map(d => h('option', d))),
     time: h('input', { type: 'time' }),
-    coach: h('input', { type: 'text', placeholder: 'Name' }),
   };
+  // eigene Styles/Levels/Coaches aus gespeicherten Classes nachladen
+  db.all('classes').then(cs => { for (const k of ['category', 'level', 'coach']) f[k].setOptions(cs.map(c => c[k])); });
   let color = null, editing = null;
   const swatches = h('div.chips', PALETTE.map(p => h('button.chip', {
     type: 'button', 'data-hex': p, style: { background: `#${p}`, color: textOn(p) },
@@ -78,7 +79,7 @@ export function classForm(onSaved) {
     type: 'button',
     onclick: async () => {
       const vals = Object.fromEntries(Object.entries(f).map(([k, el]) => [k, el.value.trim()]));
-      if (!vals.category) { msg.textContent = 'Bitte mindestens den Class-Namen angeben'; f.category.focus(); return; }
+      if (!vals.category) { msg.textContent = 'Bitte mindestens den Style angeben'; f.category.focus(); return; }
       const all = (await db.all('classes')).sort(byClassOrder);
       if (all.some(c => c.id !== editing?.id && KEYS.every(k => norm(c[k]) === norm(vals[k])))) { msg.textContent = 'Diese Class gibt es schon'; return; }
       let klass;
@@ -97,10 +98,8 @@ export function classForm(onSaved) {
   const cancelBtn = h('button.linkbtn', { type: 'button', hidden: true, onclick: () => { clear(); msg.textContent = ''; } }, 'Abbrechen');
 
   const el = h('div.classform',
-    h('datalist', { id: 'dl-cf-cat' }, CLASS_TITLES.map(v => h('option', { value: v }))),
-    h('datalist', { id: 'dl-cf-lvl' }, CLASS_LEVELS.map(v => h('option', { value: v }))),
     title,
-    h('div.row', field('Class', f.category), field('Level', f.level), field('Wochentag', f.weekday), field('Uhrzeit', f.time), field('Coach', f.coach)),
+    h('div.row', field('Style', f.category), field('Level', f.level), field('Wochentag', f.weekday), field('Uhrzeit', f.time), field('Coach', f.coach)),
     h('div', { style: { marginTop: '12px' } }, h('span.label', 'Farbe (sonst automatisch)'), swatches),
     h('div.actions', saveBtn, cancelBtn, msg));
   el.edit = cls => {

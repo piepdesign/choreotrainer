@@ -8,7 +8,8 @@ import { baseStats, latestRating, choreoLength, weekStart, dayKey } from './stat
 import { settings, saveSettings, applyTheme, resetSettings, BASE_STATS } from './settings.js';
 import { PROVIDERS } from './providers.js';
 import { classManager } from './classform.js';
-import { go, toast } from './app.js';
+import { go, toast, replaceHash } from './app.js';
+import { optionGroup, toggleList } from './ui.js';
 
 const DAY = 86400000;
 const NS = 'http://www.w3.org/2000/svg';
@@ -80,38 +81,56 @@ function heatmap(sessions, choreoTitle) {
     e.choreos.add(choreoTitle(s.choreoId));
     byDay.set(k, e);
   }
-  const weeks = 26, cell = 12, gap = 3;
+  const weeks = 26, gap = 3, left = 30, top = 22;
   const thisWeek = weekStart();
   const first = thisWeek - (weeks - 1) * 7 * DAY;
   const level = sec => (sec <= 0 ? 0 : sec < 600 ? 1 : sec < 1200 ? 2 : sec < 2400 ? 3 : 4);
-  const W = 28 + weeks * (cell + gap), H = 18 + 7 * (cell + gap);
-  const months = [];
-  const nodes = [];
-  for (let w = 0; w < weeks; w++) {
-    const ws = first + w * 7 * DAY;
-    const m = new Date(ws + 3 * DAY).getMonth();
-    if (!months.length || months.at(-1).m !== m) months.push({ m, x: 28 + w * (cell + gap) });
-    for (let d = 0; d < 7; d++) {
-      const day = dayKey(ws + d * DAY + DAY / 2);
-      if (day > Date.now()) continue;
-      const e = byDay.get(day);
-      const sec = e?.sec || 0;
-      const date = new Date(day).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
-      nodes.push(svg('rect', {
-        x: 28 + w * (cell + gap), y: 18 + d * (cell + gap), width: cell, height: cell, rx: 2,
-        class: `hm l${level(sec)}${ws === thisWeek ? ' cur' : ''}`,
-        'data-tip': sec ? `${date}: ${min(sec) || '<1'} min · ${[...e.choreos].join(', ')}` : `${date}: nicht geübt`,
-      }));
+  const monthNames = ['JAN', 'FEB', 'MÄR', 'APR', 'MAI', 'JUN', 'JUL', 'AUG', 'SEP', 'OKT', 'NOV', 'DEZ'];
+  // In echter Pixelbreite zeichnen, damit die Beschriftung klein und gleich groß bleibt (kein Mitskalieren)
+  function draw(width) {
+    const cell = Math.max(8, Math.min(22, Math.floor((width - left) / weeks) - gap));
+    const step = cell + gap;
+    const W = left + weeks * step, H = top + 7 * step;
+    const months = [];
+    const nodes = [];
+    for (let w = 0; w < weeks; w++) {
+      const ws = first + w * 7 * DAY;
+      const m = new Date(ws + 3 * DAY).getMonth();
+      if (!months.length || months.at(-1).m !== m) months.push({ m, x: left + w * step });
+      for (let d = 0; d < 7; d++) {
+        const day = dayKey(ws + d * DAY + DAY / 2);
+        if (day > Date.now()) continue;
+        const e = byDay.get(day);
+        const sec = e?.sec || 0;
+        const date = new Date(day).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+        nodes.push(svg('rect', {
+          x: left + w * step, y: top + d * step, width: cell, height: cell, rx: 2,
+          class: `hm l${level(sec)}${ws === thisWeek ? ' cur' : ''}`,
+          'data-tip': sec ? `${date}: ${min(sec) || '<1'} min · ${[...e.choreos].join(', ')}` : `${date}: nicht geübt`,
+        }));
+      }
     }
-  }
-  const monthNames = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
-  return h('div.chart.heat',
-    svg('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: 'heatmap' },
-      months.map(m => svg('text', { x: m.x, y: 10, class: 'axis' }, monthNames[m.m])),
-      ['M', 'D', 'M', 'D', 'F', 'S', 'S'].map((d, k) => svg('text', { x: 4, y: 18 + k * (cell + gap) + 10, class: 'axis' }, d)),
+    // Monatsnamen nicht überlappen lassen (erste Spalte kann sehr kurz sein)
+    const shown = months.filter((m, i) => i === months.length - 1 || months[i + 1].x - m.x >= 30);
+    return svg('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, class: 'heatmap' },
+      shown.map(m => svg('text', { x: m.x, y: 12, class: 'axis' }, monthNames[m.m])),
+      ['M', 'D', 'M', 'D', 'F', 'S', 'S'].map((d, k) => svg('text', { x: 0, y: top + k * step + cell / 2 + 4, class: 'axis' }, d)),
       // Rahmen um die aktuelle Woche
-      svg('rect', { x: 28 + (weeks - 1) * (cell + gap) - 2, y: 16, width: cell + 4, height: 7 * (cell + gap) + 1, rx: 3, class: 'curweek' }),
-      nodes),
+      svg('rect', { x: left + (weeks - 1) * step - 2, y: top - 2, width: cell + 4, height: 7 * step + 1, rx: 3, class: 'curweek' }),
+      nodes);
+  }
+  const plot = h('div.heat-plot');
+  let lastW = 0;
+  const ro = new ResizeObserver(() => {
+    if (!plot.isConnected) { ro.disconnect(); return; }
+    const w = Math.min(plot.clientWidth, 980);
+    if (Math.abs(w - lastW) < 4) return;
+    lastW = w;
+    plot.replaceChildren(draw(w));
+  });
+  ro.observe(plot);
+  return h('div.chart.heat',
+    plot,
     h('div.legend',
       h('span.label', 'Weniger'),
       h('span.hm-keys', [0, 1, 2, 3, 4].map(l => h(`i.hm-key.l${l}`, { title: ['nicht geübt', '1–9 min', '10–19 min', '20–39 min', 'ab 40 min'][l] }))),
@@ -147,17 +166,17 @@ export async function renderProfile(root, section) {
   const since = Math.min(...[...choreos.map(c => c.created), ...real.map(x => x.start)].filter(Boolean), now);
   const head = h('section.p-head',
     h('span.label', 'Profil'),
-    h('h1.wide.p-name', inlineEdit((s.name || 'Dein Name').toUpperCase(), async v => { await saveSettings({ name: v }); toast('Name gespeichert'); })),
+    h('h1.wide.p-name', inlineEdit((s.name || 'Dein Name').toUpperCase(), async v => { await saveSettings({ name: v.toUpperCase() }); toast('Name gespeichert'); })),
     h('p.label', choreos.length ? `Dabei seit ${new Date(since).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })} · ${choreos.length} Choreos · ${classes.length} Classes` : 'Noch keine Daten'));
 
   const nav = h('nav.p-nav', [['overview', 'Übersicht'], ['time', 'Übungszeit'], ['status', 'Status'], ['choreos', 'Choreos'], ['classes', 'Classes'], ['sessions', 'Einheiten'], ['prefs', 'Präferenzen'], ['account', 'Konto']]
-    .map(([id, label]) => h('a', { href: `#/profile/${id}`, onclick: e => { e.preventDefault(); document.getElementById(`p-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); history.replaceState(null, '', `#/profile/${id}`); } }, label)));
+    .map(([id, label]) => h('a', { href: `#/profile/${id}`, onclick: e => { e.preventDefault(); document.getElementById(`p-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); replaceHash(`#/profile/${id}`); } }, label)));
 
   const sect = (id, title, ...body) => h('section.p-sec', { id: `p-${id}` }, h('div.section-head', h('h2.wide', title)), ...body);
 
   // ── Übersicht: Zuletzt geübt + Heatmap ──
   const lastS = real.reduce((m, x) => (x.start > (m?.start || 0) ? x : m), null);
-  const overview = sect('overview', 'ZULETZT GEÜBT',
+  const overview = sect('overview', 'ÜBERSICHT',
     h('div.stats',
       tile('Zuletzt', values.last.value, lastS ? `${choreoTitle(lastS.choreoId)} · ${min(lastS.seconds)} min` : ''),
       tile('Serie', values.streak.value, 'Tage in Folge'),
@@ -202,7 +221,7 @@ export async function renderProfile(root, section) {
   // ── Status ──
   const rated = choreos.filter(c => latestRating(c));
   const dist = [1, 2, 3, 4, 5].map(v => ({ label: String(v), value: rated.filter(c => latestRating(c) === v).length, tip: `Status ${v}: ${rated.filter(c => latestRating(c) === v).length} Choreos` }));
-  const status = sect('status', 'Ø STATUS (1–5)',
+  const status = sect('status', 'STATUS',
     h('div.p-grid',
       h('div.p-big', h('b.wide', values.status.value), h('span.label', `aus ${rated.length} bewerteten Choreos`), dots(rated.length ? Math.round(rated.reduce((t, c) => t + latestRating(c), 0) / rated.length) : 0)),
       h('div', h('h3.p-sub', 'Verteilung'), bars(dist, { height: 90, unit: 'Choreos' }))),
@@ -253,11 +272,11 @@ export async function renderProfile(root, section) {
       const nc = nextClass(c);
       return stripe(c, `${mine.length} CHOREO${mine.length === 1 ? '' : 'S'} · ${fmtDuration(sec).toUpperCase()}${nc ? ' · ' + nc.toUpperCase() : ''}`);
     })),
-    h('details.p-add', h('summary.linkbtn', 'Classes verwalten (anlegen, bearbeiten, löschen)'), classManager(() => go('#/profile/classes', { keep: true }))));
+    h('details.p-add', h('summary.linkbtn', 'Classes verwalten'), classManager(() => go('#/profile/classes', { keep: true }))));
 
   // ── Einheiten ──
   const recent = [...real].sort((a, b) => b.start - a.start).slice(0, 25);
-  const sessionSec = sect('sessions', 'TRAININGSEINHEITEN',
+  const sessionSec = sect('sessions', 'EINHEITEN',
     recent.length ? h('div.p-table.wide5',
       h('div.p-row.head', h('span', 'Wann'), h('span', 'Choreo'), h('span', 'Dauer'), h('span', 'Tempo'), h('span', 'Loops')),
       ...recent.map(x => h('div.p-row',
@@ -268,41 +287,24 @@ export async function renderProfile(root, section) {
         h('span', x.loops != null ? String(x.loops) : '—')))) : h('p.empty', 'Noch keine Einheiten. Gezählt wird, sobald ein Video läuft.'),
   );
 
-  // ── Präferenzen ──
-  const chips = (opts, current, onPick) => {
-    const box = h('div.chips', opts.map(([id, label]) => h(`button.btn${id === current ? '.primary' : ''}`, {
-      type: 'button',
-      onclick: e => { box.querySelectorAll('.btn').forEach(b => b.classList.remove('primary')); e.currentTarget.classList.add('primary'); onPick(id); },
-    }, label)));
-    return box;
-  };
-  const statBoxes = h('div.p-checks', BASE_STATS.map(([id, label]) => {
-    const cb = h('input', { type: 'checkbox', checked: settings().baseStats.includes(id) });
-    cb.addEventListener('change', async () => {
-      const cur = new Set(settings().baseStats);
-      if (cb.checked) cur.add(id); else cur.delete(id);
-      await saveSettings({ baseStats: BASE_STATS.map(x => x[0]).filter(x => cur.has(x)) });
-    });
-    return h('label.p-check', cb, label);
-  }));
+  // ── Präferenzen: je Zeile eine Frage, links Titel, rechts die Auswahl ──
+  const pref = (title, hint, control) => h('div.pref', h('div.pref-q', h('h3.p-sub', title), hint ? h('span.label', hint) : null), control);
   const prefs = sect('prefs', 'PRÄFERENZEN',
-    h('h3.p-sub', 'Standardansicht'),
-    chips([['system', 'Wie System'], ['light', 'Hell'], ['dark', 'Dunkel']], s.theme, async v => { applyTheme(v); await saveSettings({ theme: v }); }),
-    h('h3.p-sub', 'Musikprovider'),
-    chips(PROVIDERS, s.provider, async v => { await saveSettings({ provider: v }); }),
-    chips([['app', 'In der App öffnen'], ['web', 'Im Browser öffnen']], s.openIn, async v => { await saveSettings({ openIn: v }); }),
-    h('h3.p-sub', 'Kennzahlen in der Base'),
-    statBoxes);
+    h('div.prefs',
+      pref('Ansicht', null, optionGroup([['system', 'Wie System'], ['light', 'Hell'], ['dark', 'Dunkel']], s.theme, async v => { applyTheme(v); await saveSettings({ theme: v }); })),
+      pref('Musikprovider', 'Erkannte Songs öffnen sich dort', optionGroup(PROVIDERS, s.provider, async v => { await saveSettings({ provider: v }); })),
+      pref('Songs öffnen', 'App nur, wenn installiert, sonst Browser', optionGroup([['app', 'In der App'], ['web', 'Im Browser']], s.openIn, async v => { await saveSettings({ openIn: v }); })),
+      pref('Kennzahlen in der Base', 'Reihenfolge wie hier', toggleList(BASE_STATS, s.baseStats, async list => { await saveSettings({ baseStats: list }); }))));
 
   // ── Konto ──
-  const nameIn = h('input', { type: 'text', value: s.name || '', placeholder: 'Dein Name' });
+  const nameIn = h('input.caps', { type: 'text', value: (s.name || '').toUpperCase(), placeholder: 'DEIN NAME' });
   const account = sect('account', 'KONTO',
     h('div.p-account',
       h('div',
         h('h3.p-sub', 'Name'),
         h('div.actions', nameIn, h('button.btn.small', {
           type: 'button',
-          onclick: async () => { if (!nameIn.value.trim()) return; await saveSettings({ name: nameIn.value.trim() }); toast('Name gespeichert'); go('#/profile/account', { keep: true }); },
+          onclick: async () => { if (!nameIn.value.trim()) return; await saveSettings({ name: nameIn.value.trim().toUpperCase() }); toast('Name gespeichert'); go('#/profile/account', { keep: true }); },
         }, 'Speichern'))),
       h('div',
         h('h3.p-sub', 'Zurücksetzen'),

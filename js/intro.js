@@ -5,6 +5,7 @@ import { h } from './util.js';
 import { settings, saveSettings, applyTheme, BASE_STATS } from './settings.js';
 import { PROVIDERS } from './providers.js';
 import { classManager } from './classform.js';
+import { optionGroup, toggleList } from './ui.js';
 import { db } from './db.js';
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -45,7 +46,7 @@ export async function runIntro() {
     {
       render() {
         const input = h('input.intro-input', { type: 'text', value: state.name, placeholder: 'DEIN NAME', autocomplete: 'given-name' });
-        input.addEventListener('input', () => { state.name = input.value.trim(); refreshNav(); });
+        input.addEventListener('input', () => { state.name = input.value.trim().toUpperCase(); refreshNav(); });
         input.addEventListener('keydown', e => { if (e.key === 'Enter' && state.name) go(1); });
         setTimeout(() => input.focus(), 260);
         return h('div.intro-step.center', h('h1.wide', 'HI, WIE HEISST DU?'), input);
@@ -65,32 +66,15 @@ export async function runIntro() {
     },
     {
       render() {
-        const chips = (opts, get, set) => {
-          const el = h('div.chips', opts.map(([id, label]) => h(`button.btn${get() === id ? '.primary' : ''}`, {
-            type: 'button',
-            onclick: e => { set(id); el.querySelectorAll('.btn').forEach(b => b.classList.remove('primary')); e.currentTarget.classList.add('primary'); refreshNav(); },
-          }, label)));
-          return el;
-        };
-        const stats = h('div.p-checks', BASE_STATS.map(([id, label]) => {
-          const cb = h('input', { type: 'checkbox', checked: state.baseStats.includes(id) });
-          cb.addEventListener('change', () => {
-            const cur = new Set(state.baseStats);
-            if (cb.checked) cur.add(id); else cur.delete(id);
-            state.baseStats = BASE_STATS.map(x => x[0]).filter(x => cur.has(x));
-          });
-          return h('label.p-check', cb, label);
-        }));
+        const pref = (title, control) => h('div.pref', h('div.pref-q', h('h3.p-sub', title)), control);
         return h('div.intro-step',
           h('h1.wide', 'DEINE PRÄFERENZEN'),
-          h('p.intro-lead', 'Wo hörst du Musik? Erkannte Songs öffnen sich dort.'),
-          chips(PROVIDERS, () => state.provider, v => { state.provider = v; }),
-          chips([['app', 'In der App öffnen'], ['web', 'Im Browser öffnen']], () => state.openIn, v => { state.openIn = v; }),
-          h('p.intro-lead', 'Ansicht'),
-          chips([['system', 'Wie System'], ['light', 'Hell'], ['dark', 'Dunkel']], () => state.theme, v => { state.theme = v; applyTheme(v); }),
-          h('p.intro-lead', 'Kennzahlen in deiner Base'),
-          stats,
-          h('p.label', 'Alles später im Profil änderbar.'));
+          h('p.intro-lead', 'Wo hörst du Musik? Erkannte Songs öffnen sich dort. Alles später im Profil änderbar.'),
+          h('div.prefs',
+            pref('Musikprovider', optionGroup(PROVIDERS, state.provider, v => { state.provider = v; refreshNav(); })),
+            pref('Songs öffnen', optionGroup([['app', 'In der App'], ['web', 'Im Browser']], state.openIn, v => { state.openIn = v; })),
+            pref('Ansicht', optionGroup([['system', 'Wie System'], ['light', 'Hell'], ['dark', 'Dunkel']], state.theme, v => { state.theme = v; applyTheme(v); })),
+            pref('Kennzahlen in deiner Base', toggleList(BASE_STATS, state.baseStats, list => { state.baseStats = list; }))));
       },
       canGo: () => !!state.provider,
       skippable: true,
@@ -128,7 +112,7 @@ export async function runIntro() {
 
   // 5 · Übergang, mind. 3 s, damit alles lädt und der Text gelesen werden kann
   await show(h('div.intro-step.center',
-    h('p.intro-lead', `Einen Moment ${state.name}, dein`),
+    h('p.intro-lead', `Einen Moment ${state.name.toUpperCase()}, dein`),
     h('h1.wide', 'CHOREO—TRAINER', h('sup', '©')),
     h('p.intro-lead', 'wird vorbereitet …'),
     h('div.intro-bar', h('i'))), { navVisible: false });

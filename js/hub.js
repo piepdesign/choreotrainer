@@ -5,6 +5,7 @@ import { state, go, toast } from './app.js';
 import { baseStats } from './stats.js';
 import { settings, BASE_STATS } from './settings.js';
 import { songLink } from './providers.js';
+import { classPickers, icon } from './ui.js';
 
 export async function loadAll() {
   const [classes, choreos, recordings, sessions] = await Promise.all(
@@ -237,6 +238,7 @@ function sortableStripes(classes, render) {
   const clearMarks = () => els.forEach(x => x.classList.remove('drop-before', 'drop-after'));
 
   els.forEach(el => {
+    el.firstChild.prepend(h('i.grip', { 'aria-hidden': 'true', html: icon('grip') }));
     el.title = 'Klicken zum Öffnen · ziehen zum Umsortieren';
     el.addEventListener('dragstart', e => e.preventDefault()); // native Link-Drag aus
     el.addEventListener('pointerdown', e => {
@@ -336,7 +338,7 @@ export function choreoCard(c, cls, recs, urls) {
 export async function renderClass(root, id) {
   const cls = await db.get('classes', id);
   if (!cls) { go('#/'); return; }
-  const { choreos, recsByChoreo, sessions } = await loadAll();
+  const { classes, choreos, recsByChoreo, sessions } = await loadAll();
   const mine = choreos.filter(c => c.classId === id).sort((a, b) => b.created - a.created);
   const urls = [];
 
@@ -345,8 +347,7 @@ export async function renderClass(root, id) {
   root.append(
     h('div.stripes', { style: { marginTop: '8px' } }, header),
     h('div.actions', { style: { margin: '14px 0 28px' } },
-      h('span.label', classMeta(cls) || 'Keine Zeit/Coach angegeben'),
-      h('button.linkbtn', { onclick: () => { if (editBox.hidden) { editBox.replaceChildren(classEditor(cls, header, () => { editBox.hidden = true; })); editBox.hidden = false; } else editBox.hidden = true; } }, 'Bearbeiten'),
+      h('button.linkbtn', { onclick: () => { if (editBox.hidden) { editBox.replaceChildren(classEditor(cls, header, () => { editBox.hidden = true; }, classes)); editBox.hidden = false; } else editBox.hidden = true; } }, 'Bearbeiten'),
       h('a.linkbtn', { href: `#/upload?class=${id}`, onclick: () => { state.pendingFile = null; } }, 'Neue Aufnahme')),
     editBox,
     ...(mine.length ? mine.map(c => choreoBlock(c, recsByChoreo[c.id] || [], sessions, urls)) : [h('p.empty', 'Keine Choreos in dieser Class.')]),
@@ -364,7 +365,9 @@ export async function renderClass(root, id) {
 }
 
 // Farbe wirkt sofort als Vorschau auf den Kopfstreifen. Speichern behält sie, Abbrechen setzt sie zurück.
-function classEditor(cls, header, close) {
+function classEditor(cls, header, close, allClasses = []) {
+  const pick = classPickers(allClasses, { styles: CLASS_TITLES, levels: CLASS_LEVELS });
+  pick.category.value = cls.category || ''; pick.level.value = cls.level || ''; pick.coach.value = cls.coach || '';
   const f = {};
   const field = (key, label, input) => { f[key] = input; return h('label.field', h('span', label), input); };
   const original = cls.color;
@@ -390,13 +393,11 @@ function classEditor(cls, header, close) {
   preview(color);
   return h('div.fieldset',
     h('div.row',
-      field('category', 'Kategorie', h('input', { type: 'text', list: 'dl-cat-edit', value: cls.category || '' })),
-      field('level', 'Level', h('input', { type: 'text', list: 'dl-lvl-edit', value: cls.level || '' })),
-      h('datalist', { id: 'dl-cat-edit' }, CLASS_TITLES.map(v => h('option', { value: v }))),
-      h('datalist', { id: 'dl-lvl-edit' }, CLASS_LEVELS.map(v => h('option', { value: v }))),
+      field('category', 'Style', pick.category),
+      field('level', 'Level', pick.level),
       field('weekday', 'Wochentag', h('select', h('option', { value: '' }, '—'), WEEKDAYS.map(d => h('option', { selected: d === cls.weekday }, d)))),
       field('time', 'Uhrzeit', h('input', { type: 'time', value: cls.time || '' })),
-      field('coach', 'Coach', h('input', { type: 'text', value: cls.coach || '' }))),
+      field('coach', 'Coach', pick.coach)),
     h('div', { style: { marginTop: '14px' } }, h('span.label', 'Farbe'), swatches),
     h('div.actions',
       h('button.btn.primary', {

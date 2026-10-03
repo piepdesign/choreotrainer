@@ -167,5 +167,5 @@ export function stripe(c, right, onclick) {
     href: onclick ? null : `#/class/${c.id}`,
     style: { background: `#${color}`, color: textOn(color) },
     onclick,
-  }, h('span', `${classTitle(c)}${c.weekday ? '  ' + classMeta(c) : ''}`.toUpperCase()), h('span', right ?? color));
+  }, h('span', `${classTitle(c)}${classMeta(c) ? ' · ' + classMeta(c) : ''}`.toUpperCase()), h('span', right ?? color));
 }
