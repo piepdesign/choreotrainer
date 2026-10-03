@@ -300,8 +300,18 @@ export async function renderTrain(root, recId) {
   bFitA.classList.toggle('on', fit === 'all');
   stage.classList.toggle('fill', fit === 'width');
   // Breite füllen: Ausschnitt in der Höhe per Ziehen verschieben (je Aufnahme gemerkt). Kurzer Klick bleibt Play/Pause.
-  const applyPan = () => { video.style.objectPosition = `50% ${P.fitY ?? 50}%`; };
+  // Überstand = wie viel Bild oben/unten abgeschnitten ist (Video in Breite der Fläche)
+  const overflow = () => {
+    const vw = video.videoWidth, vh = video.videoHeight;
+    return vw && vh ? Math.max(0, (stage.clientWidth / vw) * vh - stage.clientHeight) : 0;
+  };
+  // fitY 0 = oberer Rand sichtbar, 100 = unterer; das Video steht mittig, verschoben wird um den halben Überstand
+  const applyPan = () => {
+    const on = fit === 'width' && document.fullscreenElement !== stage;
+    video.style.setProperty('--pan', on ? `${(((50 - (P.fitY ?? 50)) / 100) * overflow()).toFixed(1)}px` : '0px');
+  };
   applyPan();
+  document.addEventListener('fullscreenchange', applyPan);
   let panned = false;
   video.draggable = false;
   video.addEventListener('dragstart', e => e.preventDefault());
@@ -309,9 +319,7 @@ export async function renderTrain(root, recId) {
     if (fit !== 'width' || e.button !== 0 || document.fullscreenElement === stage) return;
     if (e.target.closest('.count, button')) return;
     const y0 = e.clientY, start = P.fitY ?? 50;
-    const vw = video.videoWidth, vh = video.videoHeight;
-    // Überstand = wie viel Bild oben/unten abgeschnitten ist
-    const over = vw && vh ? Math.max(0, (stage.clientWidth / vw) * vh - stage.clientHeight) : 0;
+    const over = overflow();
     if (over < 2) return;
     e.preventDefault(); // keine Textauswahl / natives Ziehen des Videos
     panned = false;
@@ -950,6 +958,7 @@ export async function renderTrain(root, recId) {
     // Fläche so breit wie das Video, mittig (keine schwarzen Seitenbalken, wenn die Höhe begrenzt)
     stage.style.width = fit === 'width' ? `${w}px` : `${Math.min(w, Math.round(hgt * ratio))}px`;
     stage.classList.toggle('can-pan', fit === 'width' && w / ratio - hgt > 2);
+    applyPan();
     // Panel schließt unten mit der Bedienleiste ab
     side.style.height = stacked ? '' : `${Math.round(controls.getBoundingClientRect().bottom - mainCol.getBoundingClientRect().top)}px`;
   }
@@ -978,6 +987,7 @@ export async function renderTrain(root, recId) {
     stopFit();
     clearInterval(sessionTimer);
     document.removeEventListener('keydown', onKey);
+    document.removeEventListener('fullscreenchange', applyPan);
     document.removeEventListener('pointerdown', onDocClick);
     document.removeEventListener('visibilitychange', onHide);
     video.pause();

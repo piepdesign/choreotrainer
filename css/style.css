@@ -235,11 +235,15 @@ main:has(.train) { padding-bottom: 0; }
 .stage video { width: 100%; height: 100%; object-fit: contain; display: block; transition: transform .2s; }
 .stage:fullscreen { height: 100vh !important; }
 .stage video.mirror { transform: scaleX(-1); }
-.stage.fill video { object-fit: cover; }
+/* Breite füllen: Video in voller Breite und eigener Höhe, mittig; was übersteht, schneidet die Fläche ab.
+   Verschoben wird per transform (object-position zeichnete Brave bei pausiertem HDR-Video nicht neu) */
+.stage.fill video { position: absolute; left: 0; top: 50%; height: auto; transform: translateY(calc(-50% + var(--pan, 0px))); }
+.stage.fill video.mirror { transform: translateY(calc(-50% + var(--pan, 0px))) scaleX(-1); }
+.stage.fill.panning video { transition: none; }
 .stage.can-pan video { cursor: ns-resize; touch-action: none; }
 .stage.fill.panning, .stage.fill.panning video { cursor: grabbing; }
-.stage:fullscreen video { object-position: 50% 50% !important; }
-.stage.fill:fullscreen video { object-fit: contain; }
+.stage.fill:fullscreen video { position: static; height: 100%; transform: none; }
+.stage.fill:fullscreen video.mirror { transform: scaleX(-1); }
 .count {
   will-change: transform; /* eigene Ebene: Zahlwechsel zeichnet das Video nicht neu */
   position: absolute; top: 14px; right: 16px; text-align: right; color: #fff; pointer-events: none;
@@ -533,7 +537,6 @@ a.stat-link:hover { background: var(--surface-2); }
 /* Song-Panel: in jedem Schritt der Knopf unter dem Inhalt, alle gleich breit */
 .side .song-step .btn { width: 100%; justify-content: center; text-align: center; }
 .side .song-step .btn + .label { margin-top: 6px; }
-.stage:not(.fill) video { object-position: 50% 50% !important; }
 
 /* Profil: Filter, Sortierung, Erklärtexte */
 .p-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; padding: 14px 0; border-bottom: 1px solid var(--rule); }
