@@ -332,8 +332,9 @@ export function choreoCard(c, cls, recs, urls) {
     thumb,
     h('h3', c.title || c.song?.title || 'Ohne Song'),
     h('div.label', `${cls ? classTitle(cls) : ''} · ${relDate(c.lastPracticed || c.created)}`),
-    // kurz und einzeilig: nur „in 4 Tagen“, Tag und Uhrzeit im Tooltip
-    cls && nextClass(cls) ? h('div.label.next-class', { title: `Nächste Class ${nextClass(cls)}` }, `Nächste Class ${nextClass(cls).split(' · ').at(-1)}`) : null,
+    // kurz und einzeilig: nur „in 4 Tagen“, Tag und Uhrzeit im Tooltip. Zeile bleibt auch ohne Angabe stehen,
+    // damit gleiche Infos in allen Kacheln auf derselben Höhe sitzen
+    h('div.label.next-class', { title: cls && nextClass(cls) ? `Nächste Class ${nextClass(cls)}` : null }, cls && nextClass(cls) ? `Nächste Class ${nextClass(cls).split(' · ').at(-1)}` : '\u00a0'),
     h('div', { style: { marginTop: '4px' } }, dots(latestRating(c)), h('span.label', `  ${recs.length} Aufn.`)));
 }
 

@@ -166,6 +166,7 @@ function previewOnHover(el, song) {
   let timer = null;
   el.addEventListener('mouseenter', () => {
     // kurz warten, damit Überfahren mit der Maus nichts abspielt
+    if (settings().hoverPreview === 'off') return; // in den Einstellungen abgeschaltet
     timer = setTimeout(async () => {
       const url = await previewUrl(song);
       if (!url || !el.matches(':hover')) return;

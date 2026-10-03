@@ -12,6 +12,10 @@ const THEME_PATHS = {
   light: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>',
   dark: '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/>',
 };
+const SOUND_PATHS = {
+  on: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>',
+  off: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/>',
+};
 const THEME_ICONS = Object.fromEntries(Object.entries(THEME_PATHS).map(([k, p]) => [k, svg26(p)]));
 // gleiche Icons klein für die Kopfleiste
 export const themeIcon = (id, size = 18) => svg26(THEME_PATHS[id], size);
@@ -108,6 +112,8 @@ export function preferences(values, onChange, statValues = null, { baseLabel = t
   return h('div.prefs',
     block('Musikprovider', single('provider', PROVIDERS, values.provider,
       ([id, name]) => [h('i.brand', { html: brandSvg(id) }), h('span', name)])),
+    block('Hörprobe beim Hovern über Song-Cover', single('hoverPreview', [['on', 'An'], ['off', 'Aus']], values.hoverPreview === 'off' ? 'off' : 'on',
+      ([id, label]) => [h('i.brand', { html: svg26(SOUND_PATHS[id]) }), h('span', label)])),
     block('Statistiken', chips),
     block('Ansicht', single('theme', [['system', 'Wie System'], ['light', 'Hell'], ['dark', 'Dunkel']], values.theme,
       ([id, label]) => [h('i.brand', { html: THEME_ICONS[id] }), h('span', label)])));

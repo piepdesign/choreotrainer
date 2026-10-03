@@ -25,6 +25,7 @@ const DEFAULTS = {
   baseStats: DEFAULT_STATS,
   panel: { open: true, order: PANEL_SECTIONS, collapsed: [] },
   videoFit: 'all',
+  hoverPreview: 'on', // Hörprobe beim Hovern über Cover: on | off
 };
 
 let cache = null;
