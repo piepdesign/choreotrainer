@@ -9,6 +9,7 @@ import { loadSettings, settings, saveSettings, applyTheme } from './settings.js'
 import { h } from './util.js';
 import { stopPreview } from './providers.js';
 import { themeIcon, toolIcon } from './ui.js';
+import { maybeTour } from './tour.js';
 
 export const state = { pendingFile: null };
 
@@ -84,6 +85,7 @@ async function route() {
       view.replaceChildren(h('p.empty', `Fehler: ${e.message}`));
     }
     window.scrollTo(0, y);
+    maybeTour(current); // Tutorial, falls noch nicht gesehen (Teil 1 auf der Base, Teil 2 im Training)
     // zurück: dort weiter, wo man war (nach dem Aufbau, auch gegen Abschnitts-Sprünge der Seite)
     if (back != null) requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, back)));
     return;

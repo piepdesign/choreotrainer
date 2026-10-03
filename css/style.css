@@ -674,3 +674,16 @@ body.intro-open .tester-fab { display: none; }
 /* Marker beim Umbenennen neutral (Hintergrund/Vordergrund), Textauswahl invertiert ist so auf jeder Farbe sichtbar */
 .markers .kind.editing { background: var(--bg) !important; color: var(--fg) !important; outline: 1px solid var(--fg); }
 .markers .menu .menu-sep { align-self: center; margin-left: 6px; }
+
+/* ── Tutorial: Rest abgedunkelt, markierte Stelle frei, Textkarte daneben ── */
+.tour { position: fixed; inset: 0; z-index: 90; pointer-events: none; }
+.tour-spot { position: fixed; border-radius: 4px; box-shadow: 0 0 0 200vmax rgba(0, 0, 0, .58); outline: 2px solid #fff; outline-offset: 0; transition: left .25s, top .25s, width .25s, height .25s; }
+.tour-card { position: fixed; pointer-events: auto; width: min(340px, calc(100vw - 24px)); background: var(--bg); color: var(--fg); border: 1px solid var(--fg); padding: 14px 16px; display: grid; gap: 6px; box-shadow: 0 12px 34px rgba(0, 0, 0, .3); opacity: 0; transform: translateY(6px); transition: opacity .2s, transform .2s, left .25s, top .25s; }
+.tour-card.in { opacity: 1; transform: none; }
+.tour-top { display: flex; justify-content: space-between; align-items: center; }
+.tour-title { margin: 2px 0 0; }
+.tour-text { margin: 0; font-size: 13px; line-height: 1.5; }
+.tour-hint { margin: 4px 0 0; }
+body.touring .tester-fab { display: none; }
+.tour-done { z-index: 95; }
+.tour-done .modal-card p { margin: 0; font-size: 13px; line-height: 1.55; }

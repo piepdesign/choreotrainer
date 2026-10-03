@@ -443,6 +443,12 @@ export async function renderProfile(root, section) {
           type: 'button',
           onclick: async () => { if (!confirm('Einstellungen zurücksetzen? Deine Daten bleiben erhalten.')) return; await resetSettings(); location.hash = '#/'; location.reload(); },
         }, 'Zurücksetzen')),
+      accRow('Tutorial', [h('p.acc-lead', 'Zeigt dir noch einmal:'), h('ul.acc-list', h('li', 'Base, Profil und Einstellungen'), h('li', 'die Trainingsansicht beim nächsten Öffnen einer Choreo')),
+          h('p.acc-note', 'Du kannst es jederzeit überspringen.')],
+        h('button.btn.small', {
+          type: 'button',
+          onclick: async () => { await saveSettings({ tourDone: false, tourTrainDone: false }); go('#/'); },
+        }, 'Tutorial starten')),
       accRow('Werkseinstellungen', [h('p.acc-lead', 'Löscht in diesem Browser:'), h('ul.acc-list', h('li', 'Classes und Choreos'), h('li', 'Videos und Songdateien'), h('li', 'Einheiten und Profil')),
           h('p.acc-note', 'Lässt sich nicht rückgängig machen.')],
         h('button.btn.small.danger', {
