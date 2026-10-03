@@ -714,6 +714,7 @@ export async function renderTrain(root, recId) {
           if (e.key === 'Escape') { menuFor = null; renaming = false; renderMarkers(); }
         });
         input.addEventListener('blur', () => { if (menuFor === m.id && renaming) commit(); });
+        kind.classList.add('editing'); // beim Umbenennen neutrale Fläche, damit die Textauswahl auf jeder Markerfarbe sichtbar ist
         kind.append(input);
         // ganzen Namen markieren, damit direkt neu getippt werden kann (auch nach dem Klick-Ende)
         const selectAll = () => { input.focus(); input.select(); };
@@ -728,7 +729,15 @@ export async function renderTrain(root, recId) {
           small('Umbenennen', () => { renaming = true; renderMarkers(); }),
           small('Hierhin', () => { video.currentTime = m.t; menuFor = null; renderMarkers(); }),
           small('Auf jetzt setzen', () => { m.t = video.currentTime; rec.markers.sort((a, b) => a.t - b.t); menuFor = null; update(); renderMarkers(); }),
-          small('Löschen', () => { rec.markers = rec.markers.filter(x => x !== m); menuFor = null; update(); renderMarkers(); })));
+          small('Löschen', () => { rec.markers = rec.markers.filter(x => x !== m); menuFor = null; update(); renderMarkers(); }),
+          // Art wechseln, z. B. einen als Gedanke angelegten „Ende“-Marker zum echten Ende machen (zählt dann für den Loop)
+          h('span.label.menu-sep', 'Art:'),
+          ...Object.entries(MARKER_TYPES).filter(([t]) => t !== m.type).map(([t, def]) => small(def.label.charAt(0) + def.label.slice(1).toLowerCase(), () => {
+            if (t === 'start' || t === 'end') rec.markers = rec.markers.filter(x => x === m || x.type !== t); // Start/Ende gibt es je einmal
+            m.type = t;
+            menuFor = null;
+            update(); renderMarkers(); renderStatic();
+          }))));
       }
       return li;
     }) : [h('li.muted', { style: { display: 'block' } }, 'Noch keine Marker. Taste S/E/N/H oder „+ Marker“.')]));

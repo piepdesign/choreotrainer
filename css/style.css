@@ -669,3 +669,6 @@ body.intro-open .tester-fab { display: none; }
 /* Abstand rechts gehört an die Hülle, sonst reicht der Hörprobe-Rahmen über das Cover hinaus */
 .cover-wrap:has(> .sq-cover) { margin-right: 8px; }
 .cover-wrap > .sq-cover { margin-right: 0; }
+/* Marker beim Umbenennen neutral (Hintergrund/Vordergrund), Textauswahl invertiert ist so auf jeder Farbe sichtbar */
+.markers .kind.editing { background: var(--bg) !important; color: var(--fg) !important; outline: 1px solid var(--fg); }
+.markers .menu .menu-sep { align-self: center; margin-left: 6px; }
