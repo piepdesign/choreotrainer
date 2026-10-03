@@ -858,11 +858,12 @@ export async function renderTrain(root, recId) {
         },
       }, 'Aufnahme löschen')),
   ];
-  const keysBody = [h('div.keys', [
+  const KEYS = [
     ['␣', 'Play/Pause'], ['← →', '±2 s (⇧ ±0,2)'], ['M', 'Spiegeln'], ['↑ ↓', 'Tempo'],
     ['I / O', 'Loop In/Out'], ['L', 'Loop'], ['C', '8er-Count'], ['T', 'Tap-Tempo'],
-    ['1', 'Anfangscount'], ['S / E', 'Start/Ende'], ['N', 'Gedanke'], ['H', 'Highlight'], ['F', 'Vollbild'], ['A', 'Ton Video/Song'], ['P', 'Seitenpanel'], ['⌘Z', 'Rückgängig'], ['⌘⇧Z', 'Umkehren'],
-  ].map(([k, d]) => h('div', h('kbd', k), ' ', d)))];
+    ['1', 'Anfangscount'], ['S / E', 'Start/Ende'], ['N', 'Gedanke'], ['H', 'Highlight'], ['F', 'Vollbild'], ['A', 'Ton Video/Song'], ['P', 'Seitenpanel'], ['⌘Z', 'Rückgängig'], ['⌘⇧Z', 'Wiederherstellen'],
+  ];
+  const keysBody = [h('div.keys', { style: { '--rows': Math.ceil(KEYS.length / 2) } }, KEYS.map(([k, d]) => h('div', h('kbd', k), ' ', d)))];
   const SECTIONS = {
     song: ['Song', [picker.el, songFileRow]],
     marker: ['Marker', [markerList]],
