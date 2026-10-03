@@ -57,7 +57,7 @@ export function baseStats({ classes, choreos, recordings, sessions, recsByChoreo
     choreos: { value: String(choreos.length) },
     duration: {
       value: known.length ? fmtMin(known.reduce((a, b) => a + b, 0)) : '—',
-      hint: known.length < choreos.length ? `${known.length} von ${choreos.length} Choreos mit Start/Ende` : 'aus Start/Ende bzw. In/Out',
+      hint: known.length < choreos.length ? `${known.length} von ${choreos.length === 1 ? '1 Choreo' : `${choreos.length} Choreos`} mit Start/Ende` : 'aus Start/Ende bzw. In/Out',
     },
     streak: { value: streak ? `${streak} ${streak === 1 ? 'Tag' : 'Tage'}` : '—' },
     classes: { value: String(classes.length) },

@@ -84,6 +84,9 @@ export function textOn(hex) {
 
 export const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 
+// Zahl mit Einzahl/Mehrzahl: plural(1, 'Choreo', 'Choreos') → „1 Choreo“, plural(2, …) → „2 Choreos“
+export const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
 // Keine vorgegebenen Styles/Level: die Auswahllisten zeigen nur, was in eigenen Classes vorkommt
 export const CLASS_TITLES = [];
 export const CLASS_LEVELS = [];

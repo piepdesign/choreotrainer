@@ -2,7 +2,7 @@
 // und Präferenzen. Diagramme als schlankes SVG: Mengen in Graustufen (eine Skala), Identität über
 // Class-Farben, Werte immer in Textfarbe, Tooltip auf jedem Datenpunkt.
 import { db, deleteAllData } from './db.js';
-import { h, fmt, fmtDuration, relDate, fmtRecDate, inlineEdit, classTitle, stripe, byClassOrder, WEEKDAYS, textOn } from './util.js';
+import { h, fmt, fmtDuration, relDate, fmtRecDate, inlineEdit, classTitle, stripe, byClassOrder, WEEKDAYS, textOn, plural } from './util.js';
 import { loadAll, dots, choreoCard, recTitle, nextClass } from './hub.js';
 import { baseStats, latestRating, choreoLength, weekStart, dayKey } from './stats.js';
 import { settings, saveSettings, applyTheme, resetSettings, BASE_STATS } from './settings.js';
@@ -43,6 +43,7 @@ function attachTooltip(root) {
 // Senkrechte Balken (eine Reihe). items: [{ label, value, tip, now, parts: [{ color, label, value }] }]
 // Mit parts wird jeder Balken nach Class gestapelt und eingefärbt (Reihenfolge wie die Classes).
 function bars(items, { height = 120, unit = 'min' } = {}) {
+  const u = v => (Array.isArray(unit) ? plural(v, ...unit) : `${v} ${unit}`);
   const maxV = Math.max(1, ...items.map(i => i.value));
   const w = 100 / items.length;
   const top = items.reduce((b, i, k) => (i.value > (items[b]?.value ?? -1) ? k : b), 0);
@@ -63,14 +64,14 @@ function bars(items, { height = 120, unit = 'min' } = {}) {
           })
           : i.value ? [svg('rect', { x, y: height - scale(i.value), width: bw, height: scale(i.value), rx: 1.2, class: `bar${i.now ? ' now' : ''}` })] : [];
         const detail = parts.length > 1 ? ` · ${parts.map(p => `${p.label} ${p.value}`).join(' · ')}` : parts.length === 1 ? ` · ${parts[0].label}` : '';
-        return svg('g', { 'data-tip': `${i.tip ?? `${i.label}: ${i.value} ${unit}`}${detail}` },
+        return svg('g', { 'data-tip': `${i.tip ?? `${i.label}: ${u(i.value)}`}${detail}` },
           svg('rect', { x: k * w, y: 0, width: w, height, class: 'hit' }), segs);
       })),
     // Achsenbeschriftung als HTML (verzerrt nicht)
     // bei vielen Balken nur jede dritte Beschriftung (die letzte immer), Rest per Tooltip
     h('div.xlabels', items.map((i, k) => h('span', { class: k === top && i.value ? 'peak' : null },
       items.length <= 8 || (items.length - 1 - k) % 3 === 0 ? i.label : ''))),
-    h('div.label.chart-note', items[top]?.value ? `Höchstwert: ${items[top].label} · ${items[top].value} ${unit}` : 'Noch keine Daten'));
+    h('div.label.chart-note', items[top]?.value ? `Höchstwert: ${items[top].label} · ${u(items[top].value)}` : 'Noch keine Daten'));
 }
 
 // Waagrechte Balken mit Namen. items: [{ label, value, color, tip }]
@@ -155,7 +156,7 @@ function heatmap(sessions, choreoTitle, colorOf) {
   const ro = new ResizeObserver(() => {
     if (!plot.isConnected) { ro.disconnect(); return; }
     const w = plot.clientWidth;
-    if (Math.abs(w - lastW) < 4) return;
+    if (!w || Math.abs(w - lastW) < 4) return; // versteckter Reiter: erst beim Zeigen zeichnen
     lastW = w;
     redraw();
   });
@@ -249,10 +250,16 @@ export async function renderProfile(root, section) {
   const head = h('section.p-head',
     h('span.label', 'Profil'),
     h('h1.wide.p-name', inlineEdit((s.name || 'Dein Name').toUpperCase(), async v => { await saveSettings({ name: v.toUpperCase() }); toast('Name gespeichert'); })),
-    h('p.label', all.choreos.length ? `Dabei seit ${new Date(since).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })} · ${all.choreos.length} Choreos · ${all.classes.length} Classes` : 'Noch keine Daten'));
+    h('p.label', all.choreos.length ? `Dabei seit ${new Date(since).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })} · ${plural(all.choreos.length, 'Choreo', 'Choreos')} · ${plural(all.classes.length, 'Class', 'Classes')}` : 'Noch keine Daten'));
 
-  const nav = h('nav.p-nav', [['overview', 'Übersicht'], ['time', 'Übungszeit'], ['status', 'Status'], ['choreos', 'Choreos'], ['classes', 'Classes'], ['sessions', 'Einheiten'], ['prefs', 'Präferenzen'], ['account', 'Konto']]
-    .map(([id, label]) => h('a', { href: `#/profile/${id}`, onclick: e => { e.preventDefault(); document.getElementById(`p-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); replaceHash(`#/profile/${id}`); } }, label)));
+  // Reiter: immer nur ein Bereich sichtbar. Alte Abschnittsadressen (z. B. aus Base-Kacheln) zeigen auf den passenden Reiter.
+  const TABS = [['overview', 'Übersicht'], ['time', 'Übungszeit'], ['status', 'Status'], ['choreos', 'Choreos'], ['settings', 'Einstellungen']];
+  const ALIAS = { classes: 'overview', sessions: 'time', prefs: 'settings', account: 'settings' };
+  let current = ALIAS[section] || (TABS.some(t => t[0] === section) ? section : 'overview');
+  const nav = h('nav.p-nav', { role: 'tablist' }, TABS.map(([id, label]) => h(`a${id === 'settings' ? '.p-nav-end' : ''}`, {
+    href: `#/profile/${id}`, role: 'tab', 'data-tab': id,
+    onclick: e => { e.preventDefault(); showTab(id, true); },
+  }, label)));
 
   const setFilter = id => {
     try { localStorage.setItem('ct-profile-class', id); } catch { /* egal */ }
@@ -264,11 +271,12 @@ export async function renderProfile(root, section) {
       h(`button.opt${id === filter ? '.on' : ''}`, { type: 'button', onclick: () => setFilter(id) },
         color ? h('i.swatch', { style: { background: `#${color}` } }) : h('i.dot'), label)))) : null;
 
-  const sect = (id, title, ...body) => h('section.p-sec', { id: `p-${id}` }, h('div.section-head', h('h2.wide', title)), ...body);
+  // Block innerhalb eines Reiters; ohne Titel, wenn er dem Reiter entspricht
+  const sect = (id, title, ...body) => h('section.p-sec', { id: `p-${id}` }, title ? h('h2.p-group', title) : null, ...body);
 
   // ── Übersicht: Kennzahlen + Heatmap ──
   const lastS = real.reduce((m, x) => (x.start > (m?.start || 0) ? x : m), null);
-  const overview = sect('overview', 'ÜBERSICHT',
+  const overview = sect('overview', null,
     h('div.stats',
       tile('Zuletzt', values.last.value, lastS ? `${choreoTitle(lastS.choreoId)} · ${min(lastS.seconds)} min` : ''),
       tile('Serie', values.streak.value, 'Tage in Folge'),
@@ -301,12 +309,12 @@ export async function renderProfile(root, section) {
   const totalSec = real.reduce((t, x) => t + x.seconds, 0);
   const monthSec = real.filter(x => x.start > now - 30 * DAY).reduce((t, x) => t + x.seconds, 0);
   const rates = real.filter(x => x.avgRate);
-  const time = sect('time', 'ÜBUNGSZEIT',
+  const time = sect('time', null,
     h('div.stats',
       tile('Diese Woche', values.week.value),
       tile('30 Tage', fmtDuration(monthSec)),
       tile('Gesamt', values.total.value),
-      tile('Ø pro Einheit', real.length ? fmtDuration(totalSec / real.length) : '—', `${real.length} Einheiten`),
+      tile('Ø pro Einheit', real.length ? fmtDuration(totalSec / real.length) : '—', plural(real.length, 'Einheit', 'Einheiten')),
       tile('Ø Tempo', rates.length ? `${(rates.reduce((t, x) => t + x.avgRate, 0) / rates.length).toFixed(2).replace('.', ',')}×` : '—', 'Wiedergabetempo beim Üben')),
     h('div.p-grid',
       h('div', h('h3.p-sub', 'Minuten pro Woche'), bars(perWeek)),
@@ -319,15 +327,15 @@ export async function renderProfile(root, section) {
   const dist = [1, 2, 3, 4, 5].map(v => {
     const list = rated.filter(c => latestRating(c) === v);
     return {
-      label: String(v), value: list.length, tip: `Status ${v}: ${list.length} Choreos`,
+      label: String(v), value: list.length, tip: `Status ${v}: ${plural(list.length, 'Choreo', 'Choreos')}`,
       parts: classes.map(c => ({ color: c.color, label: classTitle(c), value: list.filter(x => x.classId === c.id).length })),
     };
   });
   const statusOf = c => latestRating(c) || 0;
-  const status = sect('status', 'STATUS',
+  const status = sect('status', null,
     h('div.p-grid',
-      h('div.p-big', h('b.wide', values.status.value), h('span.label', `aus ${rated.length} bewerteten Choreos`), dots(rated.length ? Math.round(rated.reduce((t, c) => t + latestRating(c), 0) / rated.length) : 0)),
-      h('div', h('h3.p-sub', 'Verteilung'), bars(dist, { height: 90, unit: 'Choreos' }))),
+      h('div.p-big', h('b.wide', values.status.value), h('span.label', `aus ${plural(rated.length, 'bewerteten Choreo', 'bewerteten Choreos')}`), dots(rated.length ? Math.round(rated.reduce((t, c) => t + latestRating(c), 0) / rated.length) : 0)),
+      h('div', h('h3.p-sub', 'Verteilung'), bars(dist, { height: 90, unit: ['Choreo', 'Choreos'] }))),
     sortTable([
       { label: 'Choreo', value: c => titleOf(c), cell: c => [h('i.swatch', { style: { background: `#${classById[c.classId]?.color || 'ccc'}` } }), titleOf(c)] },
       { label: 'Status', value: statusOf, cell: c => dots(latestRating(c)) },
@@ -370,23 +378,23 @@ export async function renderProfile(root, section) {
     toggle.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === view));
   }
   const toggle = h('div.seg', [['gallery', 'Galerie'], ['list', 'Liste']].map(([v, l]) => h('button.ctl', { type: 'button', 'data-v': v, onclick: () => { view = v; try { localStorage.setItem('ct-choreo-view', v); } catch { /* egal */ } renderChoreos(); } }, l)));
-  const choreoSec = sect('choreos', 'CHOREOS', h('div.actions.p-tools', toggle, sortWrap, h('span.label', `${choreos.length} insgesamt`)), choreoBox);
+  const choreoSec = sect('choreos', null, h('div.actions.p-tools', toggle, sortWrap, h('span.label', `${choreos.length} insgesamt`)), choreoBox);
   renderChoreos();
 
   // ── Classes ──
-  const classSec = sect('classes', 'CLASSES',
+  const classSec = sect('classes', 'Classes',
     // rechte Angaben als eigene Spalten; Wochentag/Uhrzeit stehen schon links, daher nur „in 4 Tagen“
     h('div.stripes', { style: { '--rc': 3 } }, classes.map(c => {
       const mine = choreos.filter(x => x.classId === c.id);
       const sec = real.filter(x => mine.some(m => m.id === x.choreoId)).reduce((t, x) => t + x.seconds, 0);
       const nc = nextClass(c)?.split(' · ').at(-1) || '';
-      return stripe(c, [`${mine.length} CHOREO${mine.length === 1 ? '' : 'S'}`, fmtDuration(sec).toUpperCase(), nc.toUpperCase()]);
-    })),
-    h('details.p-add', h('summary.linkbtn', 'Classes verwalten'), classManager(() => go('#/profile/classes', { keep: true }))));
+      return stripe(c, [plural(mine.length, 'CHOREO', 'CHOREOS'), fmtDuration(sec).toUpperCase(), nc.toUpperCase()]);
+    })));
+  const manageSec = sect('manage', 'Classes verwalten', classManager(() => go('#/profile/settings', { keep: true })));
 
   // ── Einheiten ──
   const recent = [...real].sort((a, b) => b.start - a.start).slice(0, 50);
-  const sessionSec = sect('sessions', 'EINHEITEN',
+  const sessionSec = sect('sessions', 'Einheiten',
     recent.length ? sortTable([
       { label: 'Wann', value: x => x.start, cell: x => new Date(x.start).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }), dir: -1 },
       { label: 'Choreo', value: x => choreoTitle(x.choreoId), cell: x => [h('i.swatch', { style: { background: `#${colorOf(x.choreoId) || 'ccc'}` } }), choreoTitle(x.choreoId)] },
@@ -394,18 +402,18 @@ export async function renderProfile(root, section) {
       { label: 'Tempo', value: x => x.avgRate || 0, cell: x => (x.avgRate ? `${x.avgRate.toFixed(2).replace('.', ',')}×` : '—'), dir: -1 },
       { label: 'Loops', value: x => x.loops ?? -1, cell: x => (x.loops != null ? String(x.loops) : '—'), dir: -1 },
     ], recent, { sort: 0, cls: '.wide5', key: 'ct-sort-sessions' }) : h('p.empty', 'Noch keine Einheiten. Gezählt wird, sobald ein Video läuft.'),
-    recent.length ? h('p.label', `Die letzten ${recent.length} Einheiten.`) : null);
+    recent.length ? h('p.label', recent.length === 1 ? 'Eine Einheit.' : `Die letzten ${recent.length} Einheiten.`) : null);
 
   // ── Präferenzen und Konto ──
-  const prefs = sect('prefs', 'PRÄFERENZEN',
+  const prefs = sect('prefs', 'Präferenzen',
     preferences(s, async patch => { if (patch.theme) applyTheme(patch.theme); await saveSettings(patch); }, baseStats(all)));
 
   const nameIn = h('input.caps', { type: 'text', value: (s.name || '').toUpperCase(), placeholder: 'DEIN NAME' });
-  const saveName = async () => { if (!nameIn.value.trim()) return; await saveSettings({ name: nameIn.value.trim().toUpperCase() }); toast('Name gespeichert'); go('#/profile/account', { keep: true }); };
+  const saveName = async () => { if (!nameIn.value.trim()) return; await saveSettings({ name: nameIn.value.trim().toUpperCase() }); toast('Name gespeichert'); go('#/profile/settings', { keep: true }); };
   nameIn.addEventListener('keydown', e => { if (e.key === 'Enter') saveName(); });
-  // Je Zeile: links Feld bzw. Erklärung, rechts der Knopf (alle Knöpfe gleich breit untereinander)
+  // Je Zeile: Feld bzw. Erklärung, der Knopf direkt daneben (alle Knöpfe gleich breit untereinander)
   const accRow = (left, button) => h('div.acc-row', h('div.acc-text', left), button);
-  const account = sect('account', 'KONTO',
+  const account = sect('account', 'Konto',
     h('div.acc',
       accRow(h('label.field', h('span', 'Name'), nameIn), h('button.btn.small', { type: 'button', onclick: saveName }, 'Speichern')),
       accRow(h('p', 'Name, Präferenzen und Panel-Anordnung auf Anfang, das Intro startet neu. Classes, Choreos, Videos und Statistiken bleiben.'),
@@ -427,9 +435,28 @@ export async function renderProfile(root, section) {
           },
         }, 'Alles löschen'))));
 
-  root.append(head, nav, filterRow || '', overview, time, status, choreoSec, classSec, sessionSec, prefs, account);
+  const panes = {
+    overview: h('div.p-tab', overview, classSec),
+    time: h('div.p-tab', time, sessionSec),
+    status: h('div.p-tab', status),
+    choreos: h('div.p-tab', choreoSec),
+    settings: h('div.p-tab', prefs, manageSec, account),
+  };
+  function showTab(id, user = false) {
+    current = id;
+    for (const [k, el] of Object.entries(panes)) el.hidden = k !== id;
+    nav.querySelectorAll('a').forEach(a => { const on = a.dataset.tab === id; a.classList.toggle('on', on); a.setAttribute('aria-selected', String(on)); });
+    if (filterRow) filterRow.hidden = id === 'settings'; // Class-Filter nur für Auswertungen
+    if (user) {
+      replaceHash(`#/profile/${id}`);
+      // Reiterleiste oben halten, Inhalt beginnt direkt darunter
+      const top = nav.getBoundingClientRect().top + scrollY - 64;
+      if (scrollY > top) scrollTo(0, top);
+    }
+  }
+  root.append(head, nav, filterRow || '', ...Object.values(panes));
+  showTab(current);
   const removeTip = attachTooltip(root);
-  if (section) requestAnimationFrame(() => document.getElementById(`p-${section}`)?.scrollIntoView({ block: 'start' }));
   return () => { removeTip(); urls.forEach(u => URL.revokeObjectURL(u)); };
 }
 
