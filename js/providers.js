@@ -115,8 +115,11 @@ export function songLink(el, song) {
   el.classList.add('song-link');
   el.title = 'Im Musikprovider öffnen';
   el.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); stopPreview(); openSong(song); });
-  if (el.tagName === 'IMG') previewOnHover(el, song);
-  return el;
+  if (el.tagName !== 'IMG') return el;
+  // Cover in eine Hülle, damit der Rahmen beim Abspielen als Negativ über dem Bild liegen kann
+  const wrap = h('span.cover-wrap', el);
+  previewOnHover(wrap, song);
+  return wrap;
 }
 
 // ── Hörprobe beim Hovern über ein Cover ──

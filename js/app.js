@@ -108,26 +108,36 @@ export function toast(msg, ms = 2600) {
   toastTimer = setTimeout(() => t.remove(), ms);
 }
 
-// Icon in der Kopfleiste zeigt die aktuelle Ansicht (Sonne/Mond wie in den Einstellungen)
+// Ansicht in der Kopfleiste: Icon zeigt die gewählte Einstellung (System/Hell/Dunkel wie in den Einstellungen),
+// Klick öffnet ein kleines Menü mit allen drei
 const themeBtn = document.querySelector('.theme-toggle');
 const darkMq = matchMedia('(prefers-color-scheme: dark)');
+const THEMES = [['system', 'Wie System'], ['light', 'Hell'], ['dark', 'Dunkel']];
+const currentTheme = () => { try { return localStorage.getItem('ct-theme') || 'system'; } catch { return 'system'; } };
 function syncThemeIcon() {
-  const dark = (document.documentElement.dataset.theme || (darkMq.matches ? 'dark' : 'light')) === 'dark';
-  themeBtn.innerHTML = themeIcon(dark ? 'dark' : 'light');
-  themeBtn.title = dark ? 'Dunkel · klicken für Hell' : 'Hell · klicken für Dunkel';
+  const t = currentTheme();
+  themeBtn.innerHTML = themeIcon(t);
+  themeBtn.title = `Ansicht: ${THEMES.find(x => x[0] === t)[1]}`;
 }
 new MutationObserver(syncThemeIcon).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 darkMq.addEventListener('change', syncThemeIcon);
 syncThemeIcon();
 
 // Hell/Dunkel: Umschalten in der Kopfleiste wird zur neuen Standardansicht (auch im Profil einstellbar)
-document.querySelector('.theme-toggle').addEventListener('click', () => {
-  const root = document.documentElement;
-  const current = root.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-  const next = current === 'dark' ? 'light' : 'dark';
-  applyTheme(next);
-  saveSettings({ theme: next });
+let themeMenu = null;
+const closeThemeMenu = () => { themeMenu?.remove(); themeMenu = null; };
+themeBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  if (themeMenu) { closeThemeMenu(); return; }
+  const cur = currentTheme();
+  themeMenu = h('div.theme-menu', { role: 'menu' }, THEMES.map(([id, label]) => h(`button${id === cur ? '.on' : ''}`, {
+    type: 'button', role: 'menuitemradio', 'aria-checked': String(id === cur),
+    onclick: () => { applyTheme(id); saveSettings({ theme: id }); syncThemeIcon(); closeThemeMenu(); },
+  }, h('i', { html: themeIcon(id, 16) }), label)));
+  themeBtn.after(themeMenu);
 });
+addEventListener('pointerdown', e => { if (themeMenu && !themeMenu.contains(e.target) && e.target !== themeBtn && !themeBtn.contains(e.target)) closeThemeMenu(); });
+addEventListener('keydown', e => { if (e.key === 'Escape') closeThemeMenu(); });
 
 // Dateien, die irgendwo außerhalb einer Dropzone landen, nicht im Tab öffnen
 addEventListener('dragover', e => e.preventDefault());

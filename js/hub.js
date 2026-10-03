@@ -325,15 +325,15 @@ export function choreoCard(c, cls, recs, urls) {
   const latest = recs[recs.length - 1];
   const thumb = hoverVideo(latest, urls, 'thumb');
   thumb.append(h('div.bar', { style: { background: `#${cls?.color || PALETTE[0]}` } }));
+  // Song-Cover klein unten links auf dem Video (Hover = Hörprobe, Klick = Musikprovider);
+  // darunter ruhige einzeilige Textzeilen, damit alle Kacheln gleich hoch sind
+  if (c.song?.cover) thumb.append(songLink(h('img.card-cover', { src: c.song.cover, alt: '' }), c.song));
   return h('a.card', { href: latest ? `#/train/${latest.id}` : `#/class/${c.classId}` },
     thumb,
-    // Song-Cover neben dem Titel (Hover = Hörprobe, Klick = Musikprovider)
-    h('div.card-head',
-      c.song?.cover ? songLink(h('img.card-cover', { src: c.song.cover, alt: '' }), c.song) : null,
-      h('div',
-        h('h3', c.title || c.song?.title || 'Ohne Song'),
-        h('div.label', `${cls ? classTitle(cls) : ''} · ${relDate(c.lastPracticed || c.created)}`))),
-    cls && nextClass(cls) ? h('div.label.next-class', `Nächste Class ${nextClass(cls)}`) : null,
+    h('h3', c.title || c.song?.title || 'Ohne Song'),
+    h('div.label', `${cls ? classTitle(cls) : ''} · ${relDate(c.lastPracticed || c.created)}`),
+    // kurz und einzeilig: nur „in 4 Tagen“, Tag und Uhrzeit im Tooltip
+    cls && nextClass(cls) ? h('div.label.next-class', { title: `Nächste Class ${nextClass(cls)}` }, `Nächste Class ${nextClass(cls).split(' · ').at(-1)}`) : null,
     h('div', { style: { marginTop: '4px' } }, dots(latestRating(c)), h('span.label', `  ${recs.length} Aufn.`)));
 }
 
