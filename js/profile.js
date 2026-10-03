@@ -425,12 +425,14 @@ export async function renderProfile(root, section) {
   const account = sect('account', 'Konto',
     h('div.acc',
       accRow('Name', nameIn, h('button.btn.small', { type: 'button', onclick: saveName }, 'Speichern')),
-      accRow('Einstellungen', h('p.label', 'Name, Präferenzen und Panel-Anordnung auf Anfang, das Intro startet neu. Classes, Choreos, Videos und Statistiken bleiben.'),
+      accRow('Einstellungen', [h('p.acc-lead', 'Setzt zurück:'), h('ul.acc-list', h('li', 'Name'), h('li', 'Präferenzen'), h('li', 'Panel-Anordnung')),
+          h('p.acc-note', 'Das Intro startet neu. Classes, Choreos, Videos und Statistiken bleiben erhalten.')],
         h('button.btn.small', {
           type: 'button',
           onclick: async () => { if (!confirm('Einstellungen zurücksetzen? Deine Daten bleiben erhalten.')) return; await resetSettings(); location.hash = '#/'; location.reload(); },
         }, 'Zurücksetzen')),
-      accRow('Daten', h('p.label', 'Löscht alles in diesem Browser: Classes, Choreos, Videos, Songdateien, Einheiten und Profil. Lässt sich nicht rückgängig machen.'),
+      accRow('Daten', [h('p.acc-lead', 'Löscht in diesem Browser:'), h('ul.acc-list', h('li', 'Classes und Choreos'), h('li', 'Videos und Songdateien'), h('li', 'Einheiten und Profil')),
+          h('p.acc-note', 'Lässt sich nicht rückgängig machen.')],
         h('button.btn.small.danger', {
           type: 'button',
           onclick: async () => {

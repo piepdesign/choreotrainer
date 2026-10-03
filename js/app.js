@@ -112,7 +112,7 @@ export function toast(msg, ms = 2600) {
 // Klick öffnet ein kleines Menü mit allen drei
 const themeBtn = document.querySelector('.theme-toggle');
 const darkMq = matchMedia('(prefers-color-scheme: dark)');
-const THEMES = [['system', 'Wie System'], ['light', 'Hell'], ['dark', 'Dunkel']];
+const THEMES = [['system', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']];
 const currentTheme = () => { try { return localStorage.getItem('ct-theme') || 'system'; } catch { return 'system'; } };
 function syncThemeIcon() {
   const t = currentTheme();

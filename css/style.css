@@ -12,6 +12,7 @@
   --surface: #f0f0f0;     /* leicht abgesetzte Fläche */
   --surface-2: #e2e2e2;   /* stärker abgesetzt (Hover, aktive Fläche) */
   --tile-gap: 5px;        /* Abstand zwischen Kacheln */
+  --hover-fill: rgba(0, 0, 0, .08); /* leicht transparente Füllung beim Hovern */
   --c1: #F5769C; --c2: #1E6236; --c3: #AFA23A; --c4: #F9C041; --c5: #F3672D; --c6: #324BB4;
   --accent: var(--c4);
   --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
@@ -20,7 +21,8 @@
   color-scheme: light;
 }
 :root[data-theme="dark"] {
-  color-scheme: dark; /* sonst bleiben Uhr-/Kalender-Icon und Auswahlpfeile schwarz */
+  color-scheme: dark;
+  --hover-fill: rgba(255, 255, 255, .14); /* sonst bleiben Uhr-/Kalender-Icon und Auswahlpfeile schwarz */
   --bg: #000; --fg: #fff; --muted: #a2a2a2; --line: rgba(255, 255, 255, .2);
   --panel: #1a1a1a; --track: rgba(255, 255, 255, .18);
   --rule: #4c4c4c; --surface: #141414; --surface-2: #232323;
@@ -28,6 +30,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
+    --hover-fill: rgba(255, 255, 255, .14);
     --bg: #000; --fg: #fff; --muted: #a2a2a2; --line: rgba(255, 255, 255, .2);
     --panel: #1a1a1a; --track: rgba(255, 255, 255, .18);
     --rule: #4c4c4c; --surface: #141414; --surface-2: #232323;
@@ -206,10 +209,12 @@ button.chip[data-hex] { width: 64px; height: 28px; padding: 0; }
 .btn.primary { background: var(--fg); color: var(--bg); }
 .btn:disabled { opacity: .35; cursor: not-allowed; }
 .btn.small { padding: 5px 9px; font-size: 11px; }
-.btn.danger:hover { background: var(--c5); border-color: var(--c5); color: #000; }
+.btn.danger:not(:disabled):hover { background: var(--c5); border-color: var(--c5); color: #000; }
 .btn, .ctl, .linkbtn, .rating button, .seg button, .pop-close { transition: opacity .15s, background-color .15s, border-color .15s, color .15s; }
-/* Hover: alle Knöpfe werden leicht transparent */
-.btn:not(:disabled):hover, .ctl:not(:disabled):hover, .linkbtn:hover, .rating button:hover, .seg button:hover { opacity: .6; }
+/* Hover: Knöpfe bekommen eine leicht transparente graue (hell) bzw. weiße (dunkel) Füllung;
+   gefüllte Knöpfe (primär, aktiv) werden etwas heller */
+.btn:not(:disabled):hover, .ctl:not(:disabled):hover, .rating button:hover, .pop-close:hover { background-color: var(--hover-fill); }
+.btn.primary:not(:disabled):hover, .ctl.on:hover, .rating button.on:hover { background-color: color-mix(in srgb, var(--fg) 78%, var(--bg)); }
 .linkbtn { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; text-decoration: underline; text-underline-offset: 3px; }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
@@ -312,11 +317,11 @@ main:has(.train) { padding-bottom: 0; }
   padding: 6px 9px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; border: 1px solid transparent;
   font-variant-numeric: tabular-nums; position: relative;
 }
-.ctl:hover { border-color: var(--line); }
 .ctl.on { background: var(--fg); color: var(--bg); }
 .ctl.icon-ctl { display: inline-grid; place-items: center; padding-left: 6px; padding-right: 6px; }
 .ctl.icon-ctl svg { display: block; }
 .panel-btn.on { background: none; color: var(--fg); }
+.panel-btn.on:hover { background-color: var(--hover-fill); }
 .ctl.play { font-size: 13px; min-width: 42px; }
 .ctl-sep { width: 1px; height: 18px; background: var(--line); margin: 0 6px; }
 .timeview { font-size: 12px; margin-left: auto; font-variant-numeric: tabular-nums; }
@@ -580,7 +585,13 @@ a.stat-link:hover { background: var(--surface-2); }
 .acc-title { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--fg); margin-bottom: -4px; }
 .acc-text input[type=text] { width: 100%; }
 .acc-card > .btn { align-self: flex-start; }
-.acc-text p { margin: 0; line-height: 1.6; }
+.acc-text p { margin: 0; }
+/* Konto-Erklärungen: normale Groß-/Kleinschreibung, kurze Liste zum schnellen Erfassen */
+.acc-lead, .acc-note, .acc-list { font-size: 12px; line-height: 1.55; }
+.acc-lead { color: var(--fg); }
+.acc-list { margin: 4px 0 8px; padding: 0; list-style: none; color: var(--fg); }
+.acc-list li::before { content: '–'; color: var(--muted); margin-right: 8px; }
+.acc-note { color: var(--muted); }
 .acc-text .field input { max-width: none; }
 
 /* Statistik-Auswahl: Kacheln wie in der Base, oben gezeigt, unten weitere */

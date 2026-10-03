@@ -115,7 +115,7 @@ export function preferences(values, onChange, statValues = null, { baseLabel = t
     block('Hörprobe beim Hovern über Song-Cover', single('hoverPreview', [['on', 'An'], ['off', 'Aus']], values.hoverPreview === 'off' ? 'off' : 'on',
       ([id, label]) => [h('i.brand', { html: svg26(SOUND_PATHS[id]) }), h('span', label)])),
     block('Statistiken', chips),
-    block('Ansicht', single('theme', [['system', 'Wie System'], ['light', 'Hell'], ['dark', 'Dunkel']], values.theme,
+    block('Ansicht', single('theme', [['system', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']], values.theme,
       ([id, label]) => [h('i.brand', { html: THEME_ICONS[id] }), h('span', label)])));
 }
 
