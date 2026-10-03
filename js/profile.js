@@ -434,16 +434,16 @@ export async function renderProfile(root, section) {
     h('div.acc',
       // Name + Tester*in in einer Kachel; Tester*in wirkt sofort (Knopf unten rechts für Bug-Meldungen und Ideen)
       accRow('Profil', [
-        h('label.field', h('span', 'Name'), nameIn),
+        h('div.field', h('span', 'Name'), h('div.acc-inline', nameIn, h('button.btn.small', { type: 'button', onclick: saveName }, 'Speichern'))),
         h('div.field.acc-tester', h('span', 'Tester*in'), testerSeg()),
-      ], h('button.btn.small', { type: 'button', onclick: saveName }, 'Name speichern')),
-      accRow('Einstellungen', [h('p.acc-lead', 'Setzt zurück:'), h('ul.acc-list', h('li', 'Name'), h('li', 'Präferenzen'), h('li', 'Panel-Anordnung')),
+      ], null),
+      accRow('Neustart', [h('p.acc-lead', 'Setzt zurück:'), h('ul.acc-list', h('li', 'Name'), h('li', 'Präferenzen'), h('li', 'Panel-Anordnung')),
           h('p.acc-note', 'Das Intro startet neu. Classes, Choreos, Videos und Statistiken bleiben erhalten.')],
         h('button.btn.small', {
           type: 'button',
           onclick: async () => { if (!confirm('Einstellungen zurücksetzen? Deine Daten bleiben erhalten.')) return; await resetSettings(); location.hash = '#/'; location.reload(); },
         }, 'Zurücksetzen')),
-      accRow('Daten', [h('p.acc-lead', 'Löscht in diesem Browser:'), h('ul.acc-list', h('li', 'Classes und Choreos'), h('li', 'Videos und Songdateien'), h('li', 'Einheiten und Profil')),
+      accRow('Werkseinstellungen', [h('p.acc-lead', 'Löscht in diesem Browser:'), h('ul.acc-list', h('li', 'Classes und Choreos'), h('li', 'Videos und Songdateien'), h('li', 'Einheiten und Profil')),
           h('p.acc-note', 'Lässt sich nicht rückgängig machen.')],
         h('button.btn.small.danger', {
           type: 'button',

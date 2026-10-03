@@ -143,8 +143,8 @@ addEventListener('keydown', e => { if (e.key === 'Escape') closeThemeMenu(); });
 const FEEDBACK_TO = 'sagmal@piep.design';
 const mail = (subject, intro) => `mailto:${FEEDBACK_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(`${intro}\n\n• `)}`;
 const FEEDBACK = [
-  ['bug', 'Bug melden', mail('Bug Report: CHOREO—TRAINER©', 'Folgende/r Bug/s sind mir aufgefallen:')],
-  ['idea', 'Idee oder Wunsch', mail('Idee/Wunsch: CHOREO—TRAINER©', 'Folgende Idee oder Wunsch habe ich:')],
+  ['bug', 'Bug melden', mail('Bug Report: CHOREO–TRAINER©', 'Folgender Bug ist mir aufgefallen:')],
+  ['idea', 'Idee oder Wunsch', mail('Idee/Wunsch: CHOREO–TRAINER©', 'Folgende Idee oder Wunsch habe ich:')],
 ];
 let testerFab = null;
 function syncTester() {
