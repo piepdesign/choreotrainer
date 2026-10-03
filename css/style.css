@@ -406,7 +406,8 @@ body.intro-open { overflow: hidden; }
 @keyframes mark-in { to { opacity: 1; transform: none; filter: none; } }
 .intro-lead { font-size: 16px; margin: 0; }
 .intro-row { display: flex; align-items: center; gap: 16px; margin-top: 18px; }
-.intro-input { font: 800 clamp(22px, 4vw, 44px) var(--wide) !important; font-stretch: 125% !important; text-transform: uppercase; text-align: center; width: min(560px, 80vw) !important; border-bottom: 2px solid var(--fg) !important; margin-top: 24px; }
+.intro-field { display: flex; justify-content: center; width: min(560px, 80vw); border-bottom: 2px solid var(--fg); margin-top: 24px; cursor: text; }
+.intro-input { font: 800 clamp(22px, 4vw, 44px) var(--wide) !important; font-stretch: 125% !important; text-transform: uppercase; text-align: left; field-sizing: content; width: auto !important; min-width: 1ch; max-width: 100%; border: 0 !important; padding: 7px 0 !important; caret-color: var(--fg); }
 .intro-input::placeholder { color: var(--rule); }
 /* Navigation immer gleich: unten, feste Plätze, schlanke Pfeile ohne Rahmen */
 .intro-nav { display: grid; grid-template-columns: 64px 1fr 64px; align-items: center; width: min(980px - 2 * var(--gutter), 100% - 2 * var(--gutter)); margin: clamp(20px, 4vh, 40px) auto 0; padding-top: 10px; border-top: 1px solid var(--rule); }

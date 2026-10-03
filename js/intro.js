@@ -48,18 +48,37 @@ export async function runIntro() {
   const steps = [
     {
       render() {
-        const input = h('input.intro-input', { type: 'text', autofocus: true, value: state.name, placeholder: 'DEIN NAME', autocomplete: 'given-name' });
-        input.addEventListener('input', () => { state.name = input.value.trim().toUpperCase(); refreshNav(); });
+        const input = h('input.intro-input', { type: 'text', autofocus: true, value: state.name, placeholder: 'DEIN NAME', autocomplete: 'off', spellcheck: 'false' });
+        const sync = () => { state.name = input.value.trim().toUpperCase(); refreshNav(); };
+        input.addEventListener('input', sync);
         input.addEventListener('keydown', e => { if (e.key === 'Enter' && state.name) go(1); });
-        // Cursor direkt ins Feld; falls der Browser den Fokus verweigert, landet der erste Tastendruck trotzdem dort
-        const focus = () => { if (input.isConnected) input.focus(); };
-        setTimeout(focus, 260); setTimeout(focus, 700);
+        // Cursor sofort ins Feld (mehrfach, weil der Browser den Fokus während des Übergangs teils verwirft)
+        const focus = () => { if (input.isConnected && document.activeElement !== input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); } };
+        [0, 260, 500, 900].forEach(ms => setTimeout(focus, ms));
+        addEventListener('focus', focus); // Fenster bekommt den Fokus erst später (z. B. nach dem Neuladen)
+        // Tippen landet immer im Feld: Zeichen, die nicht ankommen (Fokus fehlte oder wurde verschluckt), selbst einsetzen
         const grab = e => {
-          if (!input.isConnected) { removeEventListener('keydown', grab, true); return; }
-          if (document.activeElement !== input && e.key.length === 1 && !e.metaKey && !e.ctrlKey) input.focus();
+          if (!input.isConnected) { removeEventListener('keydown', grab, true); removeEventListener('focus', focus); return; }
+          if (e.key.length !== 1 || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
+          const before = input.value;
+          if (document.activeElement !== input) {
+            e.preventDefault();
+            focus();
+            input.value = before + e.key;
+            sync();
+            return;
+          }
+          setTimeout(() => {
+            if (input.value !== before) return; // normal angekommen
+            const a = input.selectionStart ?? before.length, b = input.selectionEnd ?? a;
+            input.value = before.slice(0, a) + e.key + before.slice(b);
+            input.setSelectionRange(a + 1, a + 1);
+            sync();
+          }, 0);
         };
         addEventListener('keydown', grab, true);
-        return h('div.intro-step.center', h('h1.wide', 'HI, WIE HEISST DU?'), input);
+        // breite Linie bleibt, das Feld selbst ist so breit wie der Inhalt: Cursor steht direkt vor „DEIN NAME“
+        return h('div.intro-step.center', h('h1.wide', 'HI, WIE HEISST DU?'), h('label.intro-field', input));
       },
       canGo: () => !!state.name,
     },
