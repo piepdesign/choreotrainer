@@ -3,7 +3,7 @@
 // Class-Farben, Werte immer in Textfarbe, Tooltip auf jedem Datenpunkt.
 import { db, deleteAllData } from './db.js';
 import { h, fmt, fmtDuration, relDate, fmtRecDate, inlineEdit, classTitle, stripe, byClassOrder, WEEKDAYS, textOn, plural } from './util.js';
-import { loadAll, dots, choreoCard, recTitle, nextClass, hoverVideo } from './hub.js';
+import { loadAll, dots, choreoCard, recTitle, nextClass } from './hub.js';
 import { songLink } from './providers.js';
 import { baseStats, latestRating, choreoLength, weekStart, dayKey } from './stats.js';
 import { settings, saveSettings, applyTheme, resetSettings, BASE_STATS } from './settings.js';
@@ -370,10 +370,10 @@ export async function renderProfile(root, section) {
       choreoBox.replaceChildren(list.length ? h('div.cards', list.map(c => choreoCard(c, classById[c.classId], recsByChoreo[c.id] || [], urls))) : h('p.empty', 'Noch keine Choreos.'));
     } else {
       choreoBox.replaceChildren(sortTable([
-        // klein und quadratisch: Song-Cover (Hover = Hörprobe) und Video (Hover = Vorschau)
+        // klein und quadratisch: Song-Cover (Hover = Hörprobe) und Standbild des Videos (zu klein für eine Vorschau)
         { label: 'Choreo', value: c => titleOf(c), cell: c => [
           c.song?.cover ? songLink(h('img.sq-cover', { src: c.song.cover, alt: '' }), c.song) : h('i.sq-cover.blank'),
-          (recsByChoreo[c.id] || []).length ? hoverVideo(recsByChoreo[c.id].at(-1), urls, 'sq-thumb') : h('i.sq-thumb.blank'),
+          recsByChoreo[c.id]?.at(-1)?.thumb ? h('img.sq-thumb', { src: recsByChoreo[c.id].at(-1).thumb, alt: '' }) : h('i.sq-thumb.blank'),
           h('span.sq-title', titleOf(c))] },
         { label: 'Class', value: c => (classById[c.classId] ? classTitle(classById[c.classId]) : ''), cell: c => [h('i.swatch', { style: { background: `#${classById[c.classId]?.color || 'ccc'}` } }), classById[c.classId] ? classTitle(classById[c.classId]) : '—'] },
         { label: 'Status', value: statusOf, cell: c => dots(latestRating(c)) },

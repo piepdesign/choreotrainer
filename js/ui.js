@@ -6,12 +6,15 @@ import { brandIcon } from './brand-icons.js';
 
 const brandSvg = id => brandIcon(id, 26);
 // Ansicht: halber Kreis (System), Sonne (Hell), Mond (Dunkel), Größe wie die Provider-Logos
-const svg26 = body => `<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">${body}</svg>`;
-const THEME_ICONS = {
-  system: svg26('<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/>'),
-  light: svg26('<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>'),
-  dark: svg26('<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/>'),
+const svg26 = (body, size = 26) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">${body}</svg>`;
+const THEME_PATHS = {
+  system: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/>',
+  light: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>',
+  dark: '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/>',
 };
+const THEME_ICONS = Object.fromEntries(Object.entries(THEME_PATHS).map(([k, p]) => [k, svg26(p)]));
+// gleiche Icons klein für die Kopfleiste
+export const themeIcon = (id, size = 18) => svg26(THEME_PATHS[id], size);
 
 // Auswahlliste wie beim Wochentag, mit zusätzlicher Option, einen eigenen Wert hinzuzufügen.
 // Liefert ein Element mit .value (lesen/setzen) und .focus(), passt also überall, wo vorher ein Input stand.

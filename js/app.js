@@ -8,6 +8,7 @@ import { requestPersist, undo, redo } from './db.js';
 import { loadSettings, settings, saveSettings, applyTheme } from './settings.js';
 import { h } from './util.js';
 import { stopPreview } from './providers.js';
+import { themeIcon } from './ui.js';
 
 export const state = { pendingFile: null };
 
@@ -106,6 +107,18 @@ export function toast(msg, ms = 2600) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.remove(), ms);
 }
+
+// Icon in der Kopfleiste zeigt die aktuelle Ansicht (Sonne/Mond wie in den Einstellungen)
+const themeBtn = document.querySelector('.theme-toggle');
+const darkMq = matchMedia('(prefers-color-scheme: dark)');
+function syncThemeIcon() {
+  const dark = (document.documentElement.dataset.theme || (darkMq.matches ? 'dark' : 'light')) === 'dark';
+  themeBtn.innerHTML = themeIcon(dark ? 'dark' : 'light');
+  themeBtn.title = dark ? 'Dunkel · klicken für Hell' : 'Hell · klicken für Dunkel';
+}
+new MutationObserver(syncThemeIcon).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+darkMq.addEventListener('change', syncThemeIcon);
+syncThemeIcon();
 
 // Hell/Dunkel: Umschalten in der Kopfleiste wird zur neuen Standardansicht (auch im Profil einstellbar)
 document.querySelector('.theme-toggle').addEventListener('click', () => {
