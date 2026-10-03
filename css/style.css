@@ -665,3 +665,6 @@ body.intro-open .tester-fab { display: none; }
 .fab-main svg, .fab-action svg { display: block; }
 .acc-tester { margin-top: 14px; }
 .pref-hint { margin: -6px 0 12px; font-size: 12px; line-height: 1.5; color: var(--muted); }
+/* Abstand rechts gehört an die Hülle, sonst reicht der Hörprobe-Rahmen über das Cover hinaus */
+.cover-wrap:has(> .sq-cover) { margin-right: 8px; }
+.cover-wrap > .sq-cover { margin-right: 0; }
