@@ -947,7 +947,7 @@ export async function renderTrain(root, recId) {
     {
       // Auch im schmalen (gestapelten) Layout an der Fensterhöhe begrenzen, sonst gibt es bei
       // „Breite füllen“ nie einen Überstand zum Verschieben
-      const used = crumbs.offsetHeight + timeline.offsetHeight + controls.offsetHeight + 28;
+      const used = crumbs.offsetHeight + timeline.offsetHeight + controls.offsetHeight + 34; // + Abstände
       const avail = Math.max(180, (stacked ? innerHeight - 72 : mainCol.clientHeight) - used);
       // Breite füllen: Video so breit wie die Spalte, was über die verfügbare Höhe hinausgeht, wird oben/unten
       // beschnitten (und lässt sich verschieben). Vorher wurde die Fläche auf volle Höhe gezogen, dann schnitt

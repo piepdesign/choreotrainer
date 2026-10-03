@@ -4,13 +4,14 @@
 :root {
   --bg: #fff;
   --fg: #000;
-  --muted: #6e6e6e;
-  --line: rgba(0, 0, 0, .14);
-  --panel: #f3f3f3;
-  --track: rgba(0, 0, 0, .1);
-  --rule: #c9c9c9;        /* einzige Trennlinie */
-  --surface: #f6f6f6;     /* leicht abgesetzte Fläche */
-  --surface-2: #ececec;   /* stärker abgesetzt (Hover, aktive Fläche) */
+  --muted: #5e5e5e;
+  --line: rgba(0, 0, 0, .18);
+  --panel: #ececec;
+  --track: rgba(0, 0, 0, .13);
+  --rule: #b9b9b9;        /* einzige Trennlinie */
+  --surface: #f0f0f0;     /* leicht abgesetzte Fläche */
+  --surface-2: #e2e2e2;   /* stärker abgesetzt (Hover, aktive Fläche) */
+  --tile-gap: 5px;        /* Abstand zwischen Kacheln */
   --c1: #F5769C; --c2: #1E6236; --c3: #AFA23A; --c4: #F9C041; --c5: #F3672D; --c6: #324BB4;
   --accent: var(--c4);
   --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
@@ -18,15 +19,15 @@
   --gutter: clamp(16px, 3vw, 40px);
 }
 :root[data-theme="dark"] {
-  --bg: #000; --fg: #fff; --muted: #8c8c8c; --line: rgba(255, 255, 255, .16);
-  --panel: #111; --track: rgba(255, 255, 255, .14);
-  --rule: #3a3a3a; --surface: #0c0c0c; --surface-2: #161616;
+  --bg: #000; --fg: #fff; --muted: #a2a2a2; --line: rgba(255, 255, 255, .2);
+  --panel: #1a1a1a; --track: rgba(255, 255, 255, .18);
+  --rule: #4c4c4c; --surface: #141414; --surface-2: #232323;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #000; --fg: #fff; --muted: #8c8c8c; --line: rgba(255, 255, 255, .16);
-    --panel: #111; --track: rgba(255, 255, 255, .14);
-    --rule: #3a3a3a; --surface: #0c0c0c; --surface-2: #161616;
+    --bg: #000; --fg: #fff; --muted: #a2a2a2; --line: rgba(255, 255, 255, .2);
+    --panel: #1a1a1a; --track: rgba(255, 255, 255, .18);
+    --rule: #4c4c4c; --surface: #141414; --surface-2: #232323;
   }
 }
 
@@ -84,7 +85,7 @@ main { padding: 0 var(--gutter) 80px; }
 .dropzone input { display: none; }
 
 /* Kacheln füllen jede Zeile ganz aus (auch eine übrige letzte Kachel) */
-.stats { display: flex; flex-wrap: wrap; gap: 2px; margin-top: clamp(28px, 4vw, 48px); }
+.stats { display: flex; flex-wrap: wrap; gap: var(--tile-gap); margin-top: clamp(28px, 4vw, 48px); }
 .stats > .stat { flex: 1 1 200px; min-width: 0; }
 .stat { padding: 14px 16px 16px; background: var(--surface); }
 .stat .hint { display: block; margin-top: 4px; text-transform: none; letter-spacing: 0; }
@@ -288,8 +289,8 @@ main:has(.train) { padding-bottom: 0; }
 .song-offset { display: flex; gap: 6px; align-items: center; font-size: 11px; }
 .song-offset input { width: 64px; padding: 2px 0; }
 
-.timeline { background: var(--surface); padding: 8px 10px; margin-top: 2px !important; }
-.controls { display: flex; flex-wrap: wrap; gap: 4px 2px; align-items: center; margin-top: 2px; background: var(--surface); padding: 6px 8px; }
+.timeline { background: var(--surface); padding: 8px 10px; margin-top: var(--tile-gap) !important; }
+.controls { display: flex; flex-wrap: wrap; gap: 4px 2px; align-items: center; margin-top: var(--tile-gap); background: var(--surface); padding: 6px 8px; }
 .ctl.fixed { text-align: center; white-space: nowrap; overflow: hidden; }
 .track.eights { height: 20px; cursor: pointer; user-select: none; }
 .track.eights::before { display: none; }
@@ -328,7 +329,7 @@ main:has(.train) { padding-bottom: 0; }
 .pop-close:hover { opacity: 1; }
 .pop .note { max-width: 300px; }
 
-.side { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
+.side { display: flex; flex-direction: column; gap: var(--tile-gap); min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
 .panel-sec { background: var(--surface); padding: 0 20px 14px; flex: none; }
 .panel-sec.collapsed { padding-bottom: 0; }
 .panel-sec.collapsed .panel-body { display: none; }
@@ -380,8 +381,8 @@ main:has(.train) { padding-bottom: 0; }
 .card { background: var(--surface); }
 .card > :not(.thumb) { padding-left: 8px; padding-right: 8px; }
 .card > :last-child { padding-bottom: 8px; }
-.fieldset { background: var(--surface); border-top: 0 !important; padding: 12px 14px 18px; margin-bottom: 2px; }
-.choreo-block { background: var(--surface); border-top: 0 !important; padding: 14px; margin-bottom: 2px; }
+.fieldset { background: var(--surface); border-top: 0 !important; padding: 12px 14px 18px; margin-bottom: var(--tile-gap); }
+.choreo-block { background: var(--surface); border-top: 0 !important; padding: 14px; margin-bottom: var(--tile-gap); }
 
 /* ── Auswahlfenster / Tooltip ─────────────────── */
 .modal { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, .45); display: grid; place-items: center; padding: 16px; }
@@ -439,7 +440,7 @@ body.intro-open { overflow: hidden; }
 .p-sec { scroll-margin-top: 110px; }
 .p-sec .section-head { margin-top: clamp(32px, 4vw, 52px); }
 .p-sub { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; margin: 18px 0 10px; }
-.p-grid { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 2px; }
+.p-grid { display: flex; flex-wrap: wrap; gap: var(--tile-gap); margin-top: var(--tile-gap); }
 .p-grid > div { flex: 1 1 300px; }
 .p-grid > div { background: var(--surface); padding: 4px 14px 14px; min-width: 0; }
 .p-big { display: grid; align-content: center; gap: 8px; padding: 18px 14px !important; }
@@ -457,7 +458,7 @@ body.intro-open { overflow: hidden; }
 .xlabels span { flex: 1; text-align: center; font-size: 9px; color: var(--muted); white-space: nowrap; overflow: hidden; }
 .xlabels span.peak { color: var(--fg); }
 .chart-note { margin-top: 8px; }
-.heat { background: var(--surface); padding: 14px; overflow-x: auto; margin-top: 2px; }
+.heat { background: var(--surface); padding: 14px; overflow-x: auto; margin-top: var(--tile-gap); }
 .heat-plot { min-height: 120px; }
 .heat svg { width: auto; max-width: none; }
 .heatmap .axis { font: 11px var(--mono); letter-spacing: .08em; fill: var(--muted); }
@@ -477,7 +478,7 @@ body.intro-open { overflow: hidden; }
 .hbar:hover .hb-fill { opacity: 1; }
 .hb-val { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 11px; }
 .swatch { display: inline-block; width: 8px; height: 8px; flex: none; margin-right: 6px; }
-.p-table { display: grid; gap: 2px; margin-top: 2px; }
+.p-table { display: grid; gap: 3px; margin-top: var(--tile-gap); }
 .p-row { display: grid; grid-template-columns: minmax(0, 2fr) 1fr 1fr 1fr; gap: 10px; align-items: center; background: var(--surface); padding: 9px 12px; font-size: 12px; }
 .p-table.wide5 .p-row { grid-template-columns: 1.4fr 2fr .8fr .6fr .5fr; }
 .p-table.wide6 .p-row { grid-template-columns: 2.4fr 1.2fr .9fr .6fr .8fr .8fr; }
@@ -498,7 +499,7 @@ a.p-row:hover { background: var(--surface-2); }
 
 /* ── Class-Verwaltung (Intro, Profil) ───────── */
 .class-manager { display: grid; gap: 28px; }
-.cm-list { display: grid; gap: 2px; }
+.cm-list { display: grid; gap: 3px; }
 .cm-row { display: flex; gap: 0 16px; align-items: center; padding: 10px 14px; font-size: 14px; letter-spacing: .02em; white-space: nowrap; }
 .cm-actions { display: flex; gap: 14px; flex: none; }
 .cm-actions .linkbtn { color: inherit; }
@@ -560,14 +561,14 @@ a.stat-link:hover { background: var(--surface-2); }
 /* ── Präferenzen: Titel über der Auswahl, Breite begrenzt ── */
 .prefs { display: grid; gap: 30px; margin-top: 8px; }
 .pref-block .p-sub { margin: 0 0 12px; }
-.provider-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 2px; }
+.provider-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: var(--tile-gap); }
 .provider-tiles button { display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 92px; padding: 14px 8px; background: var(--surface); font-size: 12px; color: var(--muted); transition: background .15s, color .15s; }
 .provider-tiles button:hover { color: var(--fg); background: var(--surface-2); }
 .provider-tiles button.on { background: var(--fg); color: var(--bg); }
 .provider-tiles .brand { opacity: 1; }
 
 /* ── Konto: Kacheln wie Provider/Statistiken, Knopf unten an derselben Stelle ── */
-.acc { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 2px; }
+.acc { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--tile-gap); }
 .acc-card { display: flex; flex-direction: column; gap: 14px; background: var(--surface); padding: 16px; min-height: 150px; }
 .acc-card .acc-text { flex: 1; }
 .acc-card > .btn { align-self: flex-start; }
