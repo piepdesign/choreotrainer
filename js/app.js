@@ -2,7 +2,10 @@
 import { renderHub, renderClass } from './hub.js';
 import { renderUpload } from './upload.js';
 import { renderTrain } from './train.js';
+import { renderProfile } from './profile.js';
+import { runIntro } from './intro.js';
 import { requestPersist } from './db.js';
+import { loadSettings, settings, saveSettings, applyTheme } from './settings.js';
 import { h } from './util.js';
 
 export const state = { pendingFile: null };
@@ -15,6 +18,7 @@ const routes = [
   [/^#\/upload(?:\?(choreo|class)=([\w-]+))?$/, m => renderUpload(view, m[1], m[2]), 'upload'],
   [/^#\/class\/([\w-]+)$/, m => renderClass(view, m[1]), 'hub'],
   [/^#\/train\/([\w-]+)$/, m => renderTrain(view, m[1]), null],
+  [/^#\/profile(?:\/(\w+))?$/, m => renderProfile(view, m[1]), 'profile'],
 ];
 
 // Eigener Verlauf für den „<“-Knopf (überlebt ein Neuladen des Tabs)
@@ -22,6 +26,7 @@ const backBtn = document.querySelector('.back-btn');
 let trail = [];
 try { trail = JSON.parse(sessionStorage.getItem('ct-trail')) || []; } catch { /* leer starten */ }
 let replaceNext = false;
+let keepScroll = false;
 
 function remember(hash) {
   if (replaceNext && trail.length) trail[trail.length - 1] = hash;
@@ -46,22 +51,25 @@ async function route() {
     if (!m) continue;
     remember(hash.match(/^#?\/?$/) ? '#/' : hash);
     document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === nav));
+    const y = keepScroll ? scrollY : 0;
+    keepScroll = false;
     view.replaceChildren();
-    window.scrollTo(0, 0);
     try {
       cleanup = (await fn(m)) || null;
     } catch (e) {
       console.error(e);
       view.replaceChildren(h('p.empty', `Fehler: ${e.message}`));
     }
+    window.scrollTo(0, y);
     return;
   }
   location.hash = '#/';
 }
-
 // replace: aktuelle Seite im Verlauf ersetzen (z. B. Upload → Training)
-export function go(hash, { replace = false } = {}) {
-  if (location.hash === hash) { route(); return; }
+// keep: Scrollposition behalten (z. B. nach dem Umsortieren der Classes)
+export function go(hash, { replace = false, keep = false } = {}) {
+  keepScroll = keep;
+  if (location.hash === hash || (hash === '#/' && !location.hash)) { route(); return; }
   replaceNext = replace;
   if (replace) location.replace(hash); else location.hash = hash;
 }
@@ -75,13 +83,13 @@ export function toast(msg, ms = 2600) {
   toastTimer = setTimeout(() => t.remove(), ms);
 }
 
-// Hell/Dunkel: ohne gespeicherte Wahl folgt die App dem System
+// Hell/Dunkel: Umschalten in der Kopfleiste wird zur neuen Standardansicht (auch im Profil einstellbar)
 document.querySelector('.theme-toggle').addEventListener('click', () => {
   const root = document.documentElement;
   const current = root.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   const next = current === 'dark' ? 'light' : 'dark';
-  root.dataset.theme = next;
-  try { localStorage.setItem('ct-theme', next); } catch { /* privat-Modus */ }
+  applyTheme(next);
+  saveSettings({ theme: next });
 });
 
 // Dateien, die irgendwo außerhalb einer Dropzone landen, nicht im Tab öffnen
@@ -90,4 +98,11 @@ addEventListener('drop', e => e.preventDefault());
 
 addEventListener('hashchange', route);
 requestPersist();
-route();
+
+// Start: Einstellungen laden, beim ersten Öffnen das Intro, dann die Seite
+(async () => {
+  try { await loadSettings(); } catch (e) { console.error(e); }
+  applyTheme();
+  if (!settings().introDone) await runIntro();
+  route();
+})();

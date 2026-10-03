@@ -1,7 +1,10 @@
-// Hub (Übersicht) und Class-Ansicht
+// Base (Übersicht) und Class-Ansicht
 import { db, deleteChoreo, deleteClass, deleteRecording } from './db.js';
 import { h, fmt, fmtRecDate, fmtDuration, relDate, classTitle, classMeta, stripe, inlineEdit, PALETTE, textOn, WEEKDAYS, byClassOrder, CLASS_TITLES, CLASS_LEVELS } from './util.js';
 import { state, go, toast } from './app.js';
+import { baseStats } from './stats.js';
+import { settings, BASE_STATS } from './settings.js';
+import { songLink } from './providers.js';
 
 export async function loadAll() {
   const [classes, choreos, recordings, sessions] = await Promise.all(
@@ -169,20 +172,15 @@ const cover = (song, cls = 'nocover') => song?.cover ? h('img', { src: song.cove
 
 export async function renderHub(root) {
   const data = await loadAll();
-  const { classes, choreos, sessions, classById, recsByChoreo } = data;
+  const { classes, choreos, classById, recsByChoreo } = data;
 
-  // Statistik
-  const now = Date.now();
-  const total = sessions.reduce((s, x) => s + x.seconds, 0);
-  const week = sessions.filter(s => s.start > now - 7 * 86400000).reduce((s, x) => s + x.seconds, 0);
-  const last = sessions.reduce((m, s) => Math.max(m, s.start), 0);
-  const rated = choreos.map(latestRating).filter(Boolean);
-  const avg = rated.length ? (rated.reduce((a, b) => a + b, 0) / rated.length).toFixed(1).replace('.', ',') : '—';
-  const streak = practiceStreak(sessions);
+  // Kacheln nach Wahl im Profil
+  const values = baseStats(data);
+  const chosen = settings().baseStats.filter(id => values[id]);
+  const label = id => BASE_STATS.find(x => x[0] === id)?.[1] || id;
 
-  const recent = [...choreos]
-    .sort((a, b) => (b.lastPracticed || b.created) - (a.lastPracticed || a.created))
-    .slice(0, 6);
+  const sorted = [...choreos].sort((a, b) => (b.lastPracticed || b.created) - (a.lastPracticed || a.created));
+  const recent = sorted.slice(0, 5);
   const songs = [];
   const seen = new Set();
   for (const c of [...choreos].sort((a, b) => b.created - a.created)) {
@@ -192,40 +190,42 @@ export async function renderHub(root) {
   }
 
   const urls = [];
+  // Letzte Choreos: eine Zeile, waagrecht scrollbar, max. 5. Mehr → „>“ zur Gesamtübersicht im Profil
+  const cardsRow = h('div.cards.hscroll', recent.map(c => choreoCard(c, classById[c.classId], recsByChoreo[c.id] || [], urls)),
+    choreos.length > 5 ? h('a.more', { href: '#/profile/choreos', title: `Alle ${choreos.length} Choreos` }, '>') : null);
+  // Letzte Songs: so hoch wie die Choreo-Zeile, darüber hinaus senkrecht scrollbar
+  const songList = h('ul.songlist.vscroll', songs.map(c => h('li',
+    songLink(cover(c.song), c.song),
+    songLink(h('div', h('div.t', c.song.title), h('div.label', c.song.artist || '—')), c.song),
+    h('span.label', c.song.duration ? fmt(c.song.duration) : ''))));
+
   root.append(
     h('div', { style: { height: '12px' } }),
     dropzone(f => { state.pendingFile = f; go('#/upload'); }),
-    h('div.stats',
-      stat('Zuletzt geübt', relDate(last)),
-      stat('Übungszeit 7 Tage', fmtDuration(week)),
-      stat('Übungszeit gesamt', fmtDuration(total)),
-      stat('Ø Sitzt (1–5)', avg),
-      stat('Choreos', `${choreos.length}`),
-      stat('Serie', streak ? `${streak} ${streak === 1 ? 'Tag' : 'Tage'}` : '—'),
-    ),
+    h('div.stats', chosen.map(id => stat(label(id), values[id].value, values[id].hint))),
     h('div.columns',
-      h('div',
-        h('div.section-head', h('h2.wide', 'LETZTE CHOREOS'), h('span.label', `${choreos.length} gesamt`)),
-        recent.length
-          ? h('div.cards', recent.map(c => choreoCard(c, classById[c.classId], recsByChoreo[c.id] || [], urls)))
-          : h('p.empty', 'Noch keine Choreo. Leg oben das erste Video ab.')),
-      h('div',
+      h('div.col-choreos',
+        h('div.section-head', h('h2.wide', 'LETZTE CHOREOS')),
+        recent.length ? cardsRow : h('p.empty', 'Noch keine Choreo. Leg oben das erste Video ab.')),
+      h('div.col-songs',
         h('div.section-head', h('h2.wide', 'LETZTE SONGS')),
-        songs.length
-          ? h('ul.songlist', songs.slice(0, 6).map(c => h('li',
-            cover(c.song),
-            h('div', h('div.t', c.song.title), h('div.label', c.song.artist || '—')),
-            h('span.label', c.bpm || c.song.bpm ? `${Math.round(c.bpm || c.song.bpm)} BPM` : (c.song.duration ? fmt(c.song.duration) : '')))))
-          : h('p.empty', 'Noch keine Songs.'))),
-    h('div.section-head', h('h2.wide', 'CLASSES'), h('span.label', `${classes.length}`)),
+        songs.length ? songList : h('p.empty', 'Noch keine Songs.'))),
+    h('div.section-head', h('h2.wide', 'CLASSES')),
     classes.length
       ? sortableStripes(classes.sort(byClassOrder), c => {
         const n = choreos.filter(x => x.classId === c.id).length;
         return stripe(c, `${n} CHOREO${n === 1 ? '' : 'S'}`);
       })
-      : h('p.empty', 'Classes entstehen automatisch beim ersten Upload.'),
+      : h('p.empty', 'Lege Classes im Profil an oder beim ersten Upload.'),
   );
-  return () => urls.forEach(u => URL.revokeObjectURL(u));
+
+  // Songliste an die Höhe der Choreo-Zeile koppeln
+  let ro = null;
+  if (recent.length && songs.length) {
+    ro = new ResizeObserver(() => { songList.style.maxHeight = `${cardsRow.offsetHeight}px`; });
+    ro.observe(cardsRow);
+  }
+  return () => { ro?.disconnect(); urls.forEach(u => URL.revokeObjectURL(u)); };
 }
 
 // Classes per Drag & Drop umsortieren (ab zwei Classes). Zeiger-Ereignisse statt HTML5-Drag,
@@ -284,7 +284,7 @@ function sortableStripes(classes, render) {
     const order = classes.filter(x => x !== moved);
     order.splice(order.findIndex(x => x.id === target.dataset.id) + (after ? 1 : 0), 0, moved);
     for (const [i, x] of order.entries()) { x.order = i; await db.put('classes', x); }
-    go(location.hash || '#/');
+    go(location.hash || '#/', { keep: true }); // an der Stelle bleiben
   };
 
   document.addEventListener('pointermove', onMove);
@@ -295,16 +295,6 @@ function sortableStripes(classes, render) {
     document.removeEventListener('pointerup', onUp);
   }, { once: true });
   return box;
-}
-
-// Tage in Folge mit Übung, bis heute oder gestern (heute noch nicht geübt zählt nicht als Abbruch)
-function practiceStreak(sessions) {
-  const days = new Set(sessions.filter(s => s.seconds >= 30).map(s => new Date(s.start).toDateString()));
-  const d = new Date();
-  if (!days.has(d.toDateString())) d.setDate(d.getDate() - 1);
-  let n = 0;
-  while (days.has(d.toDateString())) { n++; d.setDate(d.getDate() - 1); }
-  return n;
 }
 
 // Nächster Termin einer Class aus Wochentag + Uhrzeit → Text wie „heute 19:30 · in 3 h“
@@ -325,11 +315,11 @@ export function nextClass(cls, now = new Date()) {
   return `${when}${at} · ${rel}`;
 }
 
-function stat(label, value) {
-  return h('div.stat', h('span.label', label), h('b', value));
+function stat(label, value, hint) {
+  return h('div.stat', { title: hint || null }, h('span.label', label), h('b', value));
 }
 
-function choreoCard(c, cls, recs, urls) {
+export function choreoCard(c, cls, recs, urls) {
   const latest = recs[recs.length - 1];
   const thumb = hoverVideo(latest, urls, 'thumb');
   thumb.append(h('div.bar', { style: { background: `#${cls?.color || PALETTE[0]}` } }));
@@ -337,7 +327,7 @@ function choreoCard(c, cls, recs, urls) {
     thumb,
     h('h3', c.title || c.song?.title || 'Ohne Song'),
     h('div.label', `${cls ? classTitle(cls) : ''} · ${relDate(c.lastPracticed || c.created)}`),
-    cls && nextClass(cls) ? h('div.label.next', `Nächste Class ${nextClass(cls)}`) : null,
+    cls && nextClass(cls) ? h('div.label.next-class', `Nächste Class ${nextClass(cls)}`) : null,
     h('div', { style: { marginTop: '4px' } }, dots(latestRating(c)), h('span.label', `  ${recs.length} Aufn.`)));
 }
 
@@ -426,7 +416,7 @@ function classEditor(cls, header, close) {
 function choreoBlock(c, recs, sessions, urls) {
   const practiced = sessions.filter(s => s.choreoId === c.id).reduce((a, s) => a + s.seconds, 0);
   return h('div.choreo-block',
-    c.song?.cover ? h('img', { src: c.song.cover, alt: '' }) : h('div.nocover'),
+    c.song?.cover ? songLink(h('img', { src: c.song.cover, alt: '' }), c.song) : h('div.nocover'),
     h('div',
       h('h2.wide', { style: { fontSize: '20px', margin: '0 0 6px' } }, h('a', { href: recs.length ? `#/train/${recs[recs.length - 1].id}` : null }, (c.title || c.song?.title || 'Ohne Song').toUpperCase())),
       h('div.label', `${c.song?.artist || ''}${c.song?.artist ? ' · ' : ''}geübt ${fmtDuration(practiced)} · zuletzt ${relDate(c.lastPracticed)}  `, dots(latestRating(c))),

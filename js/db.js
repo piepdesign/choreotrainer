@@ -1,22 +1,29 @@
 // IndexedDB-Schicht. Alles bleibt lokal im Browser.
-// Stores: classes, choreos, recordings (Metadaten), videos (Blobs, key = recordingId), sessions
+// Stores: classes, choreos, recordings (Metadaten), videos (Blobs, key = recordingId), sessions,
+// settings (Profil + Präferenzen, key-value, ab Version 2)
 
 const DB_NAME = 'choreotrainer';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 let dbPromise;
 
 function open() {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = e => {
       const db = req.result;
-      db.createObjectStore('classes', { keyPath: 'id' });
-      db.createObjectStore('choreos', { keyPath: 'id' }).createIndex('classId', 'classId');
-      db.createObjectStore('recordings', { keyPath: 'id' }).createIndex('choreoId', 'choreoId');
-      db.createObjectStore('videos');
-      db.createObjectStore('sessions', { keyPath: 'id' }).createIndex('choreoId', 'choreoId');
+      // bestehende Daten bleiben erhalten, nur Fehlendes wird angelegt
+      if (e.oldVersion < 1) {
+        db.createObjectStore('classes', { keyPath: 'id' });
+        db.createObjectStore('choreos', { keyPath: 'id' }).createIndex('classId', 'classId');
+        db.createObjectStore('recordings', { keyPath: 'id' }).createIndex('choreoId', 'choreoId');
+        db.createObjectStore('videos');
+        db.createObjectStore('sessions', { keyPath: 'id' }).createIndex('choreoId', 'choreoId');
+      }
+      if (e.oldVersion < 2) db.createObjectStore('settings');
     };
+    // andere offene Tabs mit alter Version blockieren das Upgrade nicht dauerhaft
+    req.onblocked = () => console.warn('Datenbank-Upgrade wartet auf andere ChoreoTrainer-Tabs');
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });

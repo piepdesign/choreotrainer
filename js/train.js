@@ -6,6 +6,7 @@ import { songPicker, songKeyOf } from './song.js';
 import { alignToSong, checkAudio } from './align.js';
 import { recTitle } from './hub.js';
 import { go, toast } from './app.js';
+import { settings, saveSettings, PANEL_SECTIONS } from './settings.js';
 
 const MARKER_TYPES = {
   start: { label: 'START', color: 'var(--fg)', key: 'S' },
@@ -197,7 +198,7 @@ export async function renderTrain(root, recId) {
   eTrack.addEventListener('pointerdown', e => {
     const k = cellAt(e);
     if (k == null || e.button !== 0) return;
-    eTrack.setPointerCapture?.(e.pointerId);
+    try { eTrack.setPointerCapture(e.pointerId); } catch { /* egal */ }
     const from = e.shiftKey && eAnchor != null ? eAnchor : k;
     eSel = { from, to: k };
     renderEights();
@@ -498,7 +499,8 @@ export async function renderTrain(root, recId) {
   let session = null;
   async function saveSession() {
     if (deleted || !session || session.seconds < 5) return;
-    await db.put('sessions', { ...session, seconds: Math.round(session.seconds) });
+    const { rateTime, ...rest } = session;
+    await db.put('sessions', { ...rest, seconds: Math.round(session.seconds), avgRate: Math.round((rateTime / session.seconds) * 100) / 100 });
     choreo.lastPracticed = Date.now();
     await db.put('choreos', choreo);
     statLine.textContent = statText();
@@ -519,13 +521,14 @@ export async function renderTrain(root, recId) {
     const d = dur() || 1;
 
     if (!video.paused && dt < 1) {
-      session ||= { id: uid(), choreoId: choreo.id, recordingId: rec.id, start: Date.now(), seconds: 0 };
+      session ||= { id: uid(), choreoId: choreo.id, recordingId: rec.id, start: Date.now(), seconds: 0, rateTime: 0, loops: 0 };
       session.seconds += dt;
+      session.rateTime += dt * P.rate; // für Ø Tempo im Profil
     }
 
     if (P.loopOn && !video.paused) {
       const { a, b } = loopRange();
-      if (b - a > 0.2 && t >= b) video.currentTime = a;
+      if (b - a > 0.2 && t >= b) { video.currentTime = a; if (session) session.loops++; }
     }
 
     vFill.style.width = vPh.style.left = `${(t / d) * 100}%`;
@@ -583,6 +586,7 @@ export async function renderTrain(root, recId) {
       n: () => addMarker('memo'),
       h: () => addMarker('highlight'),
       a: () => toggleAudio(),
+      p: () => togglePanel(),
       f: () => toggleFull(),
     };
     if (map[k]) { e.preventDefault(); map[k](); }
@@ -728,7 +732,7 @@ export async function renderTrain(root, recId) {
   const statLine = h('div.label', statText());
 
   const recIndex = recs.findIndex(r => r.id === rec.id);
-  let songSection;
+  let songSection, togglePanel = () => {}, stopFit = () => {};
   const titleEdits = [];
   const titleEdit = () => {
     const el = inlineEdit(recTitle(rec, recIndex), async v => {
@@ -739,58 +743,141 @@ export async function renderTrain(root, recId) {
     titleEdits.push(el);
     return el;
   };
-  root.append(h('div.train', { style: { '--cc': `#${color}` } },
-    h('div',
-      h('div.crumbs',
-        h('a.tag', { href: `#/class/${cls.id}`, style: { background: `#${color}`, color: textOn(color) } }, classTitle(cls).toUpperCase()),
-        h('span.label', classMeta(cls)),
-        h('span.label', titleEdit(), ` · ${recIndex + 1}/${recs.length} · ${fmtRecDate(rec.recordedAt)}`),
-        h('h1.wide', inlineEdit((choreo.title || song?.title || 'Ohne Song').toUpperCase(), async v => { choreo.title = v; await db.put('choreos', choreo); }), song?.artist ? h('span.muted', { style: { fontWeight: 600 } }, ` — ${song.artist.toUpperCase()}`) : '')),
-      stage, timeline, controls),
-    h('aside.side',
-      h('section', h('span.label', 'Wie sitzt sie?'), ratingBox, ratingHint, h('div', { style: { marginTop: '8px' } }, statLine)),
-      h('section', h('span.label', 'Marker'), markerList),
-      h('section', h('span.label', 'Notizen'), notesIn),
-      songSection = h('section', h('span.label', 'Song'),
-        picker.el,
-        song ? h('label.field', { style: { marginTop: '10px' } }, h('span', 'Video beginnt im Song bei'), offsetIn) : null,
-        songFileRow),
-      h('section', h('span.label', 'Aufnahmen'),
-        h('ul.recs', recs.map((r, i) => h('li',
-          r.id === rec.id
-            ? h('span', { style: { fontWeight: 600 } }, '▸ ', titleEdit())
-            : h('a', { href: `#/train/${r.id}` }, recTitle(r, i)),
-          h('span.muted', `${fmtRecDate(r.recordedAt)} · ${r.duration ? fmt(r.duration) : ''}`)))),
-        h('div.actions', { style: { marginTop: '8px' } },
-          h('a.linkbtn', { href: `#/upload?choreo=${choreo.id}` }, '+ Aufnahme hinzufügen'),
-          h('button.linkbtn', {
-            onclick: async () => {
-              const last = recs.length === 1;
-              if (!confirm(last
-                ? 'Das ist die einzige Aufnahme. Aufnahme samt Video und damit die ganze Choreo löschen?'
-                : `„${recTitle(rec, recIndex)}“ samt Video löschen?`)) return;
-              deleted = true;
-              video.pause();
-              await deleteRecording(rec.id);
-              if (last) await deleteChoreo(choreo.id);
-              toast(last ? 'Choreo gelöscht' : 'Aufnahme gelöscht');
-              const next = recs.find(r => r.id !== rec.id);
-              go(next ? `#/train/${next.id}` : `#/class/${cls.id}`, { replace: true });
-            },
-          }, 'Aufnahme löschen'))),
-      h('section', h('span.label', 'Tasten'),
-        h('div.keys', [
-          ['␣', 'Play/Pause'], ['← →', '±2 s (⇧ ±0,2)'], ['M', 'Spiegeln'], ['[ ]', 'Tempo'],
-          ['I / O', 'Loop In/Out'], ['L', 'Loop'], ['C', '8er-Count'], ['T', 'Tap-Tempo'],
-          ['1', 'Hier ist die 1'], ['S / E', 'Start/Ende'], ['N', 'Gedanke'], ['H', 'Highlight'], ['F', 'Vollbild'], ['A', 'Ton Video/Song'],
-        ].map(([k, d]) => h('div', h('kbd', k), ' ', d))))),
-  ));
+  // ── Seitenpanel: Abschnitte zum Zu-/Aufklappen und Umsortieren (Reihenfolge gilt für alle Choreos) ──
+  const recsBody = [
+    h('ul.recs', recs.map((r, i) => h('li',
+      r.id === rec.id
+        ? h('span', { style: { fontWeight: 600 } }, '▸ ', titleEdit())
+        : h('a', { href: `#/train/${r.id}` }, recTitle(r, i)),
+      h('span.muted', `${fmtRecDate(r.recordedAt)} · ${r.duration ? fmt(r.duration) : ''}`)))),
+    h('div.actions', { style: { marginTop: '8px' } },
+      h('a.linkbtn', { href: `#/upload?choreo=${choreo.id}` }, '+ Aufnahme hinzufügen'),
+      h('button.linkbtn', {
+        onclick: async () => {
+          const last = recs.length === 1;
+          if (!confirm(last
+            ? 'Das ist die einzige Aufnahme. Aufnahme samt Video und damit die ganze Choreo löschen?'
+            : `„${recTitle(rec, recIndex)}“ samt Video löschen?`)) return;
+          deleted = true;
+          video.pause();
+          await deleteRecording(rec.id);
+          if (last) await deleteChoreo(choreo.id);
+          toast(last ? 'Choreo gelöscht' : 'Aufnahme gelöscht');
+          const next = recs.find(r => r.id !== rec.id);
+          go(next ? `#/train/${next.id}` : `#/class/${cls.id}`, { replace: true });
+        },
+      }, 'Aufnahme löschen')),
+  ];
+  const keysBody = [h('div.keys', [
+    ['␣', 'Play/Pause'], ['← →', '±2 s (⇧ ±0,2)'], ['M', 'Spiegeln'], ['[ ]', 'Tempo'],
+    ['I / O', 'Loop In/Out'], ['L', 'Loop'], ['C', '8er-Count'], ['T', 'Tap-Tempo'],
+    ['1', 'Hier ist die 1'], ['S / E', 'Start/Ende'], ['N', 'Gedanke'], ['H', 'Highlight'], ['F', 'Vollbild'], ['A', 'Ton Video/Song'], ['P', 'Seitenpanel'],
+  ].map(([k, d]) => h('div', h('kbd', k), ' ', d)))];
+  const SECTIONS = {
+    song: ['Song', [picker.el, song ? h('label.field', { style: { marginTop: '10px' } }, h('span', 'Video beginnt im Song bei'), offsetIn) : null, songFileRow]],
+    marker: ['Marker', [markerList]],
+    notes: ['Notizen', [notesIn]],
+    status: ['Status', [ratingBox, ratingHint, h('div', { style: { marginTop: '8px' } }, statLine)]],
+    recs: ['Aufnahmen', recsBody],
+    keys: ['Tasten', keysBody],
+  };
+  const panelState = settings().panel;
+  const side = h('aside.side');
+  const sectionEls = {};
+  for (const key of panelState.order.filter(k => SECTIONS[k])) {
+    const [label, body] = SECTIONS[key];
+    const collapsed = panelState.collapsed.includes(key);
+    const handle = h('span.drag-handle', { title: 'Ziehen zum Umsortieren', 'aria-hidden': 'true' }, '⠿');
+    const headBtn = h('button.panel-toggle', { type: 'button', 'aria-expanded': String(!collapsed) }, h('span.label', label), h('span.chev', '▾'));
+    const sec = h(`section.panel-sec${collapsed ? '.collapsed' : ''}`, { 'data-k': key },
+      h('div.panel-head', handle, headBtn),
+      h('div.panel-body', ...body));
+    headBtn.addEventListener('click', () => {
+      sec.classList.toggle('collapsed');
+      headBtn.setAttribute('aria-expanded', String(!sec.classList.contains('collapsed')));
+      savePanel();
+    });
+    sortableSection(sec, handle);
+    sectionEls[key] = sec;
+    side.append(sec);
+  }
+  songSection = sectionEls.song;
+  const savePanel = () => saveSettings({ panel: {
+    open: !trainEl.classList.contains('panel-closed'),
+    order: [...side.querySelectorAll('.panel-sec')].map(x => x.dataset.k),
+    collapsed: [...side.querySelectorAll('.panel-sec.collapsed')].map(x => x.dataset.k),
+  } });
+  // Abschnitt am Griff ziehen und zwischen den anderen ablegen
+  function sortableSection(sec, handle) {
+    handle.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      try { handle.setPointerCapture(e.pointerId); } catch { /* ohne Zeigerfang weiter */ }
+      sec.classList.add('dragging');
+      const move = ev => {
+        if (!(ev.buttons & 1)) { up(); return; }
+        const others = [...side.querySelectorAll('.panel-sec:not(.dragging)')];
+        const after = others.find(o => ev.clientY < o.getBoundingClientRect().top + o.offsetHeight / 2);
+        side.insertBefore(sec, after || null);
+      };
+      const up = () => {
+        handle.removeEventListener('pointermove', move);
+        handle.removeEventListener('pointerup', up);
+        handle.removeEventListener('pointercancel', up);
+        sec.classList.remove('dragging');
+        savePanel();
+      };
+      handle.addEventListener('pointermove', move);
+      handle.addEventListener('pointerup', up);
+      handle.addEventListener('pointercancel', up);
+    });
+  }
+
+  const panelBtn = h('button.ctl.panel-btn', { type: 'button', title: 'Seitenpanel ein/aus (P)' });
+  const crumbs = h('div.crumbs',
+    h('a.tag', { href: `#/class/${cls.id}`, style: { background: `#${color}`, color: textOn(color) } }, classTitle(cls).toUpperCase()),
+    h('span.label', classMeta(cls)),
+    h('span.label', titleEdit(), ` · ${recIndex + 1}/${recs.length} · ${fmtRecDate(rec.recordedAt)}`),
+    panelBtn,
+    h('h1.wide', inlineEdit((choreo.title || song?.title || 'Ohne Song').toUpperCase(), async v => { choreo.title = v; await db.put('choreos', choreo); }), song?.artist ? h('span.muted', { style: { fontWeight: 600 } }, ` — ${song.artist.toUpperCase()}`) : ''));
+  const mainCol = h('div.train-main', crumbs, stage, timeline, controls);
+  const trainEl = h(`div.train${panelState.open ? '' : '.panel-closed'}`, { style: { '--cc': `#${color}` } }, mainCol, side);
+  const setPanel = open => {
+    trainEl.classList.toggle('panel-closed', !open);
+    panelBtn.textContent = open ? 'Panel ›' : '‹ Panel';
+    savePanel();
+    fitStage();
+  };
+  panelBtn.addEventListener('click', () => setPanel(trainEl.classList.contains('panel-closed')));
+  panelBtn.textContent = panelState.open ? 'Panel ›' : '‹ Panel';
+  togglePanel = () => setPanel(trainEl.classList.contains('panel-closed'));
+  root.append(trainEl);
+
+  // Alles auf einen Bildschirm: Video so groß wie möglich, ohne dass Zeitleisten und Leiste herausfallen
+  function fitStage() {
+    if (document.fullscreenElement === stage) return;
+    const ratio = video.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : 16 / 9;
+    const w = mainCol.clientWidth;
+    const stacked = matchMedia('(max-width: 1000px)').matches;
+    let hgt = w / ratio;
+    if (!stacked) {
+      const used = crumbs.offsetHeight + timeline.offsetHeight + controls.offsetHeight + 28;
+      hgt = Math.min(hgt, Math.max(180, mainCol.clientHeight - used));
+    }
+    stage.style.height = `${Math.round(hgt)}px`;
+    // Fläche so breit wie das Video, mittig (keine schwarzen Seitenbalken, wenn die Höhe begrenzt)
+    stage.style.width = `${Math.min(w, Math.round(hgt * ratio))}px`;
+  }
+  const ro = new ResizeObserver(() => fitStage());
+  ro.observe(mainCol);
+  stopFit = () => ro.disconnect();
 
   video.addEventListener('loadedmetadata', () => {
     if (!rec.duration && video.duration) rec.duration = video.duration;
     // Querformat füllt die Breite, Hochformat wird in der Höhe begrenzt
     stage.classList.toggle('portrait', video.videoHeight > video.videoWidth);
     renderStatic();
+    fitStage();
   });
   // Songdatei per Drag & Drop auf den Song-Bereich
   songSection.addEventListener('dragover', e => { if (song) e.preventDefault(); });
@@ -803,6 +890,7 @@ export async function renderTrain(root, recId) {
 
   return async () => {
     cancelAnimationFrame(raf);
+    stopFit();
     clearInterval(sessionTimer);
     document.removeEventListener('keydown', onKey);
     document.removeEventListener('pointerdown', onDocClick);
@@ -838,7 +926,7 @@ function scrub(track, onRatio) {
   track.addEventListener('pointerdown', e => {
     if (e.button !== 0) return;
     dragging = true;
-    track.setPointerCapture?.(e.pointerId);
+    try { track.setPointerCapture(e.pointerId); } catch { /* egal */ }
     at(e);
   });
   track.addEventListener('pointermove', e => {
