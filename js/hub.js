@@ -202,7 +202,7 @@ export async function renderHub(root) {
   root.append(
     h('div', { style: { height: '12px' } }),
     dropzone(f => { state.pendingFile = f; go('#/upload'); }),
-    h('div.stats', chosen.map(id => stat(label(id), values[id].value, values[id].hint))),
+    h('div.stats', chosen.map(id => stat(label(id), values[id].value, values[id].hint, `#/profile/${STAT_TARGET[id] || 'overview'}`))),
     h('div.columns',
       h('div.col-choreos',
         h('div.section-head', h('h2.wide', 'LETZTE CHOREOS')),
@@ -210,12 +210,9 @@ export async function renderHub(root) {
       h('div.col-songs',
         h('div.section-head', h('h2.wide', 'LETZTE SONGS')),
         songs.length ? songList : h('p.empty', 'Noch keine Songs.'))),
-    h('div.section-head', h('h2.wide', 'CLASSES')),
+    h('div.section-head', h('h2.wide', 'CLASSES'), classes.length ? h('span.label', '# Choreos') : null),
     classes.length
-      ? sortableStripes(classes.sort(byClassOrder), c => {
-        const n = choreos.filter(x => x.classId === c.id).length;
-        return stripe(c, `${n} CHOREO${n === 1 ? '' : 'S'}`);
-      })
+      ? sortableStripes(classes.sort(byClassOrder), c => stripe(c, String(choreos.filter(x => x.classId === c.id).length)))
       : h('p.empty', 'Lege Classes im Profil an oder beim ersten Upload.'),
   );
 
@@ -315,8 +312,11 @@ export function nextClass(cls, now = new Date()) {
   return `${when}${at} · ${rel}`;
 }
 
-function stat(label, value, hint) {
-  return h('div.stat', { title: hint || null }, h('span.label', label), h('b', value));
+// Kachel → passende Stelle im Profil
+const STAT_TARGET = { last: 'overview', streak: 'overview', duration: 'choreos', week: 'time', total: 'time', sessions: 'sessions', status: 'status', choreos: 'choreos', recordings: 'choreos', classes: 'classes' };
+
+function stat(label, value, hint, href) {
+  return h(href ? 'a.stat.stat-link' : 'div.stat', { href, title: hint ? `${hint} · Details im Profil` : href ? 'Details im Profil' : null }, h('span.label', label), h('b', value));
 }
 
 export function choreoCard(c, cls, recs, urls) {

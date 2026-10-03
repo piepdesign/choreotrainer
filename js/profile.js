@@ -1,13 +1,13 @@
 // Profil: Name, ausführliche Auswertung (Heatmap, Übungszeit, Status, Choreos, Classes, Einheiten)
 // und Präferenzen. Diagramme als schlankes SVG: Mengen in Graustufen (eine Skala), Identität über
 // Class-Farben, Werte immer in Textfarbe, Tooltip auf jedem Datenpunkt.
-import { db } from './db.js';
+import { db, deleteAllData } from './db.js';
 import { h, fmt, fmtDuration, relDate, fmtRecDate, inlineEdit, classTitle, stripe, byClassOrder, WEEKDAYS, textOn } from './util.js';
 import { loadAll, dots, choreoCard, recTitle, nextClass } from './hub.js';
 import { baseStats, latestRating, choreoLength, weekStart, dayKey } from './stats.js';
-import { settings, saveSettings, applyTheme, BASE_STATS } from './settings.js';
+import { settings, saveSettings, applyTheme, resetSettings, BASE_STATS } from './settings.js';
 import { PROVIDERS } from './providers.js';
-import { classForm } from './classform.js';
+import { classManager } from './classform.js';
 import { go, toast } from './app.js';
 
 const DAY = 86400000;
@@ -108,11 +108,15 @@ function heatmap(sessions, choreoTitle) {
   return h('div.chart.heat',
     svg('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: 'heatmap' },
       months.map(m => svg('text', { x: m.x, y: 10, class: 'axis' }, monthNames[m.m])),
-      ['Mo', 'Mi', 'Fr', 'So'].map(d => svg('text', { x: 0, y: 18 + WEEKDAYS.indexOf(d) * (cell + gap) + 10, class: 'axis' }, d)),
+      ['M', 'D', 'M', 'D', 'F', 'S', 'S'].map((d, k) => svg('text', { x: 4, y: 18 + k * (cell + gap) + 10, class: 'axis' }, d)),
       // Rahmen um die aktuelle Woche
       svg('rect', { x: 28 + (weeks - 1) * (cell + gap) - 2, y: 16, width: cell + 4, height: 7 * (cell + gap) + 1, rx: 3, class: 'curweek' }),
       nodes),
-    h('div.legend', h('span.label', 'weniger'), [0, 1, 2, 3, 4].map(l => h(`i.hm-key.l${l}`)), h('span.label', 'mehr'), h('span.label', ' · 1–9 · 10–19 · 20–39 · ab 40 min pro Tag')));
+    h('div.legend',
+      h('span.label', 'Weniger'),
+      h('span.hm-keys', [0, 1, 2, 3, 4].map(l => h(`i.hm-key.l${l}`, { title: ['nicht geübt', '1–9 min', '10–19 min', '20–39 min', 'ab 40 min'][l] }))),
+      h('span.label', 'Mehr'),
+      h('span.label.legend-sep', 'Minuten pro Tag: 1–9 · 10–19 · 20–39 · ab 40')));
 }
 
 // Kleine Verlaufslinie der Status-Bewertungen
@@ -146,7 +150,7 @@ export async function renderProfile(root, section) {
     h('h1.wide.p-name', inlineEdit((s.name || 'Dein Name').toUpperCase(), async v => { await saveSettings({ name: v }); toast('Name gespeichert'); })),
     h('p.label', choreos.length ? `Dabei seit ${new Date(since).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })} · ${choreos.length} Choreos · ${classes.length} Classes` : 'Noch keine Daten'));
 
-  const nav = h('nav.p-nav', [['overview', 'Übersicht'], ['time', 'Übungszeit'], ['status', 'Status'], ['choreos', 'Choreos'], ['classes', 'Classes'], ['sessions', 'Einheiten'], ['prefs', 'Präferenzen']]
+  const nav = h('nav.p-nav', [['overview', 'Übersicht'], ['time', 'Übungszeit'], ['status', 'Status'], ['choreos', 'Choreos'], ['classes', 'Classes'], ['sessions', 'Einheiten'], ['prefs', 'Präferenzen'], ['account', 'Konto']]
     .map(([id, label]) => h('a', { href: `#/profile/${id}`, onclick: e => { e.preventDefault(); document.getElementById(`p-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); history.replaceState(null, '', `#/profile/${id}`); } }, label)));
 
   const sect = (id, title, ...body) => h('section.p-sec', { id: `p-${id}` }, h('div.section-head', h('h2.wide', title)), ...body);
@@ -157,7 +161,7 @@ export async function renderProfile(root, section) {
     h('div.stats',
       tile('Zuletzt', values.last.value, lastS ? `${choreoTitle(lastS.choreoId)} · ${min(lastS.seconds)} min` : ''),
       tile('Serie', values.streak.value, 'Tage in Folge'),
-      tile('Tage geübt (26 Wochen)', String(new Set(real.filter(x => x.start > now - 182 * DAY).map(x => dayKey(x.start))).size)),
+      tile('Tage geübt', String(new Set(real.filter(x => x.start > now - 182 * DAY).map(x => dayKey(x.start))).size), 'in den letzten 26 Wochen'),
       tile('Dauer gesamt', values.duration.value, values.duration.hint)),
     heatmap(real, choreoTitle));
 
@@ -249,9 +253,7 @@ export async function renderProfile(root, section) {
       const nc = nextClass(c);
       return stripe(c, `${mine.length} CHOREO${mine.length === 1 ? '' : 'S'} · ${fmtDuration(sec).toUpperCase()}${nc ? ' · ' + nc.toUpperCase() : ''}`);
     })),
-    classes.length ? h('div.p-grid', h('div.span-all', h('h3.p-sub', 'Übungszeit nach Class'),
-      hbars(classes.map(c => ({ label: classTitle(c), color: c.color, value: min(real.filter(x => choreoById[x.choreoId]?.classId === c.id).reduce((t, x) => t + x.seconds, 0)) })).filter(i => i.value)))) : null,
-    h('details.p-add', h('summary.linkbtn', '+ Class anlegen'), classForm(() => go('#/profile/classes', { keep: true }))));
+    h('details.p-add', h('summary.linkbtn', 'Classes verwalten (anlegen, bearbeiten, löschen)'), classManager(() => go('#/profile/classes', { keep: true }))));
 
   // ── Einheiten ──
   const recent = [...real].sort((a, b) => b.start - a.start).slice(0, 25);
@@ -264,7 +266,7 @@ export async function renderProfile(root, section) {
         h('span', fmtDuration(x.seconds)),
         h('span', x.avgRate ? `${x.avgRate.toFixed(2).replace('.', ',')}×` : '—'),
         h('span', x.loops != null ? String(x.loops) : '—')))) : h('p.empty', 'Noch keine Einheiten. Gezählt wird, sobald ein Video läuft.'),
-    h('p.label', 'Tempo und Loops werden ab dieser Version mitgeschrieben.'));
+  );
 
   // ── Präferenzen ──
   const chips = (opts, current, onPick) => {
@@ -287,14 +289,45 @@ export async function renderProfile(root, section) {
     h('h3.p-sub', 'Standardansicht'),
     chips([['system', 'Wie System'], ['light', 'Hell'], ['dark', 'Dunkel']], s.theme, async v => { applyTheme(v); await saveSettings({ theme: v }); }),
     h('h3.p-sub', 'Musikprovider'),
-    h('p.label', 'Klick auf Cover oder Songtitel öffnet den Song dort. Exakt bei Deezer und Apple Music, sonst die Suche im Provider.'),
     chips(PROVIDERS, s.provider, async v => { await saveSettings({ provider: v }); }),
+    chips([['app', 'In der App öffnen'], ['web', 'Im Browser öffnen']], s.openIn, async v => { await saveSettings({ openIn: v }); }),
     h('h3.p-sub', 'Kennzahlen in der Base'),
-    statBoxes,
-    h('h3.p-sub', 'Intro'),
-    h('button.btn.small', { type: 'button', onclick: async () => { await saveSettings({ introDone: false }); location.reload(); } }, 'Intro noch einmal zeigen'));
+    statBoxes);
 
-  root.append(head, nav, overview, time, status, choreoSec, classSec, sessionSec, prefs);
+  // ── Konto ──
+  const nameIn = h('input', { type: 'text', value: s.name || '', placeholder: 'Dein Name' });
+  const account = sect('account', 'KONTO',
+    h('div.p-account',
+      h('div',
+        h('h3.p-sub', 'Name'),
+        h('div.actions', nameIn, h('button.btn.small', {
+          type: 'button',
+          onclick: async () => { if (!nameIn.value.trim()) return; await saveSettings({ name: nameIn.value.trim() }); toast('Name gespeichert'); go('#/profile/account', { keep: true }); },
+        }, 'Speichern'))),
+      h('div',
+        h('h3.p-sub', 'Zurücksetzen'),
+        h('p.label.p-text', 'Name, Präferenzen und Panel-Layout auf Anfang, das Intro startet neu. Classes, Choreos, Videos und Statistik bleiben.'),
+        h('button.btn.small', {
+          type: 'button',
+          onclick: async () => { if (!confirm('Einstellungen zurücksetzen? Deine Daten bleiben erhalten.')) return; await resetSettings(); location.hash = '#/'; location.reload(); },
+        }, 'Zurücksetzen')),
+      h('div',
+        h('h3.p-sub', 'Löschen'),
+        h('p.label.p-text', 'Löscht alles in diesem Browser: Classes, Choreos, Videos, Songdateien, Einheiten und Profil. Nicht rückgängig zu machen.'),
+        h('button.btn.small.danger', {
+          type: 'button',
+          onclick: async () => {
+            if (!confirm('Wirklich ALLES löschen? Videos und Statistik sind danach weg.')) return;
+            const name = settings().name || 'LÖSCHEN';
+            const typed = prompt(`Zur Bestätigung „${name}“ eintippen:`);
+            if (typed == null || typed.trim().toLowerCase() !== name.toLowerCase()) { toast('Nicht gelöscht'); return; }
+            await deleteAllData();
+            location.hash = '#/';
+            location.reload();
+          },
+        }, 'Alles löschen'))));
+
+  root.append(head, nav, overview, time, status, choreoSec, classSec, sessionSec, prefs, account);
   const removeTip = attachTooltip(root);
   if (section) requestAnimationFrame(() => document.getElementById(`p-${section}`)?.scrollIntoView({ block: 'start' }));
   return () => { removeTip(); urls.forEach(u => URL.revokeObjectURL(u)); };

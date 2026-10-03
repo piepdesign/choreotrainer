@@ -47,7 +47,20 @@ export async function providerUrl(provider, song) {
   }
 }
 
-// Klick auf Cover/Titel. Fenster sofort öffnen (sonst blockt der Browser das Pop-up), Ziel nachladen.
+// App-Link zur Web-Adresse, damit sich das installierte Programm öffnet (null = keine Mac-App)
+// Tidal: geprüft im Programmcode der App, alles nach tidal:// wird als Seitenpfad angesteuert.
+export function appUrl(provider, webUrl, song) {
+  const q = encodeURIComponent([clean(song.artist), clean(song.title)].filter(Boolean).join(' '));
+  switch (provider) {
+    case 'spotify': return `spotify:search:${q}`;
+    case 'apple': return webUrl.replace(/^https:/, 'music:');
+    case 'tidal': return `tidal://search?q=${q}`;
+    case 'deezer': return webUrl.replace(/^https:\/\//, 'deezer://');
+    default: return null; // YouTube Music, Amazon Music: im Browser
+  }
+}
+
+// Klick auf Cover/Titel → App (falls installiert) oder neuer Tab
 export async function openSong(song) {
   if (!song?.title) return;
   let provider = settings().provider;
@@ -55,9 +68,27 @@ export async function openSong(song) {
     provider = await askProvider();
     if (!provider) return;
   }
-  const win = window.open('about:blank', '_blank');
-  const url = await providerUrl(provider, song);
-  if (win) win.location.href = url; else location.href = url;
+  const preferApp = settings().openIn !== 'web';
+  // Für den Browser-Fall das Fenster sofort öffnen, sonst blockt der Pop-up-Blocker (Ziel kommt ggf. asynchron)
+  if (!preferApp || !['spotify', 'apple', 'tidal', 'deezer'].includes(provider)) {
+    const win = window.open('about:blank', '_blank');
+    const url = await providerUrl(provider, song);
+    if (win) { win.opener = null; win.location.href = url; } else location.href = url;
+    return;
+  }
+  const web = await providerUrl(provider, song);
+  const app = appUrl(provider, web, song);
+  // App versuchen. Verliert die Seite nicht den Fokus (keine App da), Web-Version im neuen Tab.
+  let left = false;
+  const onLeave = () => { left = true; };
+  addEventListener('blur', onLeave, { once: true });
+  document.addEventListener('visibilitychange', onLeave, { once: true });
+  location.href = app;
+  setTimeout(() => {
+    removeEventListener('blur', onLeave);
+    document.removeEventListener('visibilitychange', onLeave);
+    if (!left) window.open(web, '_blank', 'noopener');
+  }, 1800);
 }
 
 // Auswahl beim ersten Mal, wird gemerkt (im Profil änderbar)

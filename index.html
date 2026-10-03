@@ -13,6 +13,8 @@
   <script>
     // Theme vor dem ersten Rendern setzen, damit nichts flackert
     try { const t = localStorage.getItem('ct-theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
+    // Bis klar ist, ob das Intro läuft, nichts von der App zeigen (kein aufblitzendes Menü)
+    document.documentElement.classList.add('booting');
   </script>
 </head>
 <body>

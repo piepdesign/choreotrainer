@@ -22,6 +22,7 @@ const DEFAULTS = {
   introDone: false,
   theme: 'system', // system | light | dark
   provider: null, // spotify | apple | tidal | ytmusic | deezer | amazon
+  openIn: 'app', // app (installiertes Programm, sonst Browser) | web
   baseStats: DEFAULT_STATS,
   panel: { open: true, order: PANEL_SECTIONS, collapsed: [] },
 };
@@ -38,6 +39,13 @@ export async function loadSettings() {
 }
 
 export const settings = () => cache || structuredClone(DEFAULTS);
+
+// Alles auf Anfang (Daten bleiben): Name, Präferenzen, Panel, Intro
+export async function resetSettings() {
+  cache = structuredClone(DEFAULTS);
+  await db.put('settings', cache, 'profile');
+  return cache;
+}
 
 export async function saveSettings(patch) {
   cache = { ...settings(), ...patch };

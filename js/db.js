@@ -79,3 +79,13 @@ export async function requestPersist() {
 export async function storageEstimate() {
   try { return await navigator.storage.estimate(); } catch { return null; }
 }
+
+// Alles löschen (Konto → Löschen): Verbindung schließen, ganze Datenbank entfernen
+export async function deleteAllData() {
+  if (dbPromise) { (await dbPromise).close(); dbPromise = null; }
+  await new Promise(resolve => {
+    const req = indexedDB.deleteDatabase(DB_NAME);
+    req.onsuccess = req.onerror = req.onblocked = () => resolve();
+  });
+  try { localStorage.clear(); sessionStorage.clear(); } catch { /* egal */ }
+}

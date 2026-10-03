@@ -104,5 +104,6 @@ requestPersist();
   try { await loadSettings(); } catch (e) { console.error(e); }
   applyTheme();
   if (!settings().introDone) await runIntro();
+  document.documentElement.classList.remove('booting');
   route();
 })();

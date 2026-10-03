@@ -32,6 +32,7 @@
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
+html.booting .topbar, html.booting main { visibility: hidden; }
 html, body { margin: 0; }
 body {
   background: var(--bg);
@@ -354,19 +355,29 @@ body.intro-open { overflow: hidden; }
 .intro.in { opacity: 1; }
 .intro.out { opacity: 0; transition-duration: .45s; }
 .intro-step { min-height: 100%; padding: clamp(32px, 8vh, 96px) var(--gutter); display: flex; flex-direction: column; gap: 18px; max-width: 980px; margin: 0 auto; }
-.intro-step.center { justify-content: center; align-items: center; text-align: center; }
+.intro-step.center { justify-content: center; align-items: center; text-align: center; min-height: calc(100vh - 96px); }
 .intro-step h1 { font-size: clamp(30px, 6vw, 72px); margin: 0; }
 .intro-mark { font-size: clamp(40px, 12vw, 170px) !important; text-align: left; }
 .intro-mark .line { display: block; white-space: nowrap; }
 .intro-mark .line span { display: inline-block; opacity: 0; transform: translateY(.35em); filter: blur(6px); animation: mark-in .7s cubic-bezier(.2, .7, .2, 1) forwards; }
-.intro-mark sup { font-size: .22em; vertical-align: top; opacity: 0; animation: mark-in .6s .8s forwards; }
+.intro-mark sup { font-size: .55em; vertical-align: super; line-height: 0; margin-left: .04em; font-weight: 600; opacity: 0; animation: mark-in .6s .8s forwards; }
+.intro-step h1 sup { font-size: .55em; vertical-align: super; line-height: 0; font-weight: 600; }
 @keyframes mark-in { to { opacity: 1; transform: none; filter: none; } }
 .intro-lead { font-size: 16px; margin: 0; }
 .intro-row { display: flex; align-items: center; gap: 16px; margin-top: 18px; }
-.intro-input { font: 800 clamp(22px, 4vw, 44px) var(--wide) !important; font-stretch: 125% !important; text-align: center; min-width: 260px; max-width: 70vw; border-bottom: 2px solid var(--fg) !important; }
-.intro .next { font: 600 28px var(--mono); width: 54px; height: 54px; border: 1px solid var(--fg); display: grid; place-items: center; }
-.intro .next:hover { background: var(--fg); color: var(--bg); }
-.intro-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+.intro-input { font: 800 clamp(22px, 4vw, 44px) var(--wide) !important; font-stretch: 125% !important; text-transform: uppercase; text-align: center; width: min(560px, 80vw) !important; border-bottom: 2px solid var(--fg) !important; margin-top: 24px; }
+.intro-input::placeholder { color: var(--rule); }
+/* Navigation immer gleich: unten, feste Plätze, schlanke Pfeile ohne Rahmen */
+.intro-stage { min-height: 100%; padding-bottom: 96px; }
+.intro-nav { position: fixed; left: 0; right: 0; bottom: 0; height: 84px; display: grid; grid-template-columns: 64px 1fr 64px; align-items: center; padding: 0 var(--gutter); background: linear-gradient(to top, var(--bg) 70%, transparent); }
+.intro-arrow { width: 48px; height: 48px; display: grid; place-items: center; opacity: .75; transition: opacity .15s, transform .15s; }
+.intro-arrow:hover { opacity: 1; }
+.intro-nav .intro-arrow:last-child { justify-self: end; }
+.intro-nav .intro-arrow:last-child:hover { transform: translateX(3px); }
+.intro-nav .intro-arrow:first-child:hover { transform: translateX(-3px); }
+.intro-arrow svg { width: 14px; height: 24px; }
+.intro-later { justify-self: center; }
+.intro-arrow[hidden], .intro-later[hidden] { display: grid !important; visibility: hidden; }
 .intro-classes { margin: 0 !important; }
 .intro-classes:empty { display: none; }
 .classform { background: var(--surface); padding: 14px; }
@@ -433,3 +444,27 @@ a.p-row:hover { background: var(--surface-2); }
 .p-add { margin-top: 12px; }
 .p-add summary { cursor: pointer; margin-bottom: 10px; list-style: none; }
 @media (max-width: 700px) { .p-row, .p-table.wide5 .p-row, .p-table.wide6 .p-row { grid-template-columns: 1.5fr 1fr; } .p-row span:nth-child(n+3) { display: none; } }
+
+/* ── Class-Verwaltung (Intro, Profil) ───────── */
+.class-manager { display: grid; gap: 2px; }
+.cm-list { display: grid; gap: 2px; }
+.cm-row { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 10px 14px; font-size: 14px; letter-spacing: .02em; }
+.cm-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cm-actions { display: flex; gap: 14px; flex: none; }
+.cm-actions .linkbtn { color: inherit; }
+.classform > .label:first-of-type { display: block; margin-bottom: 10px; color: var(--fg); }
+
+/* ── Base: Kacheln als Link ins Profil ──────── */
+a.stat-link { transition: background .15s; }
+a.stat-link:hover { background: var(--surface-2); }
+
+/* ── Profil: Legende, Galerie-Abstand, Konto ── */
+.legend { gap: 8px; }
+.hm-keys { display: inline-flex; gap: 3px; }
+.legend-sep { margin-left: 16px; }
+#p-choreos > .actions { margin-bottom: 14px; }
+#p-choreos .p-table { margin-top: 0; }
+.p-account { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 2px; }
+.p-account > div { background: var(--surface); padding: 4px 14px 16px; }
+.p-account input[type=text] { max-width: 240px; }
+.p-text { text-transform: none; letter-spacing: 0; font-size: 12px; margin: 0 0 12px; }
