@@ -47,10 +47,17 @@ export async function runIntro() {
   const steps = [
     {
       render() {
-        const input = h('input.intro-input', { type: 'text', value: state.name, placeholder: 'DEIN NAME', autocomplete: 'given-name' });
+        const input = h('input.intro-input', { type: 'text', autofocus: true, value: state.name, placeholder: 'DEIN NAME', autocomplete: 'given-name' });
         input.addEventListener('input', () => { state.name = input.value.trim().toUpperCase(); refreshNav(); });
         input.addEventListener('keydown', e => { if (e.key === 'Enter' && state.name) go(1); });
-        setTimeout(() => input.focus(), 260);
+        // Cursor direkt ins Feld; falls der Browser den Fokus verweigert, landet der erste Tastendruck trotzdem dort
+        const focus = () => { if (input.isConnected) input.focus(); };
+        setTimeout(focus, 260); setTimeout(focus, 700);
+        const grab = e => {
+          if (!input.isConnected) { removeEventListener('keydown', grab, true); return; }
+          if (document.activeElement !== input && e.key.length === 1 && !e.metaKey && !e.ctrlKey) input.focus();
+        };
+        addEventListener('keydown', grab, true);
         return h('div.intro-step.center', h('h1.wide', 'HI, WIE HEISST DU?'), input);
       },
       canGo: () => !!state.name,

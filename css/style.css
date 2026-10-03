@@ -310,14 +310,18 @@ main:has(.train) { padding-bottom: 0; }
 .timeview { font-size: 12px; margin-left: auto; font-variant-numeric: tabular-nums; }
 
 .pop {
-  position: absolute; z-index: 30; min-width: 220px; background: var(--bg); border: 1px solid var(--fg);
+  position: absolute; z-index: 30; min-width: 0; width: max-content; max-width: 360px; background: var(--bg); border: 1px solid var(--fg);
   padding: 12px; display: grid; gap: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
 }
 .pop .prow { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
 .pop input[type=range] { width: 100%; grid-column: 1 / -1; accent-color: var(--fg); }
 .pop .btns { display: flex; flex-wrap: wrap; gap: 4px; }
 .pop .note { font-size: 11px; color: var(--muted); text-transform: none; letter-spacing: 0; }
-.bpm-input { width: 70px !important; text-align: right; }
+.bpm-input { width: 90px !important; text-align: left; }
+.pop-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+.pop-close { font-size: 18px; line-height: 1; padding: 0 2px; opacity: .7; }
+.pop-close:hover { opacity: 1; }
+.pop .note { max-width: 300px; }
 
 .side { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
 .panel-sec { background: var(--surface); padding: 0 12px 12px; flex: none; }

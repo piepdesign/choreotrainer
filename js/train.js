@@ -418,7 +418,8 @@ export async function renderTrain(root, recId) {
     const bpmIn = h('input.bpm-input', { type: 'number', step: '0.1', min: '40', max: '240', value: P.bpm ? Math.round(P.bpm * 10) / 10 : '' });
     bpmIn.addEventListener('change', () => { const v = Number(bpmIn.value); if (v >= 40 && v <= 240) { P.bpm = v; P.manualBeat = true; update(); } });
     return [
-      h('div.prow', h('span', 'Tempo (BPM)'), bpmIn),
+      h('div.pop-head', h('span', 'Tempo (BPM)'), h('button.pop-close', { type: 'button', title: 'Schließen', 'aria-label': 'Schließen', onclick: closePop }, '×')),
+      bpmIn,
       h('div.btns',
         small('÷2', () => { if (P.bpm) { P.bpm /= 2; P.manualBeat = true; update(); bpmIn.value = Math.round(P.bpm * 10) / 10; } }),
         small('×2', () => { if (P.bpm) { P.bpm *= 2; P.manualBeat = true; update(); bpmIn.value = Math.round(P.bpm * 10) / 10; } }),
@@ -935,9 +936,11 @@ export async function renderTrain(root, recId) {
     const w = mainCol.clientWidth;
     const stacked = matchMedia('(max-width: 1000px)').matches;
     let hgt = w / ratio;
-    if (!stacked) {
+    {
+      // Auch im schmalen (gestapelten) Layout an der Fensterhöhe begrenzen, sonst gibt es bei
+      // „Breite füllen“ nie einen Überstand zum Verschieben
       const used = crumbs.offsetHeight + timeline.offsetHeight + controls.offsetHeight + 28;
-      const avail = Math.max(180, mainCol.clientHeight - used);
+      const avail = Math.max(180, (stacked ? innerHeight - 72 : mainCol.clientHeight) - used);
       // Breite füllen: Video so breit wie die Spalte, was über die verfügbare Höhe hinausgeht, wird oben/unten
       // beschnitten (und lässt sich verschieben). Vorher wurde die Fläche auf volle Höhe gezogen, dann schnitt
       // „cover“ bei Querformat links/rechts ab und es gab nichts zu verschieben.
