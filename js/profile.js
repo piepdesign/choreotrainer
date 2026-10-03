@@ -420,16 +420,17 @@ export async function renderProfile(root, section) {
   nameIn.addEventListener('keydown', e => { if (e.key === 'Enter') saveName(); });
   // Je Zeile: Feld bzw. Erklärung, der Knopf direkt daneben (alle Knöpfe gleich breit untereinander)
   // Konto als Kacheln wie die übrigen Einstellungen: oben Feld bzw. Erklärung, unten der Knopf
-  const accRow = (left, button) => h('div.acc-card', h('div.acc-text', left), button);
+  // Jede Kachel: Überschrift (wie Feldbeschriftungen), Inhalt, Knopf. Überschrift benennt das Thema, der Knopf die Aktion.
+  const accRow = (title, body, button) => h('div.acc-card', h('span.acc-title', title), h('div.acc-text', body), button);
   const account = sect('account', 'Konto',
     h('div.acc',
-      accRow(h('label.field', h('span', 'Name'), nameIn), h('button.btn.small', { type: 'button', onclick: saveName }, 'Speichern')),
-      accRow(h('p', 'Name, Präferenzen und Panel-Anordnung auf Anfang, das Intro startet neu. Classes, Choreos, Videos und Statistiken bleiben.'),
+      accRow('Name', nameIn, h('button.btn.small', { type: 'button', onclick: saveName }, 'Speichern')),
+      accRow('Einstellungen', h('p.label', 'Name, Präferenzen und Panel-Anordnung auf Anfang, das Intro startet neu. Classes, Choreos, Videos und Statistiken bleiben.'),
         h('button.btn.small', {
           type: 'button',
           onclick: async () => { if (!confirm('Einstellungen zurücksetzen? Deine Daten bleiben erhalten.')) return; await resetSettings(); location.hash = '#/'; location.reload(); },
         }, 'Zurücksetzen')),
-      accRow(h('p', 'Löscht alles in diesem Browser: Classes, Choreos, Videos, Songdateien, Einheiten und Profil. Lässt sich nicht rückgängig machen.'),
+      accRow('Daten', h('p.label', 'Löscht alles in diesem Browser: Classes, Choreos, Videos, Songdateien, Einheiten und Profil. Lässt sich nicht rückgängig machen.'),
         h('button.btn.small.danger', {
           type: 'button',
           onclick: async () => {

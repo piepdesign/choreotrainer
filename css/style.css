@@ -17,14 +17,17 @@
   --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
   --wide: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
   --gutter: clamp(16px, 3vw, 40px);
+  color-scheme: light;
 }
 :root[data-theme="dark"] {
+  color-scheme: dark; /* sonst bleiben Uhr-/Kalender-Icon und Auswahlpfeile schwarz */
   --bg: #000; --fg: #fff; --muted: #a2a2a2; --line: rgba(255, 255, 255, .2);
   --panel: #1a1a1a; --track: rgba(255, 255, 255, .18);
   --rule: #4c4c4c; --surface: #141414; --surface-2: #232323;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --bg: #000; --fg: #fff; --muted: #a2a2a2; --line: rgba(255, 255, 255, .2);
     --panel: #1a1a1a; --track: rgba(255, 255, 255, .18);
     --rule: #4c4c4c; --surface: #141414; --surface-2: #232323;
@@ -204,6 +207,9 @@ button.chip[data-hex] { width: 64px; height: 28px; padding: 0; }
 .btn:disabled { opacity: .35; cursor: not-allowed; }
 .btn.small { padding: 5px 9px; font-size: 11px; }
 .btn.danger:hover { background: var(--c5); border-color: var(--c5); color: #000; }
+.btn, .ctl, .linkbtn, .rating button, .seg button, .pop-close { transition: opacity .15s, background-color .15s, border-color .15s, color .15s; }
+/* Hover: alle Knöpfe werden leicht transparent */
+.btn:not(:disabled):hover, .ctl:not(:disabled):hover, .linkbtn:hover, .rating button:hover, .seg button:hover { opacity: .6; }
 .linkbtn { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; text-decoration: underline; text-underline-offset: 3px; }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
@@ -571,8 +577,10 @@ a.stat-link:hover { background: var(--surface-2); }
 .acc { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--tile-gap); }
 .acc-card { display: flex; flex-direction: column; gap: 14px; background: var(--surface); padding: 16px; min-height: 150px; }
 .acc-card .acc-text { flex: 1; }
+.acc-title { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--fg); margin-bottom: -4px; }
+.acc-text input[type=text] { width: 100%; }
 .acc-card > .btn { align-self: flex-start; }
-.acc-text p { margin: 0; font-size: 12px; line-height: 1.55; color: var(--muted); }
+.acc-text p { margin: 0; line-height: 1.6; }
 .acc-text .field input { max-width: none; }
 
 /* Statistik-Auswahl: Kacheln wie in der Base, oben gezeigt, unten weitere */
