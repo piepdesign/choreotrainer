@@ -51,7 +51,8 @@ body {
 a { color: inherit; text-decoration: none; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; background: none; border: 0; padding: 0; }
-::selection { background: var(--accent); color: #000; }
+/* Auswahl invertiert statt gelb, damit sie auch auf gelben Markern sichtbar ist */
+::selection { background: var(--fg); color: var(--bg); }
 
 .wide { font-family: var(--wide); font-stretch: 125%; font-weight: 800; letter-spacing: -.01em; line-height: .95; }
 .label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }

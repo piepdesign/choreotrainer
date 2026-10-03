@@ -225,6 +225,19 @@ export async function renderTrain(root, recId) {
     a: P.loopIn ?? markerTime('start') ?? 0,
     b: P.loopOut ?? markerTime('end') ?? dur(),
   });
+  // Loop an/aus (Knopf und L). Ohne In/Out gelten Start/Ende-Marker; steht die Wiedergabe außerhalb, geht es an den Anfang
+  function toggleLoop() {
+    P.loopOn = !P.loopOn;
+    if (P.loopOn) {
+      const { a, b } = loopRange();
+      if (video.currentTime < a || video.currentTime >= b) video.currentTime = a;
+      if (P.loopIn == null && P.loopOut == null) {
+        const s = markerTime('start'), e = markerTime('end');
+        toast(s != null || e != null ? `Loop ${fmt(a)}–${fmt(b)} (Start/Ende)` : 'Loop über das ganze Video', 1800);
+      }
+    }
+    update();
+  }
 
   function renderStatic() {
     const d = dur() || 1;
@@ -268,12 +281,12 @@ export async function renderTrain(root, recId) {
   const fixed = (el, chars) => { el.classList.add('fixed'); el.style.width = `calc(${chars}ch + ${chars * 0.08}em + 20px)`; return el; };
   const bPlay = ctl('▶', { class: 'ctl play fixed', title: 'Play/Pause (Leertaste)', onclick: () => togglePlay() });
   const bMirror = ctl('Spiegeln', { title: 'Spiegeln (M)', onclick: () => { P.mirror = !P.mirror; update(); } });
-  const bRate = fixed(ctl('', { title: 'Tempo ([ / ])', onclick: e => popover(e.currentTarget, ratePop) }), 5);
+  const bRate = fixed(ctl('', { title: 'Tempo (↑ / ↓)', onclick: e => popover(e.currentTarget, ratePop) }), 5);
   const bVol = fixed(ctl('', { title: 'Lautstärke', onclick: e => popover(e.currentTarget, volPop) }), 7);
   const bImg = ctl('Bild', { title: 'Helligkeit/Kontrast', onclick: e => popover(e.currentTarget, imgPop) });
   const bIn = ctl('In', { title: 'Loop-Anfang setzen (I)', onclick: () => setIn() });
   const bOut = ctl('Out', { title: 'Loop-Ende setzen (O)', onclick: () => setOut() });
-  const bLoop = ctl('Loop', { title: 'Loop an/aus (L)', onclick: () => { P.loopOn = !P.loopOn; update(); } });
+  const bLoop = ctl('Loop', { title: 'Loop an/aus (L) · ohne In/Out zwischen Start und Ende', onclick: () => toggleLoop() });
   const bClear = ctl('×', { title: 'In/Out löschen', onclick: () => { P.loopIn = P.loopOut = null; P.loopOn = false; update(); } });
   const bCount = ctl('8er', { title: '8er-Count an/aus (C)', onclick: () => { P.countOn = !P.countOn; update(); } });
   const bBpm = fixed(ctl('', { title: 'Takt einstellen', onclick: e => popover(e.currentTarget, countPop) }), 9);
@@ -512,8 +525,9 @@ export async function renderTrain(root, recId) {
     rec.markers.push(m);
     rec.markers.sort((a, b) => a.t - b.t);
     update();
-    // Gedankenstützen direkt benennen
-    if (type === 'memo') { menuFor = m.id; renaming = true; } else { menuFor = null; }
+    // wie alle Marker: umbenennen erst über das Marker-Menü
+    menuFor = null;
+    renaming = false;
     renderMarkers();
   }
 
@@ -627,19 +641,18 @@ export async function renderTrain(root, recId) {
   function onKey(e) {
     if (e.key === 'Escape') { closePop(); document.activeElement?.blur(); return; }
     if (e.target.closest?.('input, textarea, select') || e.metaKey || e.ctrlKey) return;
-    // [ ] liegen auf deutschen Mac-Tastaturen auf ⌥5 / ⌥6, daher Wahltaste nur dafür zulassen
-    if (e.altKey && e.key !== '[' && e.key !== ']') return;
+    if (e.altKey) return;
     const k = e.key.toLowerCase();
     const map = {
       ' ': () => togglePlay(),
       arrowleft: () => { video.currentTime = Math.max(0, video.currentTime - (e.shiftKey ? 0.2 : 2)); },
       arrowright: () => { video.currentTime = Math.min(dur(), video.currentTime + (e.shiftKey ? 0.2 : 2)); },
       m: () => { P.mirror = !P.mirror; update(); },
-      '[': () => { P.rate = Math.max(0.25, Math.round((P.rate - 0.05) * 100) / 100); update(); },
-      ']': () => { P.rate = Math.min(1.5, Math.round((P.rate + 0.05) * 100) / 100); update(); },
+      arrowdown: () => { P.rate = Math.max(0.25, Math.round((P.rate - 0.05) * 100) / 100); update(); },
+      arrowup: () => { P.rate = Math.min(1.5, Math.round((P.rate + 0.05) * 100) / 100); update(); },
       i: () => setIn(),
       o: () => setOut(),
-      l: () => { P.loopOn = !P.loopOn; update(); },
+      l: () => toggleLoop(),
       c: () => { P.countOn = !P.countOn; update(); },
       t: () => tap(),
       1: () => setOne(),
@@ -837,7 +850,7 @@ export async function renderTrain(root, recId) {
       }, 'Aufnahme löschen')),
   ];
   const keysBody = [h('div.keys', [
-    ['␣', 'Play/Pause'], ['← →', '±2 s (⇧ ±0,2)'], ['M', 'Spiegeln'], ['[ ]', 'Tempo'],
+    ['␣', 'Play/Pause'], ['← →', '±2 s (⇧ ±0,2)'], ['M', 'Spiegeln'], ['↑ ↓', 'Tempo'],
     ['I / O', 'Loop In/Out'], ['L', 'Loop'], ['C', '8er-Count'], ['T', 'Tap-Tempo'],
     ['1', 'Anfangscount'], ['S / E', 'Start/Ende'], ['N', 'Gedanke'], ['H', 'Highlight'], ['F', 'Vollbild'], ['A', 'Ton Video/Song'], ['P', 'Seitenpanel'], ['⌘Z', 'Rückgängig'], ['⌘⇧Z', 'Umkehren'],
   ].map(([k, d]) => h('div', h('kbd', k), ' ', d)))];
