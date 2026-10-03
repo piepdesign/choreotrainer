@@ -112,7 +112,7 @@ export function toast(msg, ms = 2600) {
 // Klick öffnet ein kleines Menü mit allen drei
 const themeBtn = document.querySelector('.theme-toggle');
 const darkMq = matchMedia('(prefers-color-scheme: dark)');
-const THEMES = [['system', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']];
+const THEMES = [['light', 'Hell'], ['dark', 'Dunkel'], ['system', 'System']];
 const currentTheme = () => { try { return localStorage.getItem('ct-theme') || 'system'; } catch { return 'system'; } };
 function syncThemeIcon() {
   const t = currentTheme();
@@ -139,7 +139,7 @@ themeBtn.addEventListener('click', e => {
 addEventListener('pointerdown', e => { if (themeMenu && !themeMenu.contains(e.target) && e.target !== themeBtn && !themeBtn.contains(e.target)) closeThemeMenu(); });
 addEventListener('keydown', e => { if (e.key === 'Escape') closeThemeMenu(); });
 
-// ── Tester*in: Knopf unten rechts, klappt „Bug“ und „Idee“ aus, beide öffnen eine vorbereitete Mail ──
+// ── Helfer*in: Knopf unten rechts, klappt „Bug“ und „Idee“ aus, beide öffnen eine vorbereitete Mail ──
 const FEEDBACK_TO = 'sagmal@piep.design';
 const mail = (subject, intro) => `mailto:${FEEDBACK_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(`${intro}\n\n• `)}`;
 const FEEDBACK = [
@@ -151,7 +151,7 @@ function syncTester() {
   const on = !!settings().tester;
   if (!on) { testerFab?.remove(); testerFab = null; return; }
   if (testerFab) return;
-  const main = h('button.fab-main', { type: 'button', title: 'Testen: Bug melden oder Idee schicken', 'aria-label': 'Tester-Menü', 'aria-expanded': 'false', html: toolIcon('clipboard') });
+  const main = h('button.fab-main', { type: 'button', title: 'Bug melden oder Idee schicken', 'aria-label': 'Helfer-Menü', 'aria-expanded': 'false', html: toolIcon('clipboard') });
   testerFab = h('div.tester-fab',
     ...FEEDBACK.map(([id, label, href], i) => h('a.fab-action', { href, title: label, 'aria-label': label, style: { '--i': i + 1 }, html: toolIcon(id), onclick: () => setTimeout(close, 300) })),
     main);

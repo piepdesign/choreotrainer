@@ -111,8 +111,8 @@ export function preferences(values, onChange, statValues = null, { baseLabel = t
   const HINTS = {
     'Musikprovider': 'Hier öffnen sich erkannte Songs: in der App, wenn sie installiert ist, sonst im Browser.',
     'Song-Cover Hörprobe': 'Fährst du mit der Maus über ein Song-Cover, spielt eine 30-Sekunden-Hörprobe in dieser Lautstärke.',
-    'Tester*in': 'Blendet unten rechts einen Knopf ein, über den du Bugs und Ideen direkt per Mail meldest.',
-    'Statistiken': 'Diese Kennzahlen zeigt deine Base. Klicke oder ziehe Kacheln hinein oder heraus.',
+    'Helfer*in': 'Blendet unten rechts einen Knopf ein, über den du Bugs und Ideen direkt per Mail meldest.',
+    'Statistiken': 'Diese Kennzahlen siehst du in deiner „Base“. Klicke oder ziehe Kacheln hinein oder heraus.',
     'Ansicht': 'Hell, dunkel oder automatisch passend zu deinem System.',
   };
   const block = (title, control) => h('div.pref-block', h('h3.p-sub', title), hints ? h('p.pref-hint', HINTS[title]) : null, control);
@@ -135,10 +135,10 @@ export function preferences(values, onChange, statValues = null, { baseLabel = t
     block('Song-Cover Hörprobe', single('hoverPreview', [['off', 'Aus'], ['low', 'Leise'], ['mid', 'Mittel'], ['high', 'Laut']],
       values.hoverPreview === 'on' || !values.hoverPreview ? 'mid' : values.hoverPreview,
       ([id, label]) => [h('i.brand', { html: svg26(SOUND_PATHS[id]) }), h('span', label)])),
-    tester ? block('Tester*in', single('tester', [[false, 'Nein'], [true, 'Ja']], !!values.tester,
+    tester ? block('Helfer*in', single('tester', [[false, 'Nein'], [true, 'Ja']], !!values.tester,
       ([id, label]) => [h('i.brand', { html: svg26(id ? TOOL_PATHS.clipboard : TOOL_PATHS.none) }), h('span', label)])) : null,
     block('Statistiken', chips),
-    block('Ansicht', single('theme', [['system', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']], values.theme,
+    block('Ansicht', single('theme', [['light', 'Hell'], ['dark', 'Dunkel'], ['system', 'System']], values.theme,
       ([id, label]) => [h('i.brand', { html: THEME_ICONS[id] }), h('span', label)])));
 }
 

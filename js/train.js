@@ -434,7 +434,7 @@ export async function renderTrain(root, recId) {
         small('−10 ms', () => { P.anchor -= 0.01; P.manualBeat = true; update(); }),
         small('+10 ms', () => { P.anchor += 0.01; P.manualBeat = true; update(); })),
       h('div.btns',
-        small('Anfangscount setzen (1)', () => setOne()),
+        small('Anfangscount (1)', () => setOne()),
         small('Tap (T)', () => tap())),
       h('div.btns',
         small(P.click ? 'Klick an' : 'Klick aus', () => { P.click = !P.click; update(); refreshPop(); }, P.click),
@@ -448,7 +448,7 @@ export async function renderTrain(root, recId) {
         small(C.plus ? 'Halbe „+“ an' : 'Halbe „+“ aus', () => { C.plus = !C.plus; saveCountView(C); update(); refreshPop(); }, C.plus),
         small(C.show ? 'Zähler sichtbar' : 'Zähler ausgeblendet', () => { C.show = !C.show; saveCountView(C); update(); refreshPop(); }, C.show)),
       h('div.note', 'Ausgeblendet zählt der Count weiter (z. B. nur mit Klick).'),
-      h('div.note', 'Zählt nicht richtig? Bei der „1“ einer Acht pausieren und „Anfangscount setzen“ drücken. Oder ab einer „1“ mindestens viermal im Takt T tippen.',
+      h('div.note', 'Zählt nicht richtig? Bei der „1“ einer Acht pausieren und „Anfangscount“ drücken. Oder ab einer „1“ mindestens viermal im Takt T tippen.',
         song?.bpm ? ` Deezer kennt ${Math.round(song.bpm)} BPM für das Original.` : ''),
     ];
   };
@@ -837,9 +837,9 @@ export async function renderTrain(root, recId) {
       }, 'Aufnahme löschen')),
   ];
   const keysBody = [h('div.keys', [
-    ['␣', 'Play/Pause'], ['← →', '±2 s (⇧ ±0,2)'], ['M', 'Spiegeln'], ['[ ]', 'Tempo (⌥5 / ⌥6)'],
+    ['␣', 'Play/Pause'], ['← →', '±2 s (⇧ ±0,2)'], ['M', 'Spiegeln'], ['[ ]', 'Tempo'],
     ['I / O', 'Loop In/Out'], ['L', 'Loop'], ['C', '8er-Count'], ['T', 'Tap-Tempo'],
-    ['1', 'Anfangscount setzen'], ['S / E', 'Start/Ende'], ['N', 'Gedanke'], ['H', 'Highlight'], ['F', 'Vollbild'], ['A', 'Ton Video/Song'], ['P', 'Seitenpanel'], ['⌘Z', 'Rückgängig (⇧ wiederherstellen)'],
+    ['1', 'Anfangscount'], ['S / E', 'Start/Ende'], ['N', 'Gedanke'], ['H', 'Highlight'], ['F', 'Vollbild'], ['A', 'Ton Video/Song'], ['P', 'Seitenpanel'], ['⌘Z', 'Rückgängig'], ['⌘⇧Z', 'Wiederherstellen'],
   ].map(([k, d]) => h('div', h('kbd', k), ' ', d)))];
   const SECTIONS = {
     song: ['Song', [picker.el, songFileRow]],

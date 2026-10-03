@@ -26,7 +26,7 @@ const DEFAULTS = {
   panel: { open: true, order: PANEL_SECTIONS, collapsed: [] },
   videoFit: 'all',
   hoverPreview: 'mid', // Hörprobe beim Hovern über Cover: off | low | mid | high (früher on = mid)
-  tester: false, // Tester*in: Knopf unten rechts für Bug-Meldungen und Ideen
+  tester: false, // Helfer*in: Knopf unten rechts für Bug-Meldungen und Ideen
 };
 
 let cache = null;
