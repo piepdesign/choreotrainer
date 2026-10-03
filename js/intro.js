@@ -3,7 +3,7 @@
 // Navigation unten fest: „<“ zurück, „Später“, „>“ weiter. Gleiche Größe und Stelle in jedem Schritt.
 import { h } from './util.js';
 import { settings, saveSettings, applyTheme, BASE_STATS } from './settings.js';
-import { PROVIDERS } from './providers.js';
+import { providerOptions } from './providers.js';
 import { classManager } from './classform.js';
 import { optionGroup, toggleList } from './ui.js';
 import { db } from './db.js';
@@ -18,7 +18,8 @@ export async function runIntro() {
   const later = h('button.linkbtn.intro-later', { type: 'button' }, 'Später');
   const next = h('button.intro-arrow', { type: 'button', 'aria-label': 'Weiter', html: arrow('next') });
   const nav = h('div.intro-nav', back, later, next);
-  box.append(stage, nav);
+  // Navigation direkt unter dem Inhalt (statt am Bildschirmrand), beides zusammen mittig
+  box.append(h('div.intro-frame', stage, nav));
   document.body.append(box);
   document.body.classList.add('intro-open');
 
@@ -39,7 +40,7 @@ export async function runIntro() {
       h('span.line', letters('TRAINER', 7), h('sup', '©')))), { navVisible: false });
   await wait(13 * 50 + 750 + 1000);
 
-  const state = { name: settings().name || '', provider: settings().provider, openIn: settings().openIn, theme: settings().theme, baseStats: [...settings().baseStats] };
+  const state = { name: settings().name || '', provider: settings().provider, theme: settings().theme, baseStats: [...settings().baseStats] };
 
   // Ein Schritt = { render(), canGo(), skippable }
   const steps = [
@@ -66,15 +67,14 @@ export async function runIntro() {
     },
     {
       render() {
-        const pref = (title, control) => h('div.pref', h('div.pref-q', h('h3.p-sub', title)), control);
+        const pref = (title, control) => h('div.pref', h('div.pref-q', h('h3.p-sub', title)), h('div.pref-a', control));
         return h('div.intro-step',
           h('h1.wide', 'DEINE PRÄFERENZEN'),
-          h('p.intro-lead', 'Wo hörst du Musik? Erkannte Songs öffnen sich dort. Alles später im Profil änderbar.'),
+          h('p.intro-lead', '(Alles später im Profil änderbar)'),
           h('div.prefs',
-            pref('Musikprovider', optionGroup(PROVIDERS, state.provider, v => { state.provider = v; refreshNav(); })),
-            pref('Songs öffnen', optionGroup([['app', 'In der App'], ['web', 'Im Browser']], state.openIn, v => { state.openIn = v; })),
+            pref('Musikprovider', optionGroup(providerOptions(), state.provider, v => { state.provider = v; refreshNav(); })),
             pref('Ansicht', optionGroup([['system', 'Wie System'], ['light', 'Hell'], ['dark', 'Dunkel']], state.theme, v => { state.theme = v; applyTheme(v); })),
-            pref('Kennzahlen in deiner Base', toggleList(BASE_STATS, state.baseStats, list => { state.baseStats = list; }))));
+            pref('Statistiken', toggleList(BASE_STATS, state.baseStats, list => { state.baseStats = list; }))));
       },
       canGo: () => !!state.provider,
       skippable: true,
@@ -94,7 +94,7 @@ export async function runIntro() {
   async function go(delta) {
     // beim Verlassen speichern, was eingetragen ist
     if (index === 0) await saveSettings({ name: state.name });
-    if (index === 2) await saveSettings({ provider: state.provider, openIn: state.openIn, theme: state.theme, baseStats: state.baseStats });
+    if (index === 2) await saveSettings({ provider: state.provider, theme: state.theme, baseStats: state.baseStats });
     index += delta;
     if (index >= steps.length) { resolveDone(); return; }
     await show(steps[index].render());

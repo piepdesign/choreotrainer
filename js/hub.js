@@ -238,7 +238,7 @@ function sortableStripes(classes, render) {
   const clearMarks = () => els.forEach(x => x.classList.remove('drop-before', 'drop-after'));
 
   els.forEach(el => {
-    el.firstChild.prepend(h('i.grip', { 'aria-hidden': 'true', html: icon('grip') }));
+    el.prepend(h('i.grip', { 'aria-hidden': 'true', html: icon('grip') }));
     el.title = 'Klicken zum Öffnen · ziehen zum Umsortieren';
     el.addEventListener('dragstart', e => e.preventDefault()); // native Link-Drag aus
     el.addEventListener('pointerdown', e => {
@@ -388,8 +388,8 @@ function classEditor(cls, header, close, allClasses = []) {
   const custom = h('label.chip.custom', { title: 'Eigene Farbe wählen' }, customLabel, picker);
   const swatches = h('div.chips', PALETTE.map(p => h('button.chip', {
     type: 'button', 'data-hex': p, style: { background: `#${p}`, color: textOn(p) },
-    onclick: () => preview(p),
-  }, p)), custom);
+    onclick: () => preview(p), title: 'Farbe', 'aria-label': 'Farbe',
+  })), custom);
   preview(color);
   return h('div.fieldset',
     h('div.row',
@@ -398,7 +398,7 @@ function classEditor(cls, header, close, allClasses = []) {
       field('weekday', 'Wochentag', h('select', h('option', { value: '' }, '—'), WEEKDAYS.map(d => h('option', { selected: d === cls.weekday }, d)))),
       field('time', 'Uhrzeit', h('input', { type: 'time', value: cls.time || '' })),
       field('coach', 'Coach', pick.coach)),
-    h('div', { style: { marginTop: '14px' } }, h('span.label', 'Farbe'), swatches),
+    h('div', { style: { marginTop: '14px' } }, h('span.label.color-label', 'Farbe'), swatches),
     h('div.actions',
       h('button.btn.primary', {
         onclick: async () => {

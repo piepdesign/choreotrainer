@@ -57,12 +57,13 @@ export function classPickers(classes, { styles = [], levels = [] } = {}) {
 }
 
 // Schlichte Einzelauswahl: Text-Optionen in einer Zeile, die gewählte unterstrichen + Punkt
+// Optionen: [id, Text] oder [id, Text, Icon-SVG] (z. B. Logos der Musikprovider)
 export function optionGroup(options, value, onChange) {
   const el = h('div.optgroup', { role: 'radiogroup' });
-  const render = v => el.replaceChildren(...options.map(([id, label]) => h(`button.opt${id === v ? '.on' : ''}`, {
+  const render = v => el.replaceChildren(...options.map(([id, label, svg]) => h(`button.opt${id === v ? '.on' : ''}${svg ? '.has-icon' : ''}`, {
     type: 'button', role: 'radio', 'aria-checked': String(id === v),
     onclick: () => { render(id); onChange(id); },
-  }, h('i.dot'), label)));
+  }, h('i.dot'), svg ? h('i.brand', { html: svg }) : null, label)));
   render(value);
   return el;
 }

@@ -16,7 +16,8 @@ const sameSong = (a, b) => {
 
 // getBlob(): aktuelles Video oder null · onChange(song, offset|null) · onOffset(offset): nur Startpunkt
 // align(prior): optionaler Abgleich mit der Songdatei → { offset, confidence } oder null
-export function songPicker({ song = null, getBlob, onChange, onOffset, align = null }) {
+// startField: Eingabefeld für den Startpunkt, steht als Schritt 2 unter dem Song
+export function songPicker({ song = null, getBlob, onChange, onOffset, align = null, startField = null }) {
   let current = song;
   let editing = !song;
   let results = [];
@@ -27,9 +28,17 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
   const picked = h('div');
   const recBtn = h('button.btn.small', { type: 'button', onclick: () => recognize(false) }, 'Aus Video erkennen');
   const startBtn = h('button.btn.small', { type: 'button', onclick: () => detectStart() }, 'Startpunkt erkennen');
-  const recStatus = h('span.label');
+  const recStatus = h('div.label.song-status');
+  const startStatus = h('div.label.song-status');
   const altBox = h('div.actions', { style: { marginTop: '6px' } });
-  const el = h('div', search, picked, h('div.actions', { style: { marginTop: '10px' } }, recBtn, startBtn, recStatus), altBox);
+  // Reihenfolge wie im Ablauf: 1 Song erkennen/suchen · 2 Startpunkt im Song
+  const startStep = h('div.song-step',
+    h('span.label.step-label', 'Video beginnt im Song bei'),
+    h('div.actions.start-row', startField, startBtn),
+    startStatus);
+  const el = h('div.song-steps',
+    h('div.song-step', search, picked, h('div.actions', recBtn), recStatus, altBox),
+    onOffset ? startStep : null);
 
   // Weitere Treffer aus dem Scan zur Auswahl anbieten (z. B. Original vs. Sample-Quelle)
   function showAlternatives(r) {
@@ -55,7 +64,9 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
         h('button.linkbtn', { type: 'button', onclick: () => { editing = true; render(); input.focus(); } }, 'Ändern'))
       : current ? h('button.linkbtn', { type: 'button', onclick: () => { editing = false; render(); } }, 'Abbrechen') : '');
     recBtn.disabled = !getBlob();
-    startBtn.hidden = !current || !onOffset;
+    recBtn.textContent = current ? 'Erneut erkennen' : 'Aus Video erkennen';
+    recBtn.title = current ? 'Song noch einmal aus der Tonspur des Videos erkennen' : '';
+    startStep.hidden = !current;
     startBtn.disabled = !getBlob();
   }
 
@@ -135,7 +146,7 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
     try {
       let shazam = null, hits = 0, segments = 0, others = [], scanError = null, hasFile = false;
       try {
-        const scan = await scanTrack(blob, msg => { recStatus.textContent = msg; });
+        const scan = await scanTrack(blob, msg => { startStatus.textContent = msg; });
         segments = scan.segments;
         const mine = scan.candidates.filter(c => sameSong({ title: c.track.title }, current));
         hits = mine.reduce((a, c) => a + c.hits, 0);
@@ -145,28 +156,28 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
         scanError = e;
       }
       // align() liefert null, solange keine Songdatei geladen ist
-      if (align) recStatus.textContent = 'Gleiche mit Songdatei ab …';
+      if (align) startStatus.textContent = 'Gleiche mit Songdatei ab …';
       const r = align ? await align(shazam) : null;
       hasFile = r !== null;
       if (scanError && !hasFile) throw scanError; // ohne Songdatei gibt es keinen anderen Weg
       if (r) {
         if (shazam != null || r.confidence >= 1.15) {
           onOffset(r.offset);
-          recStatus.textContent = `Video beginnt bei ${fmt(r.offset, true)} im Song (Abgleich mit Songdatei)`;
+          startStatus.textContent = `Video beginnt bei ${fmt(r.offset, true)} im Song (Abgleich mit Songdatei)`;
           return;
         }
       }
       if (shazam != null) {
         onOffset(Math.max(0, shazam));
-        recStatus.textContent = `Video beginnt bei ${fmt(Math.max(0, shazam), true)} im Song (${hits}/${segments} Abschnitte)`;
+        startStatus.textContent = `Video beginnt bei ${fmt(Math.max(0, shazam), true)} im Song (${hits}/${segments} Abschnitte)`;
       } else {
         const heard = others[0] ? ` Gehört wurde: ${[others[0].track.subtitle, others[0].track.title].filter(Boolean).join(' — ')}.` : '';
         const hint = align && !hasFile ? 'Lade unten die Songdatei, dann klappt es per Abgleich. Oder trag den ' : hasFile ? 'Auch der Abgleich mit der Songdatei war unsicher (anderer Song oder verlangsamt?). Trag den ' : 'Trag den ';
-        recStatus.textContent = `„${current.title}“ nicht in der Tonspur gefunden.${heard} ${hint}Startpunkt von Hand ein.`;
+        startStatus.textContent = `„${current.title}“ nicht in der Tonspur gefunden.${heard} ${hint}Startpunkt von Hand ein.`;
       }
     } catch (e) {
       console.warn(e);
-      recStatus.textContent = e.message;
+      startStatus.textContent = e.message;
     } finally {
       startBtn.disabled = recBtn.disabled = !getBlob();
     }

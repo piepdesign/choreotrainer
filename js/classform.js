@@ -1,7 +1,7 @@
 // Classes ohne Video anlegen, bearbeiten, löschen. Genutzt im Intro und im Profil.
 import { db, uid, deleteClass } from './db.js';
 import { classPickers } from './ui.js';
-import { h, PALETTE, textOn, WEEKDAYS, CLASS_TITLES, CLASS_LEVELS, classTitle, classMeta, byClassOrder } from './util.js';
+import { h, PALETTE, textOn, WEEKDAYS, CLASS_TITLES, CLASS_LEVELS, classTitle, classCells, byClassOrder } from './util.js';
 
 const norm = s => String(s || '').trim().toLowerCase();
 const KEYS = ['category', 'level', 'weekday', 'time', 'coach'];
@@ -16,7 +16,7 @@ export function classManager(onChange) {
     list.replaceChildren(...classes.map(c => {
       const n = choreos.filter(x => x.classId === c.id).length;
       return h('div.cm-row', { style: { background: `#${c.color}`, color: textOn(c.color) } },
-        h('span.cm-name', `${classTitle(c)}${classMeta(c) ? ' · ' + classMeta(c) : ''}`.toUpperCase()),
+        ...classCells(c),
         h('span.cm-actions',
           h('button.linkbtn', { type: 'button', onclick: () => form.edit(c) }, 'Bearbeiten'),
           h('button.linkbtn', {
@@ -53,8 +53,8 @@ export function classForm(onSaved) {
   let color = null, editing = null;
   const swatches = h('div.chips', PALETTE.map(p => h('button.chip', {
     type: 'button', 'data-hex': p, style: { background: `#${p}`, color: textOn(p) },
-    onclick: () => pick(p),
-  }, p)));
+    onclick: () => pick(p), title: 'Farbe', 'aria-label': 'Farbe',
+  })));
   const picker = h('input', { type: 'color', value: '#7a2cff' });
   const custom = h('label.chip.custom', { title: 'Eigene Farbe' }, h('span', 'Eigene'), picker);
   picker.addEventListener('input', () => pick(picker.value.replace('#', '').toUpperCase()));
@@ -100,7 +100,7 @@ export function classForm(onSaved) {
   const el = h('div.classform',
     title,
     h('div.row', field('Style', f.category), field('Level', f.level), field('Wochentag', f.weekday), field('Uhrzeit', f.time), field('Coach', f.coach)),
-    h('div', { style: { marginTop: '12px' } }, h('span.label', 'Farbe (sonst automatisch)'), swatches),
+    h('div', { style: { marginTop: '14px' } }, h('span.label.color-label', 'Farbe'), swatches),
     h('div.actions', saveBtn, cancelBtn, msg));
   el.edit = cls => {
     editing = cls;

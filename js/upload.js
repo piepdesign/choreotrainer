@@ -38,18 +38,19 @@ export async function renderUpload(root, kind, refId) {
   const field = (label, input) => h('label.field', h('span', label), input);
 
   // ── Song ──
-  const offsetIn = h('input', { type: 'text', placeholder: '0:00', style: { maxWidth: '90px' } });
+  const offsetIn = h('input.offset-in', { type: 'text', placeholder: '0:00' });
   const picker = songPicker({
     song: preChoreo?.song || null,
     getBlob: () => file,
     onChange: (s, offset) => { if (offset != null) offsetIn.value = fmt(offset, true); },
     onOffset: offset => { offsetIn.value = fmt(offset, true); },
+    startField: offsetIn,
   });
 
   // ── Recording + Notizen ──
   const dateIn = h('input', { type: 'date', value: isoDate(Date.now()), oninput: e => { e.target.dataset.touched = '1'; } });
-  const notesIn = h('textarea', { placeholder: 'Outfit, Gedankenstützen, Anmerkungen vom Coach …' });
-  const saveBtn = h('button.btn.primary', { onclick: save }, 'Speichern & trainieren');
+  const notesIn = h('textarea', { placeholder: '5, 6, 7, 8 Anmerkungen …' });
+  const saveBtn = h('button.btn.primary', { onclick: save }, 'Speichern');
 
   // ── linke Spalte: Video ──
   const left = h('div');
@@ -85,8 +86,7 @@ export async function renderUpload(root, kind, refId) {
           h('div.row', field('Style', f.category), field('Level', f.level)),
           h('div.row', { style: { marginTop: '12px' } }, field('Wochentag', f.weekday), field('Uhrzeit', f.time), field('Coach', f.coach))),
         h('div.fieldset', h('span.label', 'Song'),
-          picker.el,
-          h('div.row', { style: { marginTop: '12px' } }, field('Video beginnt im Song bei (optional)', offsetIn))),
+          picker.el),
         h('div.fieldset', h('span.label', 'Recording'), h('div.row', field('Aufgenommen am', dateIn))),
         h('div.fieldset', h('span.label', 'Notizen'), notesIn),
         h('div.actions', saveBtn))),
@@ -147,7 +147,7 @@ export async function renderUpload(root, kind, refId) {
       console.error(e);
       toast(`Speichern fehlgeschlagen: ${e.message}`, 5000);
       saveBtn.disabled = false;
-      saveBtn.textContent = 'Speichern & trainieren';
+      saveBtn.textContent = 'Speichern';
     }
   }
 

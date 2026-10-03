@@ -84,14 +84,9 @@ export function textOn(hex) {
 
 export const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 
-// Class-Titel als Vorschläge (aus einem Kursplan), ohne Level und Altersangabe.
-// Eigene Namen bleiben möglich, die Liste ist nur ein Vorschlag.
-export const CLASS_TITLES = [
-  'Hip Hop', 'Hip Hop Kids', 'Hip Hop Juniors', 'Hip Hop Preschool', 'Hip Hop Adults',
-  'Female Hip Hop', 'Female', 'Heels', 'K-Pop', 'Reggaeton', 'Popping',
-  'Dancers Rehab', 'The Art of Freestyle', 'Kid Cut Formation', 'Baby Cut Formation',
-];
-export const CLASS_LEVELS = ['Lvl 1', 'Lvl 2', 'Open'];
+// Keine vorgegebenen Styles/Level: die Auswahllisten zeigen nur, was in eigenen Classes vorkommt
+export const CLASS_TITLES = [];
+export const CLASS_LEVELS = [];
 
 // Aufnahmedatum mit Wochentag: (Fr) 26.09.26
 export const fmtRecDate = ts => (ts ? `(${WEEKDAYS[(new Date(ts).getDay() + 6) % 7]}) ${fmtDate(ts)}` : '—');
@@ -161,11 +156,20 @@ export function inlineEdit(text, onSave, { href = null, clickToEdit = !href, pla
   return wrap;
 }
 
+// Class als Zellen: Titel · Wochentag · Uhrzeit · Coach. In Listen (.stripes, .cm-list) stehen die
+// Zellen per Subgrid zeilenübergreifend bündig untereinander.
+export function classCells(c) {
+  return [
+    h('span.cc-title', classTitle(c).toUpperCase()),
+    ...[c.weekday, c.time, c.coach].map(v => h('span.cc-meta', v ? String(v).toUpperCase() : '')),
+  ];
+}
+
 export function stripe(c, right, onclick) {
   const color = c?.color || PALETTE[0];
   return h('a.stripe', {
     href: onclick ? null : `#/class/${c.id}`,
     style: { background: `#${color}`, color: textOn(color) },
     onclick,
-  }, h('span', `${classTitle(c)}${classMeta(c) ? ' · ' + classMeta(c) : ''}`.toUpperCase()), h('span', right ?? color));
+  }, ...classCells(c), h('span.cc-right', right ?? ''));
 }

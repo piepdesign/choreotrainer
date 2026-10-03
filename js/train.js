@@ -1,6 +1,6 @@
 // Trainingsansicht: Player mit Spiegeln, Tempo, Lautstärke, Bild, Loop, 8er-Count, Markern, Song-Zeitleiste
 import { db, uid, deleteRecording, deleteChoreo } from './db.js';
-import { h, fmt, fmtRecDate, fmtDuration, relDate, parseTime, debounce, inlineEdit, fitInput, classTitle, classMeta, PALETTE, textOn } from './util.js';
+import { h, fmt, fmtDate, WEEKDAYS, fmtRecDate, fmtDuration, relDate, parseTime, debounce, inlineEdit, fitInput, classTitle, classMeta, PALETTE, textOn } from './util.js';
 import { analyzeBeat } from './beat.js';
 import { songPicker, songKeyOf } from './song.js';
 import { alignToSong, checkAudio } from './align.js';
@@ -302,6 +302,39 @@ export async function renderTrain(root, recId) {
   bFitW.classList.toggle('on', fit === 'width');
   bFitA.classList.toggle('on', fit === 'all');
   stage.classList.toggle('fill', fit === 'width');
+  // Breite füllen: Ausschnitt in der Höhe per Ziehen verschieben (je Aufnahme gemerkt). Kurzer Klick bleibt Play/Pause.
+  const applyPan = () => { video.style.objectPosition = `50% ${P.fitY ?? 50}%`; };
+  applyPan();
+  let panned = false;
+  stage.addEventListener('pointerdown', e => {
+    if (fit !== 'width' || e.button !== 0 || document.fullscreenElement === stage) return;
+    const y0 = e.clientY, start = P.fitY ?? 50;
+    const vw = video.videoWidth, vh = video.videoHeight;
+    // Überstand = wie viel Bild oben/unten abgeschnitten ist
+    const over = vw && vh ? Math.max(0, (stage.clientWidth / vw) * vh - stage.clientHeight) : 0;
+    if (over < 2) return;
+    panned = false;
+    const move = ev => {
+      const dy = ev.clientY - y0;
+      if (!panned && Math.abs(dy) < 4) return;
+      panned = true;
+      stage.classList.add('panning');
+      P.fitY = Math.round(Math.min(100, Math.max(0, start - (dy / over) * 100)) * 10) / 10;
+      applyPan();
+    };
+    const up = () => {
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+      removeEventListener('pointercancel', up);
+      stage.classList.remove('panning');
+      if (panned) persist();
+    };
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+    addEventListener('pointercancel', up);
+  });
+  // nach dem Verschieben kein Play/Pause auslösen
+  stage.addEventListener('click', e => { if (panned) { e.stopPropagation(); panned = false; } }, true);
   stage.addEventListener('dblclick', toggleFull);
   const bMark = ctl('+ Marker', { title: 'Marker setzen', onclick: e => popover(e.currentTarget, markPop) });
   const toggleAudio = () => {
@@ -584,7 +617,9 @@ export async function renderTrain(root, recId) {
   // ── Tastatur ──
   function onKey(e) {
     if (e.key === 'Escape') { closePop(); document.activeElement?.blur(); return; }
-    if (e.target.closest?.('input, textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.target.closest?.('input, textarea, select') || e.metaKey || e.ctrlKey) return;
+    // [ ] liegen auf deutschen Mac-Tastaturen auf ⌥5 / ⌥6, daher Wahltaste nur dafür zulassen
+    if (e.altKey && e.key !== '[' && e.key !== ']') return;
     const k = e.key.toLowerCase();
     const map = {
       ' ': () => togglePlay(),
@@ -658,7 +693,11 @@ export async function renderTrain(root, recId) {
         });
         input.addEventListener('blur', () => { if (menuFor === m.id && renaming) commit(); });
         kind.append(input);
-        requestAnimationFrame(() => { input.focus(); input.select(); });
+        // ganzen Namen markieren, damit direkt neu getippt werden kann (auch nach dem Klick-Ende)
+        const selectAll = () => { input.focus(); input.select(); };
+        requestAnimationFrame(selectAll);
+        setTimeout(selectAll, 60);
+        input.addEventListener('focus', () => input.select(), { once: true });
       } else {
         kind.textContent = m.text || MARKER_TYPES[m.type].label;
       }
@@ -673,10 +712,10 @@ export async function renderTrain(root, recId) {
     }) : [h('li.muted', { style: { display: 'block' } }, 'Noch keine Marker. Taste S/E/N/H oder „+ Marker“.')]));
   }
 
-  const notesIn = h('textarea', { placeholder: 'Outfit, Gedankenstützen, Anmerkungen vom Coach …' }, rec.notes || '');
+  const notesIn = h('textarea', { placeholder: '5, 6, 7, 8 Anmerkungen …' }, rec.notes || '');
   notesIn.addEventListener('input', () => { rec.notes = notesIn.value; saveRec(); });
 
-  const offsetIn = h('input', { type: 'text', placeholder: '0:00', value: rec.songOffset != null ? fmt(rec.songOffset, true) : '' });
+  const offsetIn = h('input.offset-in', { type: 'text', placeholder: '0:00', value: rec.songOffset != null ? fmt(rec.songOffset, true) : '' });
   offsetIn.addEventListener('change', () => { rec.songOffset = parseTime(offsetIn.value); update(); });
   const picker = songPicker({
     song,
@@ -699,11 +738,12 @@ export async function renderTrain(root, recId) {
       syncSong(true);
     },
     align: prior => (songBlob ? alignToSong(blob, songBlob, { prior }) : null),
+    startField: offsetIn,
   });
 
   // Songdatei laden / entfernen
   const songFileIn = h('input', { type: 'file', accept: 'audio/*,.mp3,.m4a,.aac,.wav,.flac,.aiff', hidden: true });
-  const songFileRow = h('div', { style: { marginTop: '12px' } });
+  const songFileRow = h('div.song-step');
   async function setSongFile(file) {
     if (!file) return;
     if (!/^audio\//.test(file.type) && !/\.(mp3|m4a|aac|wav|flac|aiff?)$/i.test(file.name)) { toast('Bitte eine Audiodatei wählen'); return; }
@@ -721,7 +761,7 @@ export async function renderTrain(root, recId) {
   function renderSongFile() {
     songFileRow.hidden = !song;
     songFileRow.replaceChildren(songFileIn, songBlob
-      ? h('div.actions',
+      ? h('div', h('span.label.step-label', 'Songdatei'), h('div.actions',
         h('span.label', `♪ ${songBlob.name || 'Songdatei'}`),
         h('button.linkbtn', { type: 'button', onclick: () => songFileIn.click() }, 'Ersetzen'),
         h('button.linkbtn', {
@@ -735,10 +775,11 @@ export async function renderTrain(root, recId) {
             renderSongFile();
             update();
           },
-        }, 'Entfernen'))
+        }, 'Entfernen')))
       : h('div',
+        h('span.label.step-label', 'Songdatei (optional)'),
         h('button.btn.small', { type: 'button', onclick: () => songFileIn.click() }, 'Songdatei laden'),
-        h('div.label', { style: { marginTop: '6px' } }, 'mp3, m4a, wav · zum Trainieren auf den Song und für einen exakten Startpunkt. Auch per Drag & Drop.')));
+        h('div.label', { style: { marginTop: '6px' } }, 'mp3, m4a, wav · zum Trainieren auf den Song.')));
   }
   songFileIn.addEventListener('change', () => setSongFile(songFileIn.files[0]));
   renderSongFile();
@@ -787,12 +828,12 @@ export async function renderTrain(root, recId) {
       }, 'Aufnahme löschen')),
   ];
   const keysBody = [h('div.keys', [
-    ['␣', 'Play/Pause'], ['← →', '±2 s (⇧ ±0,2)'], ['M', 'Spiegeln'], ['[ ]', 'Tempo'],
+    ['␣', 'Play/Pause'], ['← →', '±2 s (⇧ ±0,2)'], ['M', 'Spiegeln'], ['[ ]', 'Tempo (⌥5 / ⌥6)'],
     ['I / O', 'Loop In/Out'], ['L', 'Loop'], ['C', '8er-Count'], ['T', 'Tap-Tempo'],
-    ['1', 'Hier ist die 1'], ['S / E', 'Start/Ende'], ['N', 'Gedanke'], ['H', 'Highlight'], ['F', 'Vollbild'], ['A', 'Ton Video/Song'], ['P', 'Seitenpanel'],
+    ['1', 'Anfangscount setzen'], ['S / E', 'Start/Ende'], ['N', 'Gedanke'], ['H', 'Highlight'], ['F', 'Vollbild'], ['A', 'Ton Video/Song'], ['P', 'Seitenpanel'], ['⌘Z', 'Rückgängig (⇧ wiederherstellen)'],
   ].map(([k, d]) => h('div', h('kbd', k), ' ', d)))];
   const SECTIONS = {
-    song: ['Song', [picker.el, song ? h('label.field', { style: { marginTop: '10px' } }, h('span', 'Video beginnt im Song bei'), offsetIn) : null, songFileRow]],
+    song: ['Song', [picker.el, songFileRow]],
     marker: ['Marker', [markerList]],
     notes: ['Notizen', [notesIn]],
     status: ['Status', [ratingBox, ratingHint, h('div', { style: { marginTop: '8px' } }, statLine)]],
@@ -864,12 +905,14 @@ export async function renderTrain(root, recId) {
     });
   }
 
+  // Aufnahmetag = Class-Tag → Wochentag steht schon beim Class-Tag, nicht noch einmal am Datum
+  const sameDay = !!cls.weekday && !!rec.recordedAt && WEEKDAYS[(new Date(rec.recordedAt).getDay() + 6) % 7] === cls.weekday;
   const panelBtn = h('button.ctl.icon-ctl.panel-btn', { type: 'button', title: 'Seitenpanel ein/aus (P)', 'aria-label': 'Seitenpanel ein/aus' });
   const panelIcon = open => { panelBtn.innerHTML = icon(open ? 'panelOpen' : 'panelClosed'); panelBtn.classList.toggle('on', open); };
   const crumbs = h('div.crumbs',
     h('a.tag', { href: `#/class/${cls.id}`, style: { background: `#${color}`, color: textOn(color) } }, classTitle(cls).toUpperCase()),
     h('span.label', classMeta(cls)),
-    h('span.label', titleEdit(), ` · ${recIndex + 1}/${recs.length} · ${fmtRecDate(rec.recordedAt)}`),
+    h('span.label', titleEdit(), ` · ${recIndex + 1}/${recs.length} · ${sameDay ? fmtDate(rec.recordedAt) : fmtRecDate(rec.recordedAt)}`),
     panelBtn,
     h('h1.wide', inlineEdit((choreo.title || song?.title || 'Ohne Song').toUpperCase(), async v => { choreo.title = v; await db.put('choreos', choreo); }), song?.artist ? h('span.muted', { style: { fontWeight: 600 } }, ` — ${song.artist.toUpperCase()}`) : ''));
   const mainCol = h('div.train-main', crumbs, stage, timeline, controls);
@@ -938,6 +981,7 @@ export async function renderTrain(root, recId) {
       rec.player = { ...P };
       await db.put('recordings', rec);
     }
+    deleted = true; // verspätete Speicherungen (Notizen, Player) nicht mehr schreiben
     URL.revokeObjectURL(url);
     if (songUrl) URL.revokeObjectURL(songUrl);
     ac?.close();

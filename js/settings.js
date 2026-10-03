@@ -22,7 +22,6 @@ const DEFAULTS = {
   introDone: false,
   theme: 'system', // system | light | dark
   provider: null, // spotify | apple | tidal | ytmusic | deezer | amazon
-  openIn: 'app', // app (installiertes Programm, sonst Browser) | web
   baseStats: DEFAULT_STATS,
   panel: { open: true, order: PANEL_SECTIONS, collapsed: [] },
   videoFit: 'all',

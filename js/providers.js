@@ -2,6 +2,7 @@
 // Apple Music (freie iTunes-Suche), sonst die Suche im Provider. Eine Anmeldung übernimmt der
 // Provider selbst (Browser bzw. App), die App speichert nur die Wahl.
 import { h } from './util.js';
+import { brandIcon } from './brand-icons.js';
 import { settings, saveSettings } from './settings.js';
 
 export const PROVIDERS = [
@@ -13,6 +14,8 @@ export const PROVIDERS = [
   ['amazon', 'Amazon Music'],
 ];
 export const providerName = id => PROVIDERS.find(p => p[0] === id)?.[1] || '';
+// Für Auswahllisten: [id, Name, Logo]
+export const providerOptions = () => PROVIDERS.map(([id, name]) => [id, name, brandIcon(id, 16)]);
 
 const clean = s => String(s || '').replace(/\(.*?\)|\[.*?\]|feat\..*$/gi, '').replace(/\s+/g, ' ').trim();
 const simple = s => clean(s).toLowerCase().replace(/[^a-z0-9äöüß]+/g, ' ').trim();
@@ -60,7 +63,7 @@ export function appUrl(provider, webUrl, song) {
   }
 }
 
-// Klick auf Cover/Titel → App (falls installiert) oder neuer Tab
+// Klick auf Cover/Titel → App (falls installiert), sonst Web-Version im neuen Tab
 export async function openSong(song) {
   if (!song?.title) return;
   let provider = settings().provider;
@@ -68,9 +71,8 @@ export async function openSong(song) {
     provider = await askProvider();
     if (!provider) return;
   }
-  const preferApp = settings().openIn !== 'web';
-  // Für den Browser-Fall das Fenster sofort öffnen, sonst blockt der Pop-up-Blocker (Ziel kommt ggf. asynchron)
-  if (!preferApp || !['spotify', 'apple', 'tidal', 'deezer'].includes(provider)) {
+  // Ohne Mac-App gleich der Browser. Fenster sofort öffnen, sonst blockt der Pop-up-Blocker (Ziel kommt ggf. asynchron)
+  if (!['spotify', 'apple', 'tidal', 'deezer'].includes(provider)) {
     const win = window.open('about:blank', '_blank');
     const url = await providerUrl(provider, song);
     if (win) { win.opener = null; win.location.href = url; } else location.href = url;
@@ -99,10 +101,10 @@ export function askProvider() {
       h('div.modal-card',
         h('h2.wide', 'WO HÖRST DU MUSIK?'),
         h('p.label', 'Songs öffnen sich künftig dort. Angemeldet bist du direkt beim Anbieter, die App speichert nur deine Wahl. Ändern kannst du sie im Profil.'),
-        h('div.chips', PROVIDERS.map(([id, name]) => h('button.btn', {
+        h('div.chips', PROVIDERS.map(([id, name]) => h('button.btn.provider-btn', {
           type: 'button',
           onclick: async () => { await saveSettings({ provider: id }); close(id); },
-        }, name))),
+        }, h('i.brand', { html: brandIcon(id, 16) }), name))),
         h('button.linkbtn', { type: 'button', onclick: () => close(null) }, 'Abbrechen')));
     document.body.append(box);
   });

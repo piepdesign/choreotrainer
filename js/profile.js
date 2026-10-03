@@ -6,7 +6,7 @@ import { h, fmt, fmtDuration, relDate, fmtRecDate, inlineEdit, classTitle, strip
 import { loadAll, dots, choreoCard, recTitle, nextClass } from './hub.js';
 import { baseStats, latestRating, choreoLength, weekStart, dayKey } from './stats.js';
 import { settings, saveSettings, applyTheme, resetSettings, BASE_STATS } from './settings.js';
-import { PROVIDERS } from './providers.js';
+import { providerOptions } from './providers.js';
 import { classManager } from './classform.js';
 import { go, toast, replaceHash } from './app.js';
 import { optionGroup, toggleList } from './ui.js';
@@ -41,19 +41,31 @@ function attachTooltip(root) {
   return () => tip.remove();
 }
 
-// Senkrechte Balken (eine Reihe). items: [{ label, value, tip, now }]
+// Senkrechte Balken (eine Reihe). items: [{ label, value, tip, now, parts: [{ color, label, value }] }]
+// Mit parts wird jeder Balken nach Class gestapelt und eingefärbt (Reihenfolge wie die Classes).
 function bars(items, { height = 120, unit = 'min' } = {}) {
   const maxV = Math.max(1, ...items.map(i => i.value));
   const w = 100 / items.length;
   const top = items.reduce((b, i, k) => (i.value > (items[b]?.value ?? -1) ? k : b), 0);
+  const scale = v => (v / maxV) * (height - 14);
   return h('div.chart',
     svg('svg', { viewBox: `0 0 100 ${height}`, preserveAspectRatio: 'none', class: 'bars', height },
       svg('line', { x1: 0, x2: 100, y1: height - 0.5, y2: height - 0.5, class: 'baseline' }),
       items.map((i, k) => {
-        const bh = (i.value / maxV) * (height - 14);
-        return svg('g', { 'data-tip': i.tip ?? `${i.label}: ${i.value} ${unit}` },
-          svg('rect', { x: k * w, y: 0, width: w, height, class: 'hit' }),
-          i.value ? svg('rect', { x: k * w + w * 0.18, y: height - bh, width: w * 0.64, height: bh, rx: 1.2, class: `bar${i.now ? ' now' : ''}` }) : null);
+        const x = k * w + w * 0.18, bw = w * 0.64;
+        const parts = (i.parts || []).filter(p => p.value);
+        let y = height;
+        const segs = parts.length
+          ? parts.map((p, j) => {
+            const ph = scale(p.value);
+            y -= ph;
+            // 1,5 px Fläche zwischen gestapelten Segmenten
+            return svg('rect', { x, y, width: bw, height: Math.max(0.5, ph - (j ? 1.5 : 0)), class: `bar seg${i.now ? ' now' : ''}`, style: `fill:#${p.color}` });
+          })
+          : i.value ? [svg('rect', { x, y: height - scale(i.value), width: bw, height: scale(i.value), rx: 1.2, class: `bar${i.now ? ' now' : ''}` })] : [];
+        const detail = parts.length > 1 ? ` · ${parts.map(p => `${p.label} ${p.value}`).join(' · ')}` : parts.length === 1 ? ` · ${parts[0].label}` : '';
+        return svg('g', { 'data-tip': `${i.tip ?? `${i.label}: ${i.value} ${unit}`}${detail}` },
+          svg('rect', { x: k * w, y: 0, width: w, height, class: 'hit' }), segs);
       })),
     // Achsenbeschriftung als HTML (verzerrt nicht)
     // bei vielen Balken nur jede dritte Beschriftung (die letzte immer), Rest per Tooltip
@@ -67,20 +79,24 @@ function hbars(items, unit = 'min') {
   const maxV = Math.max(1, ...items.map(i => i.value));
   return h('div.hbars', items.map(i => h('div.hbar', { 'data-tip': i.tip ?? `${i.label}: ${i.value} ${unit}` },
     h('span.hb-label', i.color ? h('i.swatch', { style: { background: `#${i.color}` } }) : null, i.label),
-    h('span.hb-track', h('span.hb-fill', { style: { width: `${(i.value / maxV) * 100}%` } })),
+    h('span.hb-track', h('span.hb-fill', { style: { width: `${(i.value / maxV) * 100}%`, background: i.color ? `#${i.color}` : null } })),
     h('span.hb-val', `${i.value} ${unit}`))));
 }
 
 // Kalender-Heatmap: 26 Wochen × 7 Tage, aktuelle Woche markiert
-function heatmap(sessions, choreoTitle) {
+// Farbe = Class, die an dem Tag am meisten geübt wurde, Deckkraft = Minuten
+function heatmap(sessions, choreoTitle, colorOf) {
   const byDay = new Map();
   for (const s of sessions) {
     const k = dayKey(s.start);
-    const e = byDay.get(k) || { sec: 0, choreos: new Set() };
+    const e = byDay.get(k) || { sec: 0, choreos: new Set(), byColor: new Map() };
     e.sec += s.seconds;
     e.choreos.add(choreoTitle(s.choreoId));
+    const c = colorOf(s.choreoId);
+    if (c) e.byColor.set(c, (e.byColor.get(c) || 0) + s.seconds);
     byDay.set(k, e);
   }
+  const mainColor = e => [...(e?.byColor || [])].sort((a, b) => b[1] - a[1])[0]?.[0];
   const weeks = 26, gap = 3, left = 30, top = 22;
   const thisWeek = weekStart();
   const first = thisWeek - (weeks - 1) * 7 * DAY;
@@ -103,9 +119,11 @@ function heatmap(sessions, choreoTitle) {
         const e = byDay.get(day);
         const sec = e?.sec || 0;
         const date = new Date(day).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+        const col = sec ? mainColor(e) : null;
         nodes.push(svg('rect', {
           x: left + w * step, y: top + d * step, width: cell, height: cell, rx: 2,
           class: `hm l${level(sec)}${ws === thisWeek ? ' cur' : ''}`,
+          style: col ? `fill:#${col}` : null,
           'data-tip': sec ? `${date}: ${min(sec) || '<1'} min · ${[...e.choreos].join(', ')}` : `${date}: nicht geübt`,
         }));
       }
@@ -150,31 +168,86 @@ function sparkline(ratings) {
     pts.map((r, i) => svg('circle', { cx: x(i), cy: y(r.value), r: 2.5, class: 'spark-dot', 'data-tip': `${fmtRecDate(r.ts)}: Status ${r.value}` })));
 }
 
+// Sortierbare Tabelle: Klick auf eine Spaltenüberschrift sortiert, zweiter Klick dreht die Richtung
+// cols: [{ label, value: r => Zahl|Text, cell: r => Inhalt, dir: 1|-1 (Startrichtung) }]
+function sortTable(cols, rows, { sort = 0, cls = '', href = null, key = null } = {}) {
+  let si = sort, sd = cols[sort].dir ?? 1;
+  try { const saved = key && JSON.parse(localStorage.getItem(key)); if (saved && cols[saved.i]) { si = saved.i; sd = saved.d; } } catch { /* egal */ }
+  const box = h(`div.p-table${cls}`);
+  const cmp = (x, y) => (typeof x === 'string' || typeof y === 'string' ? String(x ?? '').localeCompare(String(y ?? ''), 'de') : (x ?? -Infinity) - (y ?? -Infinity));
+  function render() {
+    const sorted = [...rows].sort((a, b) => cmp(cols[si].value(a), cols[si].value(b)) * sd);
+    box.replaceChildren(
+      h('div.p-row.head', cols.map((c, i) => h(`button.sort${i === si ? '.on' : ''}`, {
+        type: 'button', title: 'Sortieren',
+        onclick: () => {
+          if (si === i) sd = -sd; else { si = i; sd = c.dir ?? 1; }
+          try { if (key) localStorage.setItem(key, JSON.stringify({ i: si, d: sd })); } catch { /* egal */ }
+          render();
+        },
+      }, c.label, h('i.sort-dir', i === si ? (sd > 0 ? '↑' : '↓') : '')))),
+      ...(sorted.length ? sorted.map(r => {
+        const link = href?.(r);
+        return h(link ? 'a.p-row' : 'div.p-row', { href: link || null }, cols.map(c => h('span', c.cell(r))));
+      }) : [h('p.empty', 'Keine Einträge.')]));
+  }
+  render();
+  return box;
+}
+
 export async function renderProfile(root, section) {
-  const data = await loadAll();
-  const { classes, choreos, recordings, sessions, classById, recsByChoreo } = data;
+  const all = await loadAll();
   const s = settings();
-  const real = sessions.filter(x => x.seconds >= 5);
   const now = Date.now();
-  const values = baseStats(data);
   const titleOf = c => c?.title || c?.song?.title || 'Ohne Song';
-  const choreoById = Object.fromEntries(choreos.map(c => [c.id, c]));
+
+  // ── Filter nach Class: gilt für alle Auswertungen, Listen und Diagramme ──
+  let filter = '';
+  try { filter = localStorage.getItem('ct-profile-class') || ''; } catch { /* egal */ }
+  if (!all.classById[filter]) filter = '';
+  const classes = all.classes.filter(c => !filter || c.id === filter).sort(byClassOrder);
+  const choreos = all.choreos.filter(c => !filter || c.classId === filter);
+  const ids = new Set(choreos.map(c => c.id));
+  const recordings = all.recordings.filter(r => ids.has(r.choreoId));
+  const sessions = all.sessions.filter(x => ids.has(x.choreoId));
+  const { classById, recsByChoreo } = all;
+  const data = { ...all, classes, choreos, recordings, sessions };
+  const real = sessions.filter(x => x.seconds >= 5);
+  const values = baseStats(data);
+  const choreoById = Object.fromEntries(all.choreos.map(c => [c.id, c]));
   const choreoTitle = id => titleOf(choreoById[id]);
+  const classOf = id => classById[choreoById[id]?.classId];
+  const colorOf = id => classOf(id)?.color;
   const urls = [];
+  // Minuten einer Liste von Einheiten, aufgeteilt nach Class (für gestapelte Balken)
+  const parts = list => classes.map(c => ({
+    color: c.color, label: classTitle(c),
+    value: min(list.filter(x => choreoById[x.choreoId]?.classId === c.id).reduce((t, x) => t + x.seconds, 0)),
+  }));
 
   // ── Kopf ──
-  const since = Math.min(...[...choreos.map(c => c.created), ...real.map(x => x.start)].filter(Boolean), now);
+  const since = Math.min(...[...all.choreos.map(c => c.created), ...all.sessions.map(x => x.start)].filter(Boolean), now);
   const head = h('section.p-head',
     h('span.label', 'Profil'),
     h('h1.wide.p-name', inlineEdit((s.name || 'Dein Name').toUpperCase(), async v => { await saveSettings({ name: v.toUpperCase() }); toast('Name gespeichert'); })),
-    h('p.label', choreos.length ? `Dabei seit ${new Date(since).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })} · ${choreos.length} Choreos · ${classes.length} Classes` : 'Noch keine Daten'));
+    h('p.label', all.choreos.length ? `Dabei seit ${new Date(since).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })} · ${all.choreos.length} Choreos · ${all.classes.length} Classes` : 'Noch keine Daten'));
 
   const nav = h('nav.p-nav', [['overview', 'Übersicht'], ['time', 'Übungszeit'], ['status', 'Status'], ['choreos', 'Choreos'], ['classes', 'Classes'], ['sessions', 'Einheiten'], ['prefs', 'Präferenzen'], ['account', 'Konto']]
     .map(([id, label]) => h('a', { href: `#/profile/${id}`, onclick: e => { e.preventDefault(); document.getElementById(`p-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); replaceHash(`#/profile/${id}`); } }, label)));
 
+  const setFilter = id => {
+    try { localStorage.setItem('ct-profile-class', id); } catch { /* egal */ }
+    go(location.hash, { keep: true });
+  };
+  const filterRow = all.classes.length > 1 ? h('div.p-filter',
+    h('span.label', 'Class'),
+    h('div.optgroup', [['', 'Alle', null], ...all.classes.sort(byClassOrder).map(c => [c.id, classTitle(c), c.color])].map(([id, label, color]) =>
+      h(`button.opt${id === filter ? '.on' : ''}`, { type: 'button', onclick: () => setFilter(id) },
+        color ? h('i.swatch', { style: { background: `#${color}` } }) : h('i.dot'), label)))) : null;
+
   const sect = (id, title, ...body) => h('section.p-sec', { id: `p-${id}` }, h('div.section-head', h('h2.wide', title)), ...body);
 
-  // ── Übersicht: Zuletzt geübt + Heatmap ──
+  // ── Übersicht: Kennzahlen + Heatmap ──
   const lastS = real.reduce((m, x) => (x.start > (m?.start || 0) ? x : m), null);
   const overview = sect('overview', 'ÜBERSICHT',
     h('div.stats',
@@ -182,22 +255,26 @@ export async function renderProfile(root, section) {
       tile('Serie', values.streak.value, 'Tage in Folge'),
       tile('Tage geübt', String(new Set(real.filter(x => x.start > now - 182 * DAY).map(x => dayKey(x.start))).size), 'in den letzten 26 Wochen'),
       tile('Dauer gesamt', values.duration.value, values.duration.hint)),
-    heatmap(real, choreoTitle));
+    heatmap(real, choreoTitle, colorOf));
 
   // ── Übungszeit ──
   const ws = weekStart();
   const weeksBack = 12;
   const perWeek = Array.from({ length: weeksBack }, (_, i) => {
     const a = ws - (weeksBack - 1 - i) * 7 * DAY, b = a + 7 * DAY;
-    const sec = real.filter(x => x.start >= a && x.start < b).reduce((t, x) => t + x.seconds, 0);
+    const list = real.filter(x => x.start >= a && x.start < b);
     const d = new Date(a);
-    return { label: `${d.getDate()}.${d.getMonth() + 1}.`, value: min(sec), now: i === weeksBack - 1, tip: `Woche ab ${d.toLocaleDateString('de-DE')}: ${min(sec)} min` };
+    return { label: `${d.getDate()}.${d.getMonth() + 1}.`, value: min(list.reduce((t, x) => t + x.seconds, 0)), parts: parts(list), now: i === weeksBack - 1, tip: `Woche ab ${d.toLocaleDateString('de-DE')}: ${min(list.reduce((t, x) => t + x.seconds, 0))} min` };
   });
-  const perWeekday = WEEKDAYS.map((d, k) => ({ label: d, value: min(real.filter(x => (new Date(x.start).getDay() + 6) % 7 === k).reduce((t, x) => t + x.seconds, 0)) }));
+  const perWeekday = WEEKDAYS.map((d, k) => {
+    const list = real.filter(x => (new Date(x.start).getDay() + 6) % 7 === k);
+    return { label: d, value: min(list.reduce((t, x) => t + x.seconds, 0)), parts: parts(list) };
+  });
   const slots = [['Morgen', 5, 12], ['Mittag', 12, 17], ['Abend', 17, 22], ['Nacht', 22, 29]];
-  const perSlot = slots.map(([label, a, b]) => ({
-    label, value: min(real.filter(x => { const hh = new Date(x.start).getHours(); const hx = hh < 5 ? hh + 24 : hh; return hx >= a && hx < b; }).reduce((t, x) => t + x.seconds, 0)),
-  }));
+  const perSlot = slots.map(([label, a, b]) => {
+    const list = real.filter(x => { const hh = new Date(x.start).getHours(); const hx = hh < 5 ? hh + 24 : hh; return hx >= a && hx < b; });
+    return { label, value: min(list.reduce((t, x) => t + x.seconds, 0)), parts: parts(list) };
+  });
   const perChoreo = choreos.map(c => ({
     label: titleOf(c), color: classById[c.classId]?.color,
     value: min(real.filter(x => x.choreoId === c.id).reduce((t, x) => t + x.seconds, 0)),
@@ -220,53 +297,66 @@ export async function renderProfile(root, section) {
 
   // ── Status ──
   const rated = choreos.filter(c => latestRating(c));
-  const dist = [1, 2, 3, 4, 5].map(v => ({ label: String(v), value: rated.filter(c => latestRating(c) === v).length, tip: `Status ${v}: ${rated.filter(c => latestRating(c) === v).length} Choreos` }));
+  const dist = [1, 2, 3, 4, 5].map(v => {
+    const list = rated.filter(c => latestRating(c) === v);
+    return {
+      label: String(v), value: list.length, tip: `Status ${v}: ${list.length} Choreos`,
+      parts: classes.map(c => ({ color: c.color, label: classTitle(c), value: list.filter(x => x.classId === c.id).length })),
+    };
+  });
+  const statusOf = c => latestRating(c) || 0;
   const status = sect('status', 'STATUS',
     h('div.p-grid',
       h('div.p-big', h('b.wide', values.status.value), h('span.label', `aus ${rated.length} bewerteten Choreos`), dots(rated.length ? Math.round(rated.reduce((t, c) => t + latestRating(c), 0) / rated.length) : 0)),
       h('div', h('h3.p-sub', 'Verteilung'), bars(dist, { height: 90, unit: 'Choreos' }))),
-    h('div.p-table',
-      h('div.p-row.head', h('span', 'Choreo'), h('span', 'Status'), h('span', 'Verlauf'), h('span', 'Zuletzt bewertet')),
-      ...[...choreos].sort((a, b) => (latestRating(a) || 0) - (latestRating(b) || 0)).map(c => h('a.p-row', { href: (recsByChoreo[c.id] || []).length ? `#/train/${recsByChoreo[c.id].at(-1).id}` : null },
-        h('span', h('i.swatch', { style: { background: `#${classById[c.classId]?.color || 'ccc'}` } }), titleOf(c)),
-        h('span', dots(latestRating(c))),
-        h('span', sparkline(c.ratings)),
-        h('span.label', c.ratings?.length ? relDate(c.ratings.at(-1).ts) : 'nie')))),
-    h('p.label', 'Sortiert nach Status, die wackligsten zuerst.'));
+    sortTable([
+      { label: 'Choreo', value: c => titleOf(c), cell: c => [h('i.swatch', { style: { background: `#${classById[c.classId]?.color || 'ccc'}` } }), titleOf(c)] },
+      { label: 'Status', value: statusOf, cell: c => dots(latestRating(c)) },
+      { label: 'Verlauf', value: c => c.ratings?.length || 0, cell: c => sparkline(c.ratings), dir: -1 },
+      { label: 'Zuletzt bewertet', value: c => c.ratings?.at(-1)?.ts || 0, cell: c => h('span.label', c.ratings?.length ? relDate(c.ratings.at(-1).ts) : 'nie'), dir: -1 },
+    ], choreos, { sort: 1, key: 'ct-sort-status', href: c => ((recsByChoreo[c.id] || []).length ? `#/train/${recsByChoreo[c.id].at(-1).id}` : null) }),
+    h('p.label', 'Spaltenüberschrift anklicken zum Sortieren. Standard: die wackligsten zuerst.'));
 
   // ── Choreos: Galerie / Liste ──
-  let view = 'gallery';
-  try { view = localStorage.getItem('ct-choreo-view') || 'gallery'; } catch { /* egal */ }
+  let view = 'gallery', gsort = 'recent';
+  try { view = localStorage.getItem('ct-choreo-view') || 'gallery'; gsort = localStorage.getItem('ct-choreo-sort') || 'recent'; } catch { /* egal */ }
   const choreoBox = h('div');
-  const allSorted = [...choreos].sort((a, b) => (b.lastPracticed || b.created) - (a.lastPracticed || a.created));
+  const secOf = c => real.filter(x => x.choreoId === c.id).reduce((t, x) => t + x.seconds, 0);
+  const lenOf = c => choreoLength(recsByChoreo[c.id] || []) || 0;
+  const GSORT = {
+    recent: ['Zuletzt geübt', (a, b) => (b.lastPracticed || b.created) - (a.lastPracticed || a.created)],
+    title: ['Titel', (a, b) => titleOf(a).localeCompare(titleOf(b), 'de')],
+    status: ['Status', (a, b) => statusOf(a) - statusOf(b)],
+    time: ['Übungszeit', (a, b) => secOf(b) - secOf(a)],
+    length: ['Länge', (a, b) => lenOf(b) - lenOf(a)],
+  };
+  const sortSel = h('select.inline-select', Object.entries(GSORT).map(([k, [l]]) => h('option', { value: k, selected: k === gsort }, l)));
+  sortSel.addEventListener('change', () => { gsort = sortSel.value; try { localStorage.setItem('ct-choreo-sort', gsort); } catch { /* egal */ } renderChoreos(); });
+  const sortWrap = h('label.inline-sort', h('span.label', 'Sortieren'), sortSel);
   function renderChoreos() {
+    sortWrap.hidden = view !== 'gallery';
     if (view === 'gallery') {
-      choreoBox.replaceChildren(allSorted.length ? h('div.cards', allSorted.map(c => choreoCard(c, classById[c.classId], recsByChoreo[c.id] || [], urls))) : h('p.empty', 'Noch keine Choreos.'));
+      const list = [...choreos].sort(GSORT[gsort]?.[1] || GSORT.recent[1]);
+      choreoBox.replaceChildren(list.length ? h('div.cards', list.map(c => choreoCard(c, classById[c.classId], recsByChoreo[c.id] || [], urls))) : h('p.empty', 'Noch keine Choreos.'));
     } else {
-      choreoBox.replaceChildren(h('div.p-table.wide6',
-        h('div.p-row.head', h('span', 'Choreo'), h('span', 'Class'), h('span', 'Status'), h('span', 'Länge'), h('span', 'Geübt'), h('span', 'Zuletzt')),
-        ...allSorted.map(c => {
-          const recs = recsByChoreo[c.id] || [];
-          const len = choreoLength(recs);
-          const sec = real.filter(x => x.choreoId === c.id).reduce((t, x) => t + x.seconds, 0);
-          return h('a.p-row', { href: recs.length ? `#/train/${recs.at(-1).id}` : null },
-            h('span', titleOf(c)),
-            h('span', classById[c.classId] ? classTitle(classById[c.classId]) : '—'),
-            h('span', dots(latestRating(c))),
-            h('span', len ? fmt(len) : '—'),
-            h('span', fmtDuration(sec)),
-            h('span.label', relDate(c.lastPracticed)));
-        })));
+      choreoBox.replaceChildren(sortTable([
+        { label: 'Choreo', value: c => titleOf(c), cell: c => titleOf(c) },
+        { label: 'Class', value: c => (classById[c.classId] ? classTitle(classById[c.classId]) : ''), cell: c => [h('i.swatch', { style: { background: `#${classById[c.classId]?.color || 'ccc'}` } }), classById[c.classId] ? classTitle(classById[c.classId]) : '—'] },
+        { label: 'Status', value: statusOf, cell: c => dots(latestRating(c)) },
+        { label: 'Länge', value: lenOf, cell: c => (lenOf(c) ? fmt(lenOf(c)) : '—'), dir: -1 },
+        { label: 'Geübt', value: secOf, cell: c => fmtDuration(secOf(c)), dir: -1 },
+        { label: 'Zuletzt', value: c => c.lastPracticed || 0, cell: c => h('span.label', relDate(c.lastPracticed)), dir: -1 },
+      ], choreos, { sort: 5, cls: '.wide6', key: 'ct-sort-choreos', href: c => ((recsByChoreo[c.id] || []).length ? `#/train/${recsByChoreo[c.id].at(-1).id}` : null) }));
     }
     toggle.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === view));
   }
   const toggle = h('div.seg', [['gallery', 'Galerie'], ['list', 'Liste']].map(([v, l]) => h('button.ctl', { type: 'button', 'data-v': v, onclick: () => { view = v; try { localStorage.setItem('ct-choreo-view', v); } catch { /* egal */ } renderChoreos(); } }, l)));
-  const choreoSec = sect('choreos', `CHOREOS`, h('div.actions', toggle, h('span.label', `${choreos.length} insgesamt`)), choreoBox);
+  const choreoSec = sect('choreos', 'CHOREOS', h('div.actions.p-tools', toggle, sortWrap, h('span.label', `${choreos.length} insgesamt`)), choreoBox);
   renderChoreos();
 
   // ── Classes ──
   const classSec = sect('classes', 'CLASSES',
-    h('div.stripes', classes.sort(byClassOrder).map(c => {
+    h('div.stripes', classes.map(c => {
       const mine = choreos.filter(x => x.classId === c.id);
       const sec = real.filter(x => mine.some(m => m.id === x.choreoId)).reduce((t, x) => t + x.seconds, 0);
       const nc = nextClass(c);
@@ -275,47 +365,38 @@ export async function renderProfile(root, section) {
     h('details.p-add', h('summary.linkbtn', 'Classes verwalten'), classManager(() => go('#/profile/classes', { keep: true }))));
 
   // ── Einheiten ──
-  const recent = [...real].sort((a, b) => b.start - a.start).slice(0, 25);
+  const recent = [...real].sort((a, b) => b.start - a.start).slice(0, 50);
   const sessionSec = sect('sessions', 'EINHEITEN',
-    recent.length ? h('div.p-table.wide5',
-      h('div.p-row.head', h('span', 'Wann'), h('span', 'Choreo'), h('span', 'Dauer'), h('span', 'Tempo'), h('span', 'Loops')),
-      ...recent.map(x => h('div.p-row',
-        h('span', new Date(x.start).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })),
-        h('span', choreoTitle(x.choreoId)),
-        h('span', fmtDuration(x.seconds)),
-        h('span', x.avgRate ? `${x.avgRate.toFixed(2).replace('.', ',')}×` : '—'),
-        h('span', x.loops != null ? String(x.loops) : '—')))) : h('p.empty', 'Noch keine Einheiten. Gezählt wird, sobald ein Video läuft.'),
-  );
+    recent.length ? sortTable([
+      { label: 'Wann', value: x => x.start, cell: x => new Date(x.start).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }), dir: -1 },
+      { label: 'Choreo', value: x => choreoTitle(x.choreoId), cell: x => [h('i.swatch', { style: { background: `#${colorOf(x.choreoId) || 'ccc'}` } }), choreoTitle(x.choreoId)] },
+      { label: 'Dauer', value: x => x.seconds, cell: x => fmtDuration(x.seconds), dir: -1 },
+      { label: 'Tempo', value: x => x.avgRate || 0, cell: x => (x.avgRate ? `${x.avgRate.toFixed(2).replace('.', ',')}×` : '—'), dir: -1 },
+      { label: 'Loops', value: x => x.loops ?? -1, cell: x => (x.loops != null ? String(x.loops) : '—'), dir: -1 },
+    ], recent, { sort: 0, cls: '.wide5', key: 'ct-sort-sessions' }) : h('p.empty', 'Noch keine Einheiten. Gezählt wird, sobald ein Video läuft.'),
+    recent.length ? h('p.label', `Die letzten ${recent.length} Einheiten.`) : null);
 
-  // ── Präferenzen: je Zeile eine Frage, links Titel, rechts die Auswahl ──
-  const pref = (title, hint, control) => h('div.pref', h('div.pref-q', h('h3.p-sub', title), hint ? h('span.label', hint) : null), control);
+  // ── Präferenzen und Konto: je Zeile links die Frage/Erklärung, rechts die Auswahl bzw. der Knopf ──
+  const pref = (title, hint, control) => h('div.pref', h('div.pref-q', h('h3.p-sub', title), hint ? h('p.pref-hint', hint) : null), h('div.pref-a', control));
   const prefs = sect('prefs', 'PRÄFERENZEN',
     h('div.prefs',
       pref('Ansicht', null, optionGroup([['system', 'Wie System'], ['light', 'Hell'], ['dark', 'Dunkel']], s.theme, async v => { applyTheme(v); await saveSettings({ theme: v }); })),
-      pref('Musikprovider', 'Erkannte Songs öffnen sich dort', optionGroup(PROVIDERS, s.provider, async v => { await saveSettings({ provider: v }); })),
-      pref('Songs öffnen', 'App nur, wenn installiert, sonst Browser', optionGroup([['app', 'In der App'], ['web', 'Im Browser']], s.openIn, async v => { await saveSettings({ openIn: v }); })),
-      pref('Kennzahlen in der Base', 'Reihenfolge wie hier', toggleList(BASE_STATS, s.baseStats, async list => { await saveSettings({ baseStats: list }); }))));
+      pref('Musikprovider', 'Songs öffnen sich in der App, wenn sie installiert ist, sonst im Browser.', optionGroup(providerOptions(), s.provider, async v => { await saveSettings({ provider: v }); })),
+      pref('Statistiken', 'In deiner Base, Reihenfolge wie hier.', toggleList(BASE_STATS, s.baseStats, async list => { await saveSettings({ baseStats: list }); }))));
 
-  // ── Konto ──
   const nameIn = h('input.caps', { type: 'text', value: (s.name || '').toUpperCase(), placeholder: 'DEIN NAME' });
+  const saveName = async () => { if (!nameIn.value.trim()) return; await saveSettings({ name: nameIn.value.trim().toUpperCase() }); toast('Name gespeichert'); go('#/profile/account', { keep: true }); };
+  nameIn.addEventListener('keydown', e => { if (e.key === 'Enter') saveName(); });
   const account = sect('account', 'KONTO',
-    h('div.p-account',
-      h('div',
-        h('h3.p-sub', 'Name'),
-        h('div.actions', nameIn, h('button.btn.small', {
-          type: 'button',
-          onclick: async () => { if (!nameIn.value.trim()) return; await saveSettings({ name: nameIn.value.trim().toUpperCase() }); toast('Name gespeichert'); go('#/profile/account', { keep: true }); },
-        }, 'Speichern'))),
-      h('div',
-        h('h3.p-sub', 'Zurücksetzen'),
-        h('p.label.p-text', 'Name, Präferenzen und Panel-Layout auf Anfang, das Intro startet neu. Classes, Choreos, Videos und Statistik bleiben.'),
+    h('div.prefs',
+      // Knöpfe stehen in allen Zeilen an derselben Stelle (rechte Spalte), das Namensfeld links bei der Frage
+      h('div.pref', h('div.pref-q', h('h3.p-sub', 'Name'), h('p.pref-hint', 'So begrüßt dich die App.'), nameIn), h('div.pref-a', h('button.btn.small', { type: 'button', onclick: saveName }, 'Speichern'))),
+      pref('Zurücksetzen', 'Setzt Name, Präferenzen und Panel-Anordnung zurück, das Intro startet neu. Deine Classes, Choreos, Videos und Statistiken bleiben erhalten.',
         h('button.btn.small', {
           type: 'button',
           onclick: async () => { if (!confirm('Einstellungen zurücksetzen? Deine Daten bleiben erhalten.')) return; await resetSettings(); location.hash = '#/'; location.reload(); },
         }, 'Zurücksetzen')),
-      h('div',
-        h('h3.p-sub', 'Löschen'),
-        h('p.label.p-text', 'Löscht alles in diesem Browser: Classes, Choreos, Videos, Songdateien, Einheiten und Profil. Nicht rückgängig zu machen.'),
+      pref('Alles löschen', 'Löscht alles, was in diesem Browser gespeichert ist: Classes, Choreos, Videos, Songdateien, Einheiten und Profil. Das lässt sich nicht rückgängig machen.',
         h('button.btn.small.danger', {
           type: 'button',
           onclick: async () => {
@@ -329,7 +410,7 @@ export async function renderProfile(root, section) {
           },
         }, 'Alles löschen'))));
 
-  root.append(head, nav, overview, time, status, choreoSec, classSec, sessionSec, prefs, account);
+  root.append(head, nav, filterRow || '', overview, time, status, choreoSec, classSec, sessionSec, prefs, account);
   const removeTip = attachTooltip(root);
   if (section) requestAnimationFrame(() => document.getElementById(`p-${section}`)?.scrollIntoView({ block: 'start' }));
   return () => { removeTip(); urls.forEach(u => URL.revokeObjectURL(u)); };

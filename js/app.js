@@ -4,7 +4,7 @@ import { renderUpload } from './upload.js';
 import { renderTrain } from './train.js';
 import { renderProfile } from './profile.js';
 import { runIntro } from './intro.js';
-import { requestPersist } from './db.js';
+import { requestPersist, undo, redo } from './db.js';
 import { loadSettings, settings, saveSettings, applyTheme } from './settings.js';
 import { h } from './util.js';
 
@@ -119,6 +119,30 @@ addEventListener('drop', e => e.preventDefault());
 
 addEventListener('hashchange', route);
 requestPersist();
+
+// ⌘Z / Strg+Z rückgängig, ⌘⇧Z / Strg+⇧Z wiederherstellen. In Textfeldern gilt das eigene Rückgängig des Feldes.
+let undoBusy = false;
+addEventListener('keydown', async e => {
+  if (!(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== 'z') return;
+  if (e.target.closest?.('input, textarea, select, [contenteditable]') || document.body.classList.contains('intro-open')) return;
+  e.preventDefault();
+  if (undoBusy) return;
+  undoBusy = true;
+  try {
+    // Erst die Ansicht ihren Stand sichern lassen (noch ausstehende Änderung zählt als letzter Schritt),
+    // dann zurückdrehen und neu aufbauen
+    if (cleanup) { const c = cleanup; cleanup = null; await c(); }
+    const done = await (e.shiftKey ? redo() : undo());
+    toast(done ? (e.shiftKey ? 'Wiederhergestellt' : 'Rückgängig gemacht') : (e.shiftKey ? 'Nichts zum Wiederherstellen' : 'Nichts zum Rückgängigmachen'), 1600);
+    keepScroll = true;
+    await route();
+  } catch (err) {
+    console.error(err);
+    toast(`Rückgängig fehlgeschlagen: ${err.message}`);
+  } finally {
+    undoBusy = false;
+  }
+});
 
 // Start: Einstellungen laden, beim ersten Öffnen das Intro, dann die Seite
 (async () => {
