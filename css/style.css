@@ -422,7 +422,8 @@ body.intro-open { overflow: hidden; }
 /* ── Profil ──────────────────────────────────── */
 .p-head { padding: 24px 0 8px; }
 .p-name { font-size: clamp(34px, 7vw, 96px); margin: 6px 0 10px; }
-.p-nav { position: sticky; top: 64px; z-index: 10; background: var(--bg); display: flex; gap: 18px; flex-wrap: wrap; padding: 10px 0; border-bottom: 1px solid var(--rule); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+/* volle Breite, damit randlose Flächen (Class-Streifen) beim Scrollen nicht seitlich hervorschauen */
+.p-nav { position: sticky; top: 64px; z-index: 10; background: var(--bg); display: flex; gap: 18px; flex-wrap: wrap; margin: 0 calc(-1 * var(--gutter)); padding: 10px var(--gutter); border-bottom: 1px solid var(--rule); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
 .p-nav a { opacity: .6; } .p-nav a:hover { opacity: 1; }
 .p-sec { scroll-margin-top: 110px; }
 .p-sec .section-head { margin-top: clamp(32px, 4vw, 52px); }
@@ -504,28 +505,12 @@ a.stat-link:hover { background: var(--surface-2); }
 .pick select, .pick input { flex: 1; min-width: 0; width: 100%; }
 .caps { text-transform: uppercase; }
 
-/* ── Präferenzen: Frage links, Auswahl rechts, eine Linie je Zeile ── */
-.prefs { display: grid; margin-top: 8px; }
-.pref { display: grid; grid-template-columns: minmax(180px, 260px) 1fr; gap: 10px 32px; padding: 16px 0; border-top: 1px solid var(--rule); }
-.pref:last-child { border-bottom: 1px solid var(--rule); }
-.pref-q .p-sub { margin: 2px 0 4px; }
-.pref-q .label { display: block; text-transform: none; letter-spacing: .02em; }
-@media (max-width: 700px) { .pref { grid-template-columns: 1fr; } }
 .optgroup { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: center; }
 .opt { display: inline-flex; align-items: center; gap: 8px; padding: 4px 0; font: inherit; font-size: 13px; color: var(--muted); }
 .opt:hover { color: var(--fg); }
 .opt .dot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid currentColor; flex: none; }
 .opt.on { color: var(--fg); font-weight: 600; }
 .opt.on .dot { background: var(--fg); border-color: var(--fg); }
-.toggles { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 22px; }
-.toggle { display: flex; align-items: center; gap: 10px; padding: 5px 0; font: inherit; font-size: 13px; color: var(--muted); text-align: left; }
-.toggle:hover { color: var(--fg); }
-.toggle.on { color: var(--fg); }
-.switch { position: relative; width: 26px; height: 14px; border-radius: 7px; border: 1.5px solid currentColor; flex: none; transition: background .15s; }
-.switch::after { content: ''; position: absolute; top: 1.5px; left: 1.5px; width: 8px; height: 8px; border-radius: 50%; background: currentColor; transition: transform .15s; }
-.toggle.on .switch { background: var(--fg); border-color: var(--fg); }
-.toggle.on .switch::after { background: var(--bg); transform: translateX(12px); }
-.intro .prefs { max-width: 860px; }
 /* Logos der Musikprovider */
 .brand { display: inline-flex; flex: none; }
 .brand svg { display: block; }
@@ -553,9 +538,33 @@ a.stat-link:hover { background: var(--surface-2); }
 .inline-sort { display: inline-flex; align-items: center; gap: 8px; }
 .inline-sort[hidden] { display: none; }
 .inline-select { width: auto; padding: 4px 0; font-size: 12px; }
-.pref-hint { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); max-width: 46ch; }
-.pref-a { min-width: 0; align-self: center; }
-.pref-a input[type=text] { max-width: 260px; }
 .intro-frame:has(.intro-step.center) .intro-nav { width: min(560px, 80vw); border-top: 0; }
-.intro .pref:last-child { border-bottom: 0; }
-.pref-q > input[type=text] { margin-top: 10px; max-width: 260px; }
+
+/* ── Präferenzen: Titel über der Auswahl, Breite begrenzt ── */
+.prefs { display: grid; gap: 30px; margin-top: 8px; }
+.pref-block .p-sub { margin: 0 0 12px; }
+.provider-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 2px; }
+.provider-tiles button { display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 92px; padding: 14px 8px; background: var(--surface); font-size: 12px; color: var(--muted); transition: background .15s, color .15s; }
+.provider-tiles button:hover { color: var(--fg); background: var(--surface-2); }
+.provider-tiles button.on { background: var(--fg); color: var(--bg); }
+.provider-tiles .brand { opacity: 1; }
+.segmented { display: inline-flex; border: 1px solid var(--fg); }
+.segmented button { padding: 8px 16px; font-size: 12px; letter-spacing: .04em; }
+.segmented button + button { border-left: 1px solid var(--fg); }
+.segmented button.on { background: var(--fg); color: var(--bg); }
+.stat-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.stat-chip { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border: 1px solid var(--rule); font-size: 12px; color: var(--muted); }
+.stat-chip:hover { border-color: var(--fg); color: var(--fg); }
+.stat-chip.on { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+.stat-chip .check { width: 10px; height: 10px; border: 1px solid currentColor; flex: none; position: relative; }
+.stat-chip.on .check { border-color: var(--bg); }
+.stat-chip.on .check::after { content: ''; position: absolute; left: 2.5px; top: 0; width: 3px; height: 6px; border: solid var(--bg); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+
+/* ── Konto: links Feld/Erklärung, rechts gleich breite Knöpfe ── */
+.acc { display: grid; }
+.acc-row { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 12px 32px; align-items: center; padding: 16px 0; border-top: 1px solid var(--rule); }
+.acc-row:last-child { border-bottom: 1px solid var(--rule); }
+.acc-row > .btn { width: 100%; justify-content: center; text-align: center; }
+.acc-text p { margin: 0; font-size: 13px; line-height: 1.55; max-width: 56ch; }
+.acc-text .field input { max-width: 320px; }
+@media (max-width: 600px) { .acc-row { grid-template-columns: 1fr; } }

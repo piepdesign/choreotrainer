@@ -14,8 +14,6 @@ export const PROVIDERS = [
   ['amazon', 'Amazon Music'],
 ];
 export const providerName = id => PROVIDERS.find(p => p[0] === id)?.[1] || '';
-// Für Auswahllisten: [id, Name, Logo]
-export const providerOptions = () => PROVIDERS.map(([id, name]) => [id, name, brandIcon(id, 16)]);
 
 const clean = s => String(s || '').replace(/\(.*?\)|\[.*?\]|feat\..*$/gi, '').replace(/\s+/g, ' ').trim();
 const simple = s => clean(s).toLowerCase().replace(/[^a-z0-9äöüß]+/g, ' ').trim();

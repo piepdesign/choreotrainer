@@ -1,5 +1,10 @@
-// Gemeinsame Bedienelemente: Auswahlliste mit „+ Neu …“, Optionsauswahl, Schalterliste, Icons
+// Gemeinsame Bedienelemente: Auswahlliste mit „+ Neu …“, Präferenzen, Icons
 import { h } from './util.js';
+import { PROVIDERS } from './providers.js';
+import { BASE_STATS } from './settings.js';
+import { brandIcon } from './brand-icons.js';
+
+const brandSvg = id => brandIcon(id, 26);
 
 // Auswahlliste wie beim Wochentag, mit zusätzlicher Option, einen eigenen Wert hinzuzufügen.
 // Liefert ein Element mit .value (lesen/setzen) und .focus(), passt also überall, wo vorher ein Input stand.
@@ -57,34 +62,6 @@ export function classPickers(classes, { styles = [], levels = [] } = {}) {
 }
 
 // Schlichte Einzelauswahl: Text-Optionen in einer Zeile, die gewählte unterstrichen + Punkt
-// Optionen: [id, Text] oder [id, Text, Icon-SVG] (z. B. Logos der Musikprovider)
-export function optionGroup(options, value, onChange) {
-  const el = h('div.optgroup', { role: 'radiogroup' });
-  const render = v => el.replaceChildren(...options.map(([id, label, svg]) => h(`button.opt${id === v ? '.on' : ''}${svg ? '.has-icon' : ''}`, {
-    type: 'button', role: 'radio', 'aria-checked': String(id === v),
-    onclick: () => { render(id); onChange(id); },
-  }, h('i.dot'), svg ? h('i.brand', { html: svg }) : null, label)));
-  render(value);
-  return el;
-}
-
-// Mehrfachauswahl als Schalterliste (z. B. Kennzahlen der Base)
-export function toggleList(options, selected, onChange) {
-  const cur = new Set(selected);
-  return h('div.toggles', options.map(([id, label]) => {
-    const btn = h(`button.toggle${cur.has(id) ? '.on' : ''}`, {
-      type: 'button', role: 'switch', 'aria-checked': String(cur.has(id)),
-      onclick: () => {
-        if (cur.has(id)) cur.delete(id); else cur.add(id);
-        btn.classList.toggle('on', cur.has(id));
-        btn.setAttribute('aria-checked', String(cur.has(id)));
-        onChange(options.map(o => o[0]).filter(x => cur.has(x)));
-      },
-    }, h('span.switch'), label);
-    return btn;
-  }));
-}
-
 // Kleine Strich-Icons (SVG, currentColor)
 const ICONS = {
   // Seitenpanel: Rahmen mit rechter Spalte (offen = gefüllt)
@@ -99,4 +76,38 @@ const ICONS = {
 export function icon(name) {
   const fillOnly = name === 'grip';
   return `<svg viewBox="0 0 20 18" width="20" height="18" aria-hidden="true" fill="${fillOnly ? 'currentColor' : 'none'}" stroke="${fillOnly ? 'none' : 'currentColor'}" stroke-width="1.4" stroke-linecap="round">${ICONS[name]}</svg>`;
+}
+
+// Präferenzen (Intro und Profil gleich): Ansicht als Umschalter, Musikprovider als Kacheln mit Logo,
+// Statistiken als An/Aus-Chips. values: { theme, provider, baseStats } · onChange(patch)
+export function preferences(values, onChange) {
+  const block = (title, control) => h('div.pref-block', h('h3.p-sub', title), control);
+  // Einzelauswahl; render(neu) setzt die Markierung
+  const single = (cls, options, value, content) => {
+    const el = h(`div.${cls}`, { role: 'radiogroup' });
+    const render = v => el.replaceChildren(...options.map(o => h(`button${o[0] === v ? '.on' : ''}`, {
+      type: 'button', role: 'radio', 'aria-checked': String(o[0] === v),
+      onclick: () => { render(o[0]); onChange(cls === 'segmented' ? { theme: o[0] } : { provider: o[0] }); },
+    }, content(o))));
+    render(value);
+    return el;
+  };
+  const cur = new Set(values.baseStats || []);
+  const chips = h('div.stat-chips', BASE_STATS.map(([id, label]) => {
+    const btn = h(`button.stat-chip${cur.has(id) ? '.on' : ''}`, {
+      type: 'button', role: 'switch', 'aria-checked': String(cur.has(id)),
+      onclick: () => {
+        if (cur.has(id)) cur.delete(id); else cur.add(id);
+        btn.classList.toggle('on', cur.has(id));
+        btn.setAttribute('aria-checked', String(cur.has(id)));
+        onChange({ baseStats: BASE_STATS.map(x => x[0]).filter(x => cur.has(x)) });
+      },
+    }, h('i.check'), label);
+    return btn;
+  }));
+  return h('div.prefs',
+    block('Musikprovider', single('provider-tiles', PROVIDERS, values.provider,
+      ([id, name]) => [h('i.brand', { html: brandSvg(id) }), h('span', name)])),
+    block('Ansicht', single('segmented', [['system', 'Wie System'], ['light', 'Hell'], ['dark', 'Dunkel']], values.theme, ([, label]) => label)),
+    block('Statistiken', chips));
 }

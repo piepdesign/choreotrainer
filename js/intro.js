@@ -3,9 +3,8 @@
 // Navigation unten fest: „<“ zurück, „Später“, „>“ weiter. Gleiche Größe und Stelle in jedem Schritt.
 import { h } from './util.js';
 import { settings, saveSettings, applyTheme, BASE_STATS } from './settings.js';
-import { providerOptions } from './providers.js';
 import { classManager } from './classform.js';
-import { optionGroup, toggleList } from './ui.js';
+import { preferences } from './ui.js';
 import { db } from './db.js';
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -67,14 +66,10 @@ export async function runIntro() {
     },
     {
       render() {
-        const pref = (title, control) => h('div.pref', h('div.pref-q', h('h3.p-sub', title)), h('div.pref-a', control));
         return h('div.intro-step',
           h('h1.wide', 'DEINE PRÄFERENZEN'),
           h('p.intro-lead', '(Alles später im Profil änderbar)'),
-          h('div.prefs',
-            pref('Musikprovider', optionGroup(providerOptions(), state.provider, v => { state.provider = v; refreshNav(); })),
-            pref('Ansicht', optionGroup([['system', 'Wie System'], ['light', 'Hell'], ['dark', 'Dunkel']], state.theme, v => { state.theme = v; applyTheme(v); })),
-            pref('Statistiken', toggleList(BASE_STATS, state.baseStats, list => { state.baseStats = list; }))));
+          preferences(state, patch => { Object.assign(state, patch); if (patch.theme) applyTheme(patch.theme); refreshNav(); }));
       },
       canGo: () => !!state.provider,
       skippable: true,

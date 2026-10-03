@@ -6,10 +6,9 @@ import { h, fmt, fmtDuration, relDate, fmtRecDate, inlineEdit, classTitle, strip
 import { loadAll, dots, choreoCard, recTitle, nextClass } from './hub.js';
 import { baseStats, latestRating, choreoLength, weekStart, dayKey } from './stats.js';
 import { settings, saveSettings, applyTheme, resetSettings, BASE_STATS } from './settings.js';
-import { providerOptions } from './providers.js';
 import { classManager } from './classform.js';
 import { go, toast, replaceHash } from './app.js';
-import { optionGroup, toggleList } from './ui.js';
+import { preferences } from './ui.js';
 
 const DAY = 86400000;
 const NS = 'http://www.w3.org/2000/svg';
@@ -376,27 +375,24 @@ export async function renderProfile(root, section) {
     ], recent, { sort: 0, cls: '.wide5', key: 'ct-sort-sessions' }) : h('p.empty', 'Noch keine Einheiten. Gezählt wird, sobald ein Video läuft.'),
     recent.length ? h('p.label', `Die letzten ${recent.length} Einheiten.`) : null);
 
-  // ── Präferenzen und Konto: je Zeile links die Frage/Erklärung, rechts die Auswahl bzw. der Knopf ──
-  const pref = (title, hint, control) => h('div.pref', h('div.pref-q', h('h3.p-sub', title), hint ? h('p.pref-hint', hint) : null), h('div.pref-a', control));
+  // ── Präferenzen und Konto ──
   const prefs = sect('prefs', 'PRÄFERENZEN',
-    h('div.prefs',
-      pref('Ansicht', null, optionGroup([['system', 'Wie System'], ['light', 'Hell'], ['dark', 'Dunkel']], s.theme, async v => { applyTheme(v); await saveSettings({ theme: v }); })),
-      pref('Musikprovider', 'Songs öffnen sich in der App, wenn sie installiert ist, sonst im Browser.', optionGroup(providerOptions(), s.provider, async v => { await saveSettings({ provider: v }); })),
-      pref('Statistiken', 'In deiner Base, Reihenfolge wie hier.', toggleList(BASE_STATS, s.baseStats, async list => { await saveSettings({ baseStats: list }); }))));
+    preferences(s, async patch => { if (patch.theme) applyTheme(patch.theme); await saveSettings(patch); }));
 
   const nameIn = h('input.caps', { type: 'text', value: (s.name || '').toUpperCase(), placeholder: 'DEIN NAME' });
   const saveName = async () => { if (!nameIn.value.trim()) return; await saveSettings({ name: nameIn.value.trim().toUpperCase() }); toast('Name gespeichert'); go('#/profile/account', { keep: true }); };
   nameIn.addEventListener('keydown', e => { if (e.key === 'Enter') saveName(); });
+  // Je Zeile: links Feld bzw. Erklärung, rechts der Knopf (alle Knöpfe gleich breit untereinander)
+  const accRow = (left, button) => h('div.acc-row', h('div.acc-text', left), button);
   const account = sect('account', 'KONTO',
-    h('div.prefs',
-      // Knöpfe stehen in allen Zeilen an derselben Stelle (rechte Spalte), das Namensfeld links bei der Frage
-      h('div.pref', h('div.pref-q', h('h3.p-sub', 'Name'), h('p.pref-hint', 'So begrüßt dich die App.'), nameIn), h('div.pref-a', h('button.btn.small', { type: 'button', onclick: saveName }, 'Speichern'))),
-      pref('Zurücksetzen', 'Setzt Name, Präferenzen und Panel-Anordnung zurück, das Intro startet neu. Deine Classes, Choreos, Videos und Statistiken bleiben erhalten.',
+    h('div.acc',
+      accRow(h('label.field', h('span', 'Name'), nameIn), h('button.btn.small', { type: 'button', onclick: saveName }, 'Speichern')),
+      accRow(h('p', 'Name, Präferenzen und Panel-Anordnung auf Anfang, das Intro startet neu. Classes, Choreos, Videos und Statistiken bleiben.'),
         h('button.btn.small', {
           type: 'button',
           onclick: async () => { if (!confirm('Einstellungen zurücksetzen? Deine Daten bleiben erhalten.')) return; await resetSettings(); location.hash = '#/'; location.reload(); },
         }, 'Zurücksetzen')),
-      pref('Alles löschen', 'Löscht alles, was in diesem Browser gespeichert ist: Classes, Choreos, Videos, Songdateien, Einheiten und Profil. Das lässt sich nicht rückgängig machen.',
+      accRow(h('p', 'Löscht alles in diesem Browser: Classes, Choreos, Videos, Songdateien, Einheiten und Profil. Lässt sich nicht rückgängig machen.'),
         h('button.btn.small.danger', {
           type: 'button',
           onclick: async () => {
