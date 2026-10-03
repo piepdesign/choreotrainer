@@ -8,7 +8,7 @@ import { requestPersist, undo, redo } from './db.js';
 import { loadSettings, settings, saveSettings, applyTheme } from './settings.js';
 import { h } from './util.js';
 import { stopPreview } from './providers.js';
-import { themeIcon } from './ui.js';
+import { themeIcon, toolIcon } from './ui.js';
 
 export const state = { pendingFile: null };
 
@@ -139,6 +139,29 @@ themeBtn.addEventListener('click', e => {
 addEventListener('pointerdown', e => { if (themeMenu && !themeMenu.contains(e.target) && e.target !== themeBtn && !themeBtn.contains(e.target)) closeThemeMenu(); });
 addEventListener('keydown', e => { if (e.key === 'Escape') closeThemeMenu(); });
 
+// ── Tester*in: Knopf unten rechts, klappt „Bug“ und „Idee“ aus, beide öffnen eine vorbereitete Mail ──
+const FEEDBACK_TO = 'sagmal@piep.design';
+const mail = (subject, intro) => `mailto:${FEEDBACK_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(`${intro}\n\n• `)}`;
+const FEEDBACK = [
+  ['bug', 'Bug melden', mail('Bug Report: CHOREO—TRAINER©', 'Folgende/r Bug/s sind mir aufgefallen:')],
+  ['idea', 'Idee oder Wunsch', mail('Idee/Wunsch: CHOREO—TRAINER©', 'Folgende Idee oder Wunsch habe ich:')],
+];
+let testerFab = null;
+function syncTester() {
+  const on = !!settings().tester;
+  if (!on) { testerFab?.remove(); testerFab = null; return; }
+  if (testerFab) return;
+  const main = h('button.fab-main', { type: 'button', title: 'Testen: Bug melden oder Idee schicken', 'aria-label': 'Tester-Menü', 'aria-expanded': 'false', html: toolIcon('clipboard') });
+  testerFab = h('div.tester-fab',
+    ...FEEDBACK.map(([id, label, href], i) => h('a.fab-action', { href, title: label, 'aria-label': label, style: { '--i': i + 1 }, html: toolIcon(id), onclick: () => setTimeout(close, 300) })),
+    main);
+  const close = () => { testerFab?.classList.remove('open'); main.setAttribute('aria-expanded', 'false'); };
+  main.addEventListener('click', () => { const open = testerFab.classList.toggle('open'); main.setAttribute('aria-expanded', String(open)); });
+  addEventListener('pointerdown', e => { if (testerFab && !testerFab.contains(e.target)) close(); });
+  document.body.append(testerFab);
+}
+addEventListener('ct-settings', e => { if ('tester' in (e.detail || {})) syncTester(); });
+
 // Dateien, die irgendwo außerhalb einer Dropzone landen, nicht im Tab öffnen
 addEventListener('dragover', e => e.preventDefault());
 addEventListener('drop', e => e.preventDefault());
@@ -176,5 +199,6 @@ addEventListener('keydown', async e => {
   applyTheme();
   if (!settings().introDone) await runIntro();
   document.documentElement.classList.remove('booting');
+  syncTester();
   route();
 })();

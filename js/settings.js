@@ -25,7 +25,8 @@ const DEFAULTS = {
   baseStats: DEFAULT_STATS,
   panel: { open: true, order: PANEL_SECTIONS, collapsed: [] },
   videoFit: 'all',
-  hoverPreview: 'on', // Hörprobe beim Hovern über Cover: on | off
+  hoverPreview: 'mid', // Hörprobe beim Hovern über Cover: off | low | mid | high (früher on = mid)
+  tester: false, // Tester*in: Knopf unten rechts für Bug-Meldungen und Ideen
 };
 
 let cache = null;
@@ -51,6 +52,7 @@ export async function resetSettings() {
 export async function saveSettings(patch) {
   cache = { ...settings(), ...patch };
   await db.put('settings', cache, 'profile');
+  dispatchEvent(new CustomEvent('ct-settings', { detail: patch })); // z. B. Tester-Knopf ein-/ausblenden
   return cache;
 }
 

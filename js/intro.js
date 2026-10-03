@@ -42,7 +42,7 @@ export async function runIntro() {
   await show(h('div.intro-step.center', mark('')), { navVisible: false });
   await wait(13 * 50 + 750 + 1000);
 
-  const state = { name: settings().name || '', provider: settings().provider, theme: settings().theme, baseStats: [...settings().baseStats] };
+  const state = { name: settings().name || '', provider: settings().provider, theme: settings().theme, baseStats: [...settings().baseStats], hoverPreview: settings().hoverPreview, tester: settings().tester };
 
   // Ein Schritt = { render(), canGo(), skippable }
   const steps = [
@@ -99,7 +99,7 @@ export async function runIntro() {
           h('h1.wide', 'DEINE PRÄFERENZEN'),
           h('p.intro-lead', '(Alles später im Profil änderbar)'),
           preferences(state, patch => { Object.assign(state, patch); if (patch.theme) applyTheme(patch.theme); refreshNav(); },
-            loadAll().then(baseStats), { baseLabel: false }));
+            loadAll().then(baseStats), { baseLabel: false, tester: true }));
       },
       canGo: () => !!state.provider,
       skippable: true,
@@ -119,7 +119,7 @@ export async function runIntro() {
   async function go(delta) {
     // beim Verlassen speichern, was eingetragen ist
     if (index === 0) await saveSettings({ name: state.name });
-    if (index === 2) await saveSettings({ provider: state.provider, theme: state.theme, baseStats: state.baseStats });
+    if (index === 2) await saveSettings({ provider: state.provider, theme: state.theme, baseStats: state.baseStats, hoverPreview: state.hoverPreview, tester: state.tester });
     index += delta;
     if (index >= steps.length) { resolveDone(); return; }
     await show(steps[index].render());

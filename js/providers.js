@@ -144,6 +144,8 @@ async function previewUrl(song) {
   return url;
 }
 
+// Lautstärke der Hörprobe je Einstellung (on = ältere Einstellung)
+const PREVIEW_VOLUME = { off: 0, low: 0.25, mid: 0.55, on: 0.55, high: 0.9 };
 const player = new Audio();
 player.preload = 'none';
 let owner = null, fadeTimer = null;
@@ -166,7 +168,8 @@ function previewOnHover(el, song) {
   let timer = null;
   el.addEventListener('mouseenter', () => {
     // kurz warten, damit Überfahren mit der Maus nichts abspielt
-    if (settings().hoverPreview === 'off') return; // in den Einstellungen abgeschaltet
+    const level = PREVIEW_VOLUME[settings().hoverPreview] ?? PREVIEW_VOLUME.mid;
+    if (!level) return; // in den Einstellungen abgeschaltet
     timer = setTimeout(async () => {
       const url = await previewUrl(song);
       if (!url || !el.matches(':hover')) return;
@@ -179,7 +182,7 @@ function previewOnHover(el, song) {
         await player.play();
         if (owner !== el) return;
         el.classList.add('previewing');
-        fadeTo(0.8, 300);
+        fadeTo(level, 300);
       } catch { owner = null; } // ohne vorherigen Klick auf der Seite blockt der Browser den Ton
     }, 250);
   });

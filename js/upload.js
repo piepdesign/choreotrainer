@@ -2,6 +2,7 @@
 import { db, uid } from './db.js';
 import { h, fmt, parseTime, isoDate, classTitle, classMeta, PALETTE, textOn, WEEKDAYS, byClassOrder, CLASS_TITLES, CLASS_LEVELS } from './util.js';
 import { songPicker, songKeyOf } from './song.js';
+import { alignToSong, checkAudio } from './align.js';
 import { classPickers } from './ui.js';
 import { dropzone } from './hub.js';
 import { state, go, toast } from './app.js';
@@ -39,13 +40,40 @@ export async function renderUpload(root, kind, refId) {
 
   // ── Song ──
   const offsetIn = h('input.offset-in', { type: 'text', placeholder: '0:00' });
+  let songFile = null; // optionale Songdatei (wird mit der Choreo gespeichert, wie in der Trainingsansicht)
   const picker = songPicker({
     song: preChoreo?.song || null,
     getBlob: () => file,
-    onChange: (s, offset) => { if (offset != null) offsetIn.value = fmt(offset, true); },
+    onChange: (s, offset) => { if (offset != null) offsetIn.value = fmt(offset, true); songStep.hidden = false; },
     onOffset: offset => { offsetIn.value = fmt(offset, true); },
+    align: prior => (songFile && file ? alignToSong(file, songFile, { prior }) : null),
     startField: offsetIn,
   });
+  // Schritt 3: Songdatei (optional) – gleicher Aufbau wie im Panel der Trainingsansicht
+  const songFileIn = h('input', { type: 'file', accept: 'audio/*,.mp3,.m4a,.aac,.wav,.flac,.aiff', hidden: true });
+  const songStep = h('div.song-step', { hidden: !preChoreo?.song });
+  function renderSongStep(msg = '') {
+    songStep.replaceChildren(songFileIn, h('span.label.step-label', 'Songdatei (optional)'), songFile
+      ? h('div.actions',
+        h('span.label', `♪ ${songFile.name}`),
+        h('button.linkbtn', { type: 'button', onclick: () => songFileIn.click() }, 'Ersetzen'),
+        h('button.linkbtn', { type: 'button', onclick: () => { songFile = null; renderSongStep(); } }, 'Entfernen'))
+      : h('div.actions', h('button.btn.small', { type: 'button', onclick: () => songFileIn.click() }, 'Songdatei laden')),
+    h('div.label', { style: { marginTop: '6px' } }, msg || 'mp3, m4a, wav · zum Trainieren auf den Song.'));
+  }
+  songFileIn.addEventListener('change', async () => {
+    const f = songFileIn.files[0];
+    songFileIn.value = '';
+    if (!f) return;
+    if (!/^audio\//.test(f.type) && !/\.(mp3|m4a|aac|wav|flac|aiff?)$/i.test(f.name)) { toast('Bitte eine Audiodatei wählen'); return; }
+    renderSongStep('Prüfe Songdatei …');
+    const problem = await checkAudio(f);
+    if (problem) { toast(problem, 8000); renderSongStep(); return; }
+    songFile = f;
+    renderSongStep();
+    if (file && picker.get()) picker.detectStart(); // Startpunkt direkt per Abgleich
+  });
+  renderSongStep();
 
   // ── Recording + Notizen ──
   const dateIn = h('input', { type: 'date', value: isoDate(Date.now()), oninput: e => { e.target.dataset.touched = '1'; } });
@@ -86,7 +114,7 @@ export async function renderUpload(root, kind, refId) {
           h('div.row', field('Style', f.category), field('Level', f.level)),
           h('div.row', { style: { marginTop: '12px' } }, field('Wochentag', f.weekday), field('Uhrzeit', f.time), field('Coach', f.coach))),
         h('div.fieldset', h('span.label', 'Song'),
-          picker.el),
+          picker.el, songStep),
         h('div.fieldset', h('span.label', 'Recording'), h('div.row', field('Aufgenommen am', dateIn))),
         h('div.fieldset', h('span.label', 'Notizen'), notesIn),
         h('div.actions', saveBtn))),
@@ -140,6 +168,7 @@ export async function renderUpload(root, kind, refId) {
         player: {},
       };
       await db.put('videos', file, rec.id);
+      if (songFile) await db.put('videos', songFile, `song:${choreo.id}`);
       await db.put('recordings', rec);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       go(`#/train/${rec.id}`, { replace: true });

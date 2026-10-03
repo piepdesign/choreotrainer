@@ -12,10 +12,21 @@ const THEME_PATHS = {
   light: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>',
   dark: '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/>',
 };
+const SPEAKER = '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/>';
 const SOUND_PATHS = {
-  on: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>',
-  off: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/>',
+  off: `${SPEAKER}<path d="M16 9.5l5 5M21 9.5l-5 5"/>`,
+  low: `${SPEAKER}<path d="M15.5 10a2.8 2.8 0 0 1 0 4"/>`,
+  mid: `${SPEAKER}<path d="M15.5 10a2.8 2.8 0 0 1 0 4M17.8 8a5.8 5.8 0 0 1 0 8"/>`,
+  high: `${SPEAKER}<path d="M15.5 10a2.8 2.8 0 0 1 0 4M17.8 8a5.8 5.8 0 0 1 0 8M20.1 6a8.8 8.8 0 0 1 0 12"/>`,
 };
+// Tester-Symbole: Klemmbrett, Käfer, Glühbirne
+export const TOOL_PATHS = {
+  none: '<rect x="6" y="4.5" width="12" height="16" rx="1.5" stroke-dasharray="2 2.2"/>',
+  clipboard: '<rect x="5.5" y="4.5" width="13" height="16.5" rx="1.5"/><rect x="9" y="3" width="6" height="3.2" rx=".8"/><path d="M8.5 11h7M8.5 14.5h7M8.5 18h4"/>',
+  bug: '<ellipse cx="12" cy="14" rx="4.5" ry="5.5"/><path d="M12 8.5v11M9.5 6.5l1.2 1.8M14.5 6.5l-1.2 1.8M7.5 12H4.5M7.5 16H5M16.5 12h3M16.5 16H19M8.2 9.5 6 8M15.8 9.5 18 8"/>',
+  idea: '<path d="M9 17.5h6M9.8 20.5h4.4M12 3.5a5.8 5.8 0 0 0-3.3 10.6c.6.5.8 1.1.8 1.8v1.6h5v-1.6c0-.7.2-1.3.8-1.8A5.8 5.8 0 0 0 12 3.5z"/>',
+};
+export const toolIcon = (id, size = 22) => svg26(TOOL_PATHS[id], size);
 const THEME_ICONS = Object.fromEntries(Object.entries(THEME_PATHS).map(([k, p]) => [k, svg26(p)]));
 // gleiche Icons klein für die Kopfleiste
 export const themeIcon = (id, size = 18) => svg26(THEME_PATHS[id], size);
@@ -95,7 +106,7 @@ export function icon(name) {
 // Präferenzen (Intro und Profil gleich): Ansicht als Umschalter, Musikprovider als Kacheln mit Logo,
 // Statistiken als Kacheln wie in der Base. values: { theme, provider, baseStats } · onChange(patch)
 // statValues: { id: { value } } bzw. Promise darauf, für echte Werte in den Kacheln
-export function preferences(values, onChange, statValues = null, { baseLabel = true } = {}) {
+export function preferences(values, onChange, statValues = null, { baseLabel = true, tester = false } = {}) {
   const block = (title, control) => h('div.pref-block', h('h3.p-sub', title), control);
   // Einzelauswahl; render(neu) setzt die Markierung
   // Einzelauswahl als Kacheln (Musikprovider, Ansicht); key = Name der Einstellung
@@ -112,8 +123,12 @@ export function preferences(values, onChange, statValues = null, { baseLabel = t
   return h('div.prefs',
     block('Musikprovider', single('provider', PROVIDERS, values.provider,
       ([id, name]) => [h('i.brand', { html: brandSvg(id) }), h('span', name)])),
-    block('Hörprobe beim Hovern über Song-Cover', single('hoverPreview', [['on', 'An'], ['off', 'Aus']], values.hoverPreview === 'off' ? 'off' : 'on',
+    // An/Aus und Lautstärke in einem: Aus · Leise · Mittel · Laut
+    block('Song-Cover Hörprobe', single('hoverPreview', [['off', 'Aus'], ['low', 'Leise'], ['mid', 'Mittel'], ['high', 'Laut']],
+      values.hoverPreview === 'on' || !values.hoverPreview ? 'mid' : values.hoverPreview,
       ([id, label]) => [h('i.brand', { html: svg26(SOUND_PATHS[id]) }), h('span', label)])),
+    tester ? block('Tester*in', single('tester', [[false, 'Nein'], [true, 'Ja']], !!values.tester,
+      ([id, label]) => [h('i.brand', { html: svg26(id ? TOOL_PATHS.clipboard : TOOL_PATHS.none) }), h('span', label)])) : null,
     block('Statistiken', chips),
     block('Ansicht', single('theme', [['system', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']], values.theme,
       ([id, label]) => [h('i.brand', { html: THEME_ICONS[id] }), h('span', label)])));

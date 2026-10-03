@@ -650,3 +650,15 @@ a.stat-link:hover { background: var(--surface-2); }
 .theme-menu button:hover { color: var(--fg); background: var(--surface); }
 .theme-menu button.on { color: var(--bg); background: var(--fg); }
 .theme-menu i { display: grid; place-items: center; }
+
+/* Tester*in: Knopf unten rechts, Bug/Idee schieben sich darüber heraus */
+.tester-fab { position: fixed; right: 18px; bottom: 18px; z-index: 70; width: 48px; height: 48px; }
+body.intro-open .tester-fab { display: none; }
+.fab-main, .fab-action { position: absolute; left: 0; bottom: 0; width: 48px; height: 48px; display: grid; place-items: center; border-radius: 50%; background: var(--fg); color: var(--bg); box-shadow: 0 6px 20px rgba(0, 0, 0, .25); transition: transform .22s cubic-bezier(.2, .7, .2, 1), opacity .18s, background-color .15s; }
+.fab-main { z-index: 2; }
+.fab-main:hover, .fab-action:hover { background-color: color-mix(in srgb, var(--fg) 78%, var(--bg)); }
+.fab-action { opacity: 0; pointer-events: none; transform: translateY(0) scale(.6); }
+.tester-fab.open .fab-action { opacity: 1; pointer-events: auto; transform: translateY(calc(var(--i) * -58px)) scale(1); }
+.tester-fab.open .fab-main { transform: rotate(-8deg); }
+.fab-main svg, .fab-action svg { display: block; }
+.acc-tester { margin-top: 14px; }

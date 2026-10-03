@@ -420,11 +420,23 @@ export async function renderProfile(root, section) {
   nameIn.addEventListener('keydown', e => { if (e.key === 'Enter') saveName(); });
   // Je Zeile: Feld bzw. Erklärung, der Knopf direkt daneben (alle Knöpfe gleich breit untereinander)
   // Konto als Kacheln wie die übrigen Einstellungen: oben Feld bzw. Erklärung, unten der Knopf
+  const testerSeg = () => {
+    const box = h('div.seg');
+    const render = () => box.replaceChildren(...[[false, 'Nein'], [true, 'Ja']].map(([v, l]) => h(`button.ctl${!!settings().tester === v ? '.on' : ''}`, {
+      type: 'button', onclick: async () => { await saveSettings({ tester: v }); render(); },
+    }, l)));
+    render();
+    return box;
+  };
   // Jede Kachel: Überschrift (wie Feldbeschriftungen), Inhalt, Knopf. Überschrift benennt das Thema, der Knopf die Aktion.
   const accRow = (title, body, button) => h('div.acc-card', h('span.acc-title', title), h('div.acc-text', body), button);
   const account = sect('account', 'Konto',
     h('div.acc',
-      accRow('Name', nameIn, h('button.btn.small', { type: 'button', onclick: saveName }, 'Speichern')),
+      // Name + Tester*in in einer Kachel; Tester*in wirkt sofort (Knopf unten rechts für Bug-Meldungen und Ideen)
+      accRow('Profil', [
+        h('label.field', h('span', 'Name'), nameIn),
+        h('div.field.acc-tester', h('span', 'Tester*in'), testerSeg()),
+      ], h('button.btn.small', { type: 'button', onclick: saveName }, 'Name speichern')),
       accRow('Einstellungen', [h('p.acc-lead', 'Setzt zurück:'), h('ul.acc-list', h('li', 'Name'), h('li', 'Präferenzen'), h('li', 'Panel-Anordnung')),
           h('p.acc-note', 'Das Intro startet neu. Classes, Choreos, Videos und Statistiken bleiben erhalten.')],
         h('button.btn.small', {
