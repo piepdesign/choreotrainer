@@ -61,6 +61,7 @@ button { cursor: pointer; background: none; border: 0; padding: 0; }
 .topbar nav { display: flex; align-items: center; gap: 22px; font-size: 12px; letter-spacing: .08em; }
 .topbar nav a { opacity: .55; }
 .topbar nav a.active, .topbar nav a:hover { opacity: 1; }
+.topbar nav .icon-link { display: grid; place-items: center; width: 28px; height: 28px; margin-right: -12px; }
 .brand { display: flex; align-items: center; gap: 12px; }
 .brand .wordmark { line-height: 1; display: block; }
 .back-btn { width: 16px; height: 16px; display: grid; place-items: center; opacity: .6; }
@@ -100,12 +101,12 @@ main { padding: 0 var(--gutter) 80px; }
 .card .thumb { aspect-ratio: 16/10; background: var(--panel) center/cover no-repeat; position: relative; }
 /* Vorschauen immer neutral: keine Player-Filter, und HDR-Videos (iPhone) auf SDR begrenzen.
    Sonst springt Helligkeit/Kontrast zwischen Standbild (SDR-JPEG) und Video, und macOS schaltet EDR hin und her → Flackern */
-.card .thumb video, .mini-thumb video, .card .thumb .still, .mini-thumb .still { filter: none !important; dynamic-range-limit: standard; }
-.card .thumb .frame, .mini-thumb .frame { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.card .thumb video, .mini-thumb video, .card .thumb .still, .mini-thumb .still, .sq-thumb video, .sq-thumb .still { filter: none !important; dynamic-range-limit: standard; }
+.card .thumb .frame, .mini-thumb .frame, .sq-thumb .frame { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .card .thumb { overflow: hidden; }
 .cards > *, .columns > * { min-width: 0; }
-.card .thumb video, .mini-thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
-.card .thumb .still, .mini-thumb .still { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.card .thumb video, .mini-thumb video, .sq-thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.card .thumb .still, .mini-thumb .still, .sq-thumb .still { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .mini-thumb { position: relative; width: 88px; aspect-ratio: 16/10; background: var(--panel); }
 a.mini { display: block; }
 .card .thumb .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 6px; }
@@ -478,7 +479,12 @@ body.intro-open { overflow: hidden; }
 .p-table { display: grid; gap: 2px; margin-top: 2px; }
 .p-row { display: grid; grid-template-columns: minmax(0, 2fr) 1fr 1fr 1fr; gap: 10px; align-items: center; background: var(--surface); padding: 9px 12px; font-size: 12px; }
 .p-table.wide5 .p-row { grid-template-columns: 1.4fr 2fr .8fr .6fr .5fr; }
-.p-table.wide6 .p-row { grid-template-columns: 2fr 1.2fr .9fr .6fr .8fr .8fr; }
+.p-table.wide6 .p-row { grid-template-columns: 2.4fr 1.2fr .9fr .6fr .8fr .8fr; }
+/* Choreo-Liste: Cover und Video klein und quadratisch vor dem Titel */
+.sq-cover, .sq-thumb { position: relative; flex: none; width: 34px; height: 34px; display: block; background: var(--surface-2); object-fit: cover; overflow: hidden; margin-right: 8px; }
+.sq-thumb + .sq-title { margin-left: 4px; }
+.sq-title { overflow: hidden; text-overflow: ellipsis; }
+#p-choreos .p-row { padding-top: 6px; padding-bottom: 6px; }
 .p-row.head { background: transparent; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 a.p-row:hover { background: var(--surface-2); }
 .p-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; }
@@ -558,19 +564,14 @@ a.stat-link:hover { background: var(--surface-2); }
 .provider-tiles button:hover { color: var(--fg); background: var(--surface-2); }
 .provider-tiles button.on { background: var(--fg); color: var(--bg); }
 .provider-tiles .brand { opacity: 1; }
-.segmented { display: inline-flex; border: 1px solid var(--fg); }
-.segmented button { padding: 8px 16px; font-size: 12px; letter-spacing: .04em; }
-.segmented button + button { border-left: 1px solid var(--fg); }
-.segmented button.on { background: var(--fg); color: var(--bg); }
 
-/* ── Konto: links Feld/Erklärung, rechts gleich breite Knöpfe ── */
-.acc { display: grid; max-width: 720px; }
-.acc-row { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 12px 24px; align-items: center; padding: 16px 0; border-top: 1px solid var(--rule); }
-.acc-row:last-child { border-bottom: 1px solid var(--rule); }
-.acc-row > .btn { width: 100%; justify-content: center; text-align: center; }
-.acc-text p { margin: 0; font-size: 13px; line-height: 1.55; }
+/* ── Konto: Kacheln wie Provider/Statistiken, Knopf unten an derselben Stelle ── */
+.acc { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 2px; }
+.acc-card { display: flex; flex-direction: column; gap: 14px; background: var(--surface); padding: 16px; min-height: 150px; }
+.acc-card .acc-text { flex: 1; }
+.acc-card > .btn { align-self: flex-start; }
+.acc-text p { margin: 0; font-size: 12px; line-height: 1.55; color: var(--muted); }
 .acc-text .field input { max-width: none; }
-@media (max-width: 600px) { .acc-row { grid-template-columns: 1fr; } }
 
 /* Statistik-Auswahl: Kacheln wie in der Base, oben gezeigt, unten weitere */
 .stat-picker { display: grid; gap: 8px; }
@@ -599,8 +600,13 @@ a.stat-link:hover { background: var(--surface-2); }
 /* Profil als Reiter */
 .p-nav a { padding: 4px 0; border-bottom: 2px solid transparent; }
 .p-nav a.on { opacity: 1; border-bottom-color: var(--fg); }
-.p-nav-end { margin-left: auto; }
 .p-tab { padding-top: clamp(20px, 3vw, 32px); }
 .p-tab > .p-sec + .p-sec { margin-top: clamp(32px, 4vw, 52px); }
 .p-group { font-family: var(--wide); font-stretch: 125%; font-weight: 800; font-size: clamp(16px, 1.6vw, 20px); text-transform: uppercase; margin: 0 0 14px; }
 .p-tab .stats { margin-top: 0; }
+.p-settings { padding-top: 8px; }
+
+/* Cover spielt gerade die Hörprobe */
+img.song-link.previewing { outline: 2px solid var(--fg); outline-offset: 2px; animation: preview-pulse 1.2s ease-in-out infinite; }
+@keyframes preview-pulse { 50% { outline-offset: 4px; } }
+@media (prefers-reduced-motion: reduce) { img.song-link.previewing { animation: none; } }

@@ -3,6 +3,7 @@
 // Provider selbst (Browser bzw. App), die App speichert nur die Wahl.
 import { h } from './util.js';
 import { brandIcon } from './brand-icons.js';
+import { searchSongs, songDetails } from './deezer.js';
 import { settings, saveSettings } from './settings.js';
 
 export const PROVIDERS = [
@@ -113,6 +114,71 @@ export function songLink(el, song) {
   if (!song?.title) return el;
   el.classList.add('song-link');
   el.title = 'Im Musikprovider öffnen';
-  el.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); openSong(song); });
+  el.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); stopPreview(); openSong(song); });
+  if (el.tagName === 'IMG') previewOnHover(el, song);
   return el;
 }
+
+// ── Hörprobe beim Hovern über ein Cover ──
+// Deezer liefert zu fast jedem Titel eine freie 30-s-Hörprobe (ohne Key, unabhängig vom gewählten Provider).
+// Die Adressen sind signiert und laufen ab, daher frisch holen und nur kurz merken.
+const previewCache = new Map();
+const norm = s => clean(s).toLowerCase().replace(/[^a-z0-9äöüß]+/g, ' ').trim();
+async function previewUrl(song) {
+  const key = song.source === 'deezer' && song.id ? `dz:${song.id}` : `q:${norm(song.artist)}|${norm(song.title)}`;
+  const hit = previewCache.get(key);
+  if (hit && Date.now() - hit.t < 10 * 60 * 1000) return hit.url;
+  let url = '';
+  try {
+    if (song.source === 'deezer' && song.id) url = (await songDetails(song.id))?.preview || '';
+    if (!url) {
+      const list = await searchSongs([clean(song.artist), clean(song.title)].filter(Boolean).join(' '));
+      const t = norm(song.title);
+      url = (list.find(x => x.preview && norm(x.title).startsWith(t)) || list.find(x => x.preview))?.preview || '';
+    }
+  } catch { /* keine Hörprobe */ }
+  previewCache.set(key, { url, t: Date.now() });
+  return url;
+}
+
+const player = new Audio();
+player.preload = 'none';
+let owner = null, fadeTimer = null;
+function fadeTo(target, ms, done) {
+  clearInterval(fadeTimer);
+  const start = player.volume, t0 = performance.now();
+  fadeTimer = setInterval(() => {
+    const k = Math.min(1, (performance.now() - t0) / ms);
+    player.volume = start + (target - start) * k;
+    if (k >= 1) { clearInterval(fadeTimer); done?.(); }
+  }, 30);
+}
+export function stopPreview() {
+  const el = owner;
+  owner = null;
+  el?.classList.remove('previewing');
+  if (!player.paused) fadeTo(0, 200, () => player.pause());
+}
+function previewOnHover(el, song) {
+  let timer = null;
+  el.addEventListener('mouseenter', () => {
+    // kurz warten, damit Überfahren mit der Maus nichts abspielt
+    timer = setTimeout(async () => {
+      const url = await previewUrl(song);
+      if (!url || !el.matches(':hover')) return;
+      stopPreview();
+      owner = el;
+      if (player.src !== url) player.src = url;
+      player.currentTime = 0; // Hörprobe von Anfang an
+      player.volume = 0;
+      try {
+        await player.play();
+        if (owner !== el) return;
+        el.classList.add('previewing');
+        fadeTo(0.8, 300);
+      } catch { owner = null; } // ohne vorherigen Klick auf der Seite blockt der Browser den Ton
+    }, 250);
+  });
+  el.addEventListener('mouseleave', () => { clearTimeout(timer); if (owner === el) stopPreview(); });
+}
+player.addEventListener('ended', () => { owner?.classList.remove('previewing'); owner = null; });

@@ -7,6 +7,7 @@ import { runIntro } from './intro.js';
 import { requestPersist, undo, redo } from './db.js';
 import { loadSettings, settings, saveSettings, applyTheme } from './settings.js';
 import { h } from './util.js';
+import { stopPreview } from './providers.js';
 
 export const state = { pendingFile: null };
 
@@ -19,6 +20,7 @@ const routes = [
   [/^#\/class\/([\w-]+)$/, m => renderClass(view, m[1]), 'hub'],
   [/^#\/train\/([\w-]+)$/, m => renderTrain(view, m[1]), null],
   [/^#\/profile(?:\/(\w+))?$/, m => renderProfile(view, m[1]), 'profile'],
+  [/^#\/settings$/, () => renderProfile(view, 'settings'), 'settings'],
 ];
 
 // Eigener Verlauf für den „<“-Knopf (überlebt ein Neuladen des Tabs)
@@ -59,6 +61,7 @@ export function replaceHash(hash) {
 backBtn.addEventListener('click', back);
 
 async function route() {
+  stopPreview(); // Hörprobe nicht in die nächste Seite mitnehmen
   if (cleanup) { try { await cleanup(); } catch (e) { console.error(e); } cleanup = null; }
   if (current) scrolls[current] = scrollY;
   const hash = location.hash || '#/';

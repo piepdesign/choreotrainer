@@ -25,6 +25,7 @@ const toSong = t => ({
   cover: t.album?.cover_medium || t.album?.cover || '',
   duration: t.duration || null,
   bpm: t.bpm || null,
+  preview: t.preview || '', // 30-s-Hörprobe (mp3), Adresse läuft nach einiger Zeit ab
 });
 
 export async function searchSongs(q) {

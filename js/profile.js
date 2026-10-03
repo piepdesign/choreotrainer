@@ -3,7 +3,8 @@
 // Class-Farben, Werte immer in Textfarbe, Tooltip auf jedem Datenpunkt.
 import { db, deleteAllData } from './db.js';
 import { h, fmt, fmtDuration, relDate, fmtRecDate, inlineEdit, classTitle, stripe, byClassOrder, WEEKDAYS, textOn, plural } from './util.js';
-import { loadAll, dots, choreoCard, recTitle, nextClass } from './hub.js';
+import { loadAll, dots, choreoCard, recTitle, nextClass, hoverVideo } from './hub.js';
+import { songLink } from './providers.js';
 import { baseStats, latestRating, choreoLength, weekStart, dayKey } from './stats.js';
 import { settings, saveSettings, applyTheme, resetSettings, BASE_STATS } from './settings.js';
 import { classManager } from './classform.js';
@@ -253,10 +254,12 @@ export async function renderProfile(root, section) {
     h('p.label', all.choreos.length ? `Dabei seit ${new Date(since).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })} · ${plural(all.choreos.length, 'Choreo', 'Choreos')} · ${plural(all.classes.length, 'Class', 'Classes')}` : 'Noch keine Daten'));
 
   // Reiter: immer nur ein Bereich sichtbar. Alte Abschnittsadressen (z. B. aus Base-Kacheln) zeigen auf den passenden Reiter.
-  const TABS = [['overview', 'Übersicht'], ['time', 'Übungszeit'], ['status', 'Status'], ['choreos', 'Choreos'], ['settings', 'Einstellungen']];
+  // Einstellungen sind eine eigene Seite (#/settings, Zahnrad in der Kopfleiste)
+  const TABS = [['overview', 'Übersicht'], ['time', 'Übungszeit'], ['status', 'Status'], ['choreos', 'Choreos']];
   const ALIAS = { classes: 'overview', sessions: 'time', prefs: 'settings', account: 'settings' };
+  const settingsPage = (ALIAS[section] || section) === 'settings';
   let current = ALIAS[section] || (TABS.some(t => t[0] === section) ? section : 'overview');
-  const nav = h('nav.p-nav', { role: 'tablist' }, TABS.map(([id, label]) => h(`a${id === 'settings' ? '.p-nav-end' : ''}`, {
+  const nav = h('nav.p-nav', { role: 'tablist' }, TABS.map(([id, label]) => h('a', {
     href: `#/profile/${id}`, role: 'tab', 'data-tab': id,
     onclick: e => { e.preventDefault(); showTab(id, true); },
   }, label)));
@@ -367,7 +370,11 @@ export async function renderProfile(root, section) {
       choreoBox.replaceChildren(list.length ? h('div.cards', list.map(c => choreoCard(c, classById[c.classId], recsByChoreo[c.id] || [], urls))) : h('p.empty', 'Noch keine Choreos.'));
     } else {
       choreoBox.replaceChildren(sortTable([
-        { label: 'Choreo', value: c => titleOf(c), cell: c => titleOf(c) },
+        // klein und quadratisch: Song-Cover (Hover = Hörprobe) und Video (Hover = Vorschau)
+        { label: 'Choreo', value: c => titleOf(c), cell: c => [
+          c.song?.cover ? songLink(h('img.sq-cover', { src: c.song.cover, alt: '' }), c.song) : h('i.sq-cover.blank'),
+          (recsByChoreo[c.id] || []).length ? hoverVideo(recsByChoreo[c.id].at(-1), urls, 'sq-thumb') : h('i.sq-thumb.blank'),
+          h('span.sq-title', titleOf(c))] },
         { label: 'Class', value: c => (classById[c.classId] ? classTitle(classById[c.classId]) : ''), cell: c => [h('i.swatch', { style: { background: `#${classById[c.classId]?.color || 'ccc'}` } }), classById[c.classId] ? classTitle(classById[c.classId]) : '—'] },
         { label: 'Status', value: statusOf, cell: c => dots(latestRating(c)) },
         { label: 'Länge', value: lenOf, cell: c => (lenOf(c) ? fmt(lenOf(c)) : '—'), dir: -1 },
@@ -390,7 +397,7 @@ export async function renderProfile(root, section) {
       const nc = nextClass(c)?.split(' · ').at(-1) || '';
       return stripe(c, [plural(mine.length, 'CHOREO', 'CHOREOS'), fmtDuration(sec).toUpperCase(), nc.toUpperCase()]);
     })));
-  const manageSec = sect('manage', 'Classes verwalten', classManager(() => go('#/profile/settings', { keep: true })));
+  const manageSec = sect('manage', 'Classes verwalten', classManager(() => go('#/settings', { keep: true })));
 
   // ── Einheiten ──
   const recent = [...real].sort((a, b) => b.start - a.start).slice(0, 50);
@@ -409,10 +416,11 @@ export async function renderProfile(root, section) {
     preferences(s, async patch => { if (patch.theme) applyTheme(patch.theme); await saveSettings(patch); }, baseStats(all)));
 
   const nameIn = h('input.caps', { type: 'text', value: (s.name || '').toUpperCase(), placeholder: 'DEIN NAME' });
-  const saveName = async () => { if (!nameIn.value.trim()) return; await saveSettings({ name: nameIn.value.trim().toUpperCase() }); toast('Name gespeichert'); go('#/profile/settings', { keep: true }); };
+  const saveName = async () => { if (!nameIn.value.trim()) return; await saveSettings({ name: nameIn.value.trim().toUpperCase() }); toast('Name gespeichert'); go('#/settings', { keep: true }); };
   nameIn.addEventListener('keydown', e => { if (e.key === 'Enter') saveName(); });
   // Je Zeile: Feld bzw. Erklärung, der Knopf direkt daneben (alle Knöpfe gleich breit untereinander)
-  const accRow = (left, button) => h('div.acc-row', h('div.acc-text', left), button);
+  // Konto als Kacheln wie die übrigen Einstellungen: oben Feld bzw. Erklärung, unten der Knopf
+  const accRow = (left, button) => h('div.acc-card', h('div.acc-text', left), button);
   const account = sect('account', 'Konto',
     h('div.acc',
       accRow(h('label.field', h('span', 'Name'), nameIn), h('button.btn.small', { type: 'button', onclick: saveName }, 'Speichern')),
@@ -440,13 +448,15 @@ export async function renderProfile(root, section) {
     time: h('div.p-tab', time, sessionSec),
     status: h('div.p-tab', status),
     choreos: h('div.p-tab', choreoSec),
-    settings: h('div.p-tab', prefs, manageSec, account),
   };
+  if (settingsPage) {
+    root.append(h('section.p-head', h('h1.wide.p-name', 'EINSTELLUNGEN')), h('div.p-tab.p-settings', prefs, manageSec, account));
+    return () => { urls.forEach(u => URL.revokeObjectURL(u)); };
+  }
   function showTab(id, user = false) {
     current = id;
     for (const [k, el] of Object.entries(panes)) el.hidden = k !== id;
     nav.querySelectorAll('a').forEach(a => { const on = a.dataset.tab === id; a.classList.toggle('on', on); a.setAttribute('aria-selected', String(on)); });
-    if (filterRow) filterRow.hidden = id === 'settings'; // Class-Filter nur für Auswertungen
     if (user) {
       replaceHash(`#/profile/${id}`);
       // Reiterleiste oben halten, Inhalt beginnt direkt darunter

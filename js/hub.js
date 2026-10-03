@@ -27,8 +27,8 @@ export function dropzone(onFile) {
   const input = h('input', { type: 'file', accept: 'video/*' });
   const zone = h('label.dropzone',
     input,
-    h('strong', 'VIDEO ABLEGEN'),
-    h('span.label', 'oder klicken zum Auswählen · bleibt lokal auf diesem Gerät'));
+    h('strong', 'NEUE CHOREO'),
+    h('span.label', '(Video ablegen oder klicken zum Auswählen)'));
   const take = f => {
     if (!f) return;
     if (!f.type.startsWith('video/') && !/\.(mov|mp4|m4v|webm)$/i.test(f.name)) return toast('Bitte eine Videodatei wählen');
@@ -70,7 +70,7 @@ export function deflicker({ tolerance = 0.06, holdMs = 150 } = {}) {
 // Grund: iPhone-Videos sind HDR. Ein sichtbares HDR-Video schaltet macOS in den EDR-Modus,
 // Helligkeit/Kontrast der Seite springen und flackern, auch nach dem Hovern.
 // Beim Verlassen bleibt der letzte Frame im Canvas stehen, beim Wiedereintritt geht es dort weiter.
-function hoverVideo(rec, urls, cls) {
+export function hoverVideo(rec, urls, cls) {
   const v = h('video', { muted: true, playsinline: true, preload: 'none' });
   v.muted = true;
   v.style.display = 'none';

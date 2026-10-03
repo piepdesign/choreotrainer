@@ -5,6 +5,13 @@ import { BASE_STATS } from './settings.js';
 import { brandIcon } from './brand-icons.js';
 
 const brandSvg = id => brandIcon(id, 26);
+// Ansicht: halber Kreis (System), Sonne (Hell), Mond (Dunkel), Größe wie die Provider-Logos
+const svg26 = body => `<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">${body}</svg>`;
+const THEME_ICONS = {
+  system: svg26('<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/>'),
+  light: svg26('<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>'),
+  dark: svg26('<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/>'),
+};
 
 // Auswahlliste wie beim Wochentag, mit zusätzlicher Option, einen eigenen Wert hinzuzufügen.
 // Liefert ein Element mit .value (lesen/setzen) und .focus(), passt also überall, wo vorher ein Input stand.
@@ -84,21 +91,23 @@ export function icon(name) {
 export function preferences(values, onChange, statValues = null, { baseLabel = true } = {}) {
   const block = (title, control) => h('div.pref-block', h('h3.p-sub', title), control);
   // Einzelauswahl; render(neu) setzt die Markierung
-  const single = (cls, options, value, content) => {
-    const el = h(`div.${cls}`, { role: 'radiogroup' });
+  // Einzelauswahl als Kacheln (Musikprovider, Ansicht); key = Name der Einstellung
+  const single = (key, options, value, content) => {
+    const el = h('div.provider-tiles', { role: 'radiogroup' });
     const render = v => el.replaceChildren(...options.map(o => h(`button${o[0] === v ? '.on' : ''}`, {
       type: 'button', role: 'radio', 'aria-checked': String(o[0] === v),
-      onclick: () => { render(o[0]); onChange(cls === 'segmented' ? { theme: o[0] } : { provider: o[0] }); },
+      onclick: () => { render(o[0]); onChange({ [key]: o[0] }); },
     }, content(o))));
     render(value);
     return el;
   };
   const chips = statPicker(values.baseStats || [], statValues, list => onChange({ baseStats: list }), { baseLabel });
   return h('div.prefs',
-    block('Musikprovider', single('provider-tiles', PROVIDERS, values.provider,
+    block('Musikprovider', single('provider', PROVIDERS, values.provider,
       ([id, name]) => [h('i.brand', { html: brandSvg(id) }), h('span', name)])),
     block('Statistiken', chips),
-    block('Ansicht', single('segmented', [['system', 'Wie System'], ['light', 'Hell'], ['dark', 'Dunkel']], values.theme, ([, label]) => label)));
+    block('Ansicht', single('theme', [['system', 'Wie System'], ['light', 'Hell'], ['dark', 'Dunkel']], values.theme,
+      ([id, label]) => [h('i.brand', { html: THEME_ICONS[id] }), h('span', label)])));
 }
 
 // Statistik-Kacheln wie in der Base. Oben die gezeigten, unten die übrigen.
