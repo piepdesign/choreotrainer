@@ -34,8 +34,20 @@ async function find(step) {
 // steps: [{ target, title, text, route?, block?, when?, before? }]
 // block: Klick auf die Stelle löst die eigentliche Aktion nicht aus (z. B. Dateiauswahl), führt nur weiter
 // scope: Teil gilt nur auf diesen Seiten; wer sie verlässt, beendet ihn (ohne ihn als gesehen zu markieren)
-export function runTour(steps, { finish, onEnd, scope = null } = {}) {
+// start: Begrüßung vor dem ersten Schritt (eigenes Fenster mit „Los geht’s“ / „Überspringen“)
+export function runTour(steps, opts = {}) {
   if (active) return Promise.resolve();
+  if (!opts.start) return tour(steps, opts);
+  active = true;
+  document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); // offene Menüs schließen
+  return confirmBox({ ...opts.start, skip: true }).then(go => {
+    active = false;
+    if (!go) { opts.onEnd?.(false); return; }
+    return tour(steps, opts);
+  });
+}
+
+function tour(steps, { finish, onEnd, scope = null } = {}) {
   active = true;
   // offene Menüs (Leiste, Ansicht, Helfer*in) schließen: alle gehen bei Klick daneben zu. Später fängt die Sperre
   // unten solche Klicks ab, ein offenes Menü könnte sonst die markierte Stelle verdecken.
@@ -149,14 +161,16 @@ export function runTour(steps, { finish, onEnd, scope = null } = {}) {
 }
 
 // Kurzes Bestätigungsfenster am Ende
-function confirmBox({ title, text, button = 'Los geht’s' }) {
+function confirmBox({ title, text, button = 'Los geht’s', skip = false }) {
   return new Promise(resolve => {
     const ok = h('button.btn.primary', { type: 'button' }, button);
+    const no = skip ? h('button.linkbtn', { type: 'button' }, 'Überspringen') : null;
     const body = h('div.tour-text'); fill(body, text);
-    const box = h('div.modal.tour-done', h('div.modal-card', h('h2.wide', title), body, h('div.actions', ok)));
-    const close = () => { box.remove(); resolve(); };
-    ok.addEventListener('click', close);
-    box.addEventListener('click', e => { if (e.target === box) close(); });
+    const box = h('div.modal.tour-done', h('div.modal-card', h('h2.wide', title), body, h('div.actions', ok, no)));
+    const close = go => { box.remove(); resolve(go); };
+    ok.addEventListener('click', () => close(true));
+    no?.addEventListener('click', () => close(false));
+    box.addEventListener('click', e => { if (e.target === box) close(!skip); }); // Begrüßung: daneben klicken = überspringen
     document.body.append(box);
     ok.focus();
   });
@@ -172,7 +186,7 @@ const panelOpen = () => {
 const key = k => tt(h('span.tour-kbd', ` (${k})`), '');
 const IO = 'In / Out';
 
-// Hinweis im ersten Schritt beider Teile
+// Hinweis in der Begrüßung beider Teile
 const REPEAT = [null, 'Das Tutorial kannst du jederzeit unter Einstellungen › Konto wiederholen.'];
 
 // Grundsatz der Texte: beschreiben, was ein Element tut, nicht die Umstände drumherum
@@ -180,8 +194,7 @@ export function mainTour() {
   const tap = tt('Klick', 'Tippen');
   return runTour([
     { route: /^#\/?$/, target: '.dropzone', block: true, title: 'Neue Choreo', text: [
-      [tt('Ablegen / Klick', 'Tippen'), 'Legt aus einem Kursvideo eine neue Choreo an'],
-      REPEAT] },
+      [tt('Ablegen / Klick', 'Tippen'), 'Legt aus einem Kursvideo eine neue Choreo an']] },
     { route: /^#\/?$/, target: '.stats', block: true, title: 'Statistiken', text: [
       ['Kacheln', 'Zeigen Kennzahlen zu deinem Üben'],
       [tap, 'Öffnet die passende Auswertung im Profil']] },
@@ -198,6 +211,10 @@ export function mainTour() {
       [svgIco(themeIcon('system')), 'Wie am Gerät eingestellt']] },
     { target: '[data-nav="hub"]', title: 'Base', text: [[tap, 'Führt zurück zur Startseite']] },
   ], {
+    start: { title: 'TUTORIAL', text: [
+      ['Teil 1', 'Base, Profil und Einstellungen'],
+      ['Teil 2', 'Trainingsansicht, beim ersten Öffnen einer Choreo'],
+      REPEAT] },
     finish: { title: 'GESCHAFFT!', text: [
       ['Teil 2', 'Zeigt die Trainingsansicht, sobald du deine erste Choreo öffnest']] },
     onEnd: () => saveSettings({ tourDone: true }),
@@ -210,8 +227,7 @@ export function trainTour() {
   return runTour([
     { target: '.stage', block: true, title: 'Video', text: [
       [tap, 'Play / Pause'],
-      [tt('Doppelklick', 'Doppelt tippen'), 'Vollbild'],
-      REPEAT] },
+      [tt('Doppelklick', 'Doppelt tippen'), 'Vollbild']] },
     { target: '.timeline .tl-row:first-child .track', block: true, title: 'Zeitleiste', text: [
       [`${tap} / Ziehen`, 'Springt an die Stelle'],
       ['Striche', 'Zeigen Marker und Loop']] },
@@ -272,6 +288,9 @@ export function trainTour() {
       ['Liste', 'Alle Tastenkürzel']] },
   ], {
     scope: /^#\/train\//,
+    start: { title: 'TRAININGSANSICHT', text: [
+      ['Teil 2', 'Video, Bedienleiste und Seitenpanel'],
+      REPEAT] },
     finish: { title: 'VIEL SPASS BEIM ÜBEN!', text: [tt(['Tastenkürzel', 'Seitenpanel › Tasten'], ['Song, Marker, Notizen, Status', 'Seitenpanel unter dem Video'])] },
     onEnd: () => saveSettings({ tourTrainDone: true }),
   });

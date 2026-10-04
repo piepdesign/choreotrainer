@@ -311,9 +311,11 @@ main:has(.train) { padding-bottom: 0; }
 .ctl-group { display: flex; gap: 2px; align-items: center; background: var(--surface); padding: 2px 4px; min-width: 0; }
 .ctl-group > .ctl { flex: 1 1 0; min-width: 0; width: auto !important; text-align: center; justify-content: center; white-space: nowrap; padding-left: 4px; padding-right: 4px; }
 .ctl-group > .ctl.icon-ctl { display: grid; place-items: center; }
-/* Tempo: immer gleich breit (Platz für den Faktor), damit der Knopf beim Umschalten auf ≠ 1× nicht breiter wird */
-.ctl-group > .ctl.rate { flex-grow: 2.8; padding-left: 2px; padding-right: 2px; }
+/* Tempo: feste Breite genau für Stoppuhr + Faktor, in beiden Zuständen gleich (Ränder bleiben beim Umschalten stehen) */
+.ctl-group > .ctl.rate { flex: 0 0 auto; width: calc(20px + 6px + 5ch + .25em + 8px) !important; padding-left: 4px; padding-right: 4px; }
 .ctl-group > .ctl.icon-ctl.has-val { grid-auto-flow: column; align-items: center; gap: 6px; }
+/* Ziffern optisch auf die Mitte des Zifferblatts (liegt im Icon 1,5 px unter der Icon-Mitte) */
+.ctl.rate .ctl-val { transform: translateY(1.5px); }
 .ctl-group > .ctl.bpm { flex-grow: 1.6; } /* „95.5 BPM“ braucht mehr Platz als 8er / 1 / Tap */
 .ctl-val { display: block; width: calc(5ch + .25em); line-height: 1; text-align: left; font-variant-numeric: tabular-nums; } /* Schrift wie BPM, feste Breite: kein Springen bei 0.90× / 0.95× */
 .ctl-group > .ctl[hidden] { display: none; }
