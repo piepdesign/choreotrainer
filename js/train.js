@@ -300,10 +300,10 @@ export async function renderTrain(root, recId) {
   // Feste Breite für Schalter mit wechselndem Text (Mono-Schrift: Zeichen × Laufweite), damit nichts springt
   const fixed = (el, chars) => { el.classList.add('fixed'); el.style.width = `calc(${chars}ch + ${chars * 0.08}em + 20px)`; return el; };
   const bPlay = ctl('▶', { class: 'ctl play fixed', title: 'Play/Pause (Leertaste)', onclick: () => togglePlay() });
-  const bMirror = ctl('Spiegeln', { title: 'Spiegeln (M)', onclick: () => { P.mirror = !P.mirror; update(); } });
+  const bMirror = h('button.ctl.icon-ctl', { type: 'button', title: tt('Spiegeln (M)', 'Spiegeln'), 'aria-label': 'Spiegeln', html: icon('mirror'), onclick: () => { P.mirror = !P.mirror; update(); } });
   const bRate = fixed(ctl('', { title: 'Tempo (↑ / ↓)', onclick: e => popover(e.currentTarget, ratePop) }), 5);
   const bVol = fixed(ctl('', { title: 'Lautstärke', onclick: e => popover(e.currentTarget, volPop) }), 7);
-  const bImg = ctl('Bild', { title: 'Helligkeit/Kontrast', onclick: e => popover(e.currentTarget, imgPop) });
+  const bImg = h('button.ctl.icon-ctl', { type: 'button', title: 'Bild: Helligkeit/Kontrast', 'aria-label': 'Bild: Helligkeit/Kontrast', html: icon('image'), onclick: e => popover(e.currentTarget, imgPop) });
   const bIn = ctl('In', { title: 'Loop-Anfang setzen (I)', onclick: () => setIn() });
   const bOut = ctl('Out', { title: 'Loop-Ende setzen (O)', onclick: () => setOut() });
   const bLoop = ctl('Loop', { title: 'Loop an/aus (L) · ohne In/Out zwischen Start und Ende', onclick: () => toggleLoop() });
@@ -391,7 +391,7 @@ export async function renderTrain(root, recId) {
   // nach dem Verschieben kein Play/Pause auslösen
   stage.addEventListener('click', e => { if (panned) { e.stopPropagation(); panned = false; } }, true);
   stage.addEventListener('dblclick', toggleFull);
-  const bMark = ctl('+ Marker', { title: 'Marker setzen', onclick: e => popover(e.currentTarget, markPop) });
+  const bMark = h('button.ctl.icon-ctl', { type: 'button', title: 'Marker setzen', 'aria-label': 'Marker setzen', html: icon('marker'), onclick: e => popover(e.currentTarget, markPop) });
   const toggleAudio = () => {
     if (!songBlob) { toast('Erst unter SONG eine Songdatei laden'); return; }
     if (P.audio !== 'song' && rec.fileOffset === null) { toast('Die Songdatei passt nicht zum Video. Bitte die richtige Datei laden oder den Startpunkt von Hand eintragen.', 5000); return; }
@@ -807,7 +807,7 @@ export async function renderTrain(root, recId) {
           }))));
       }
       return li;
-    }) : [h('li.muted', { style: { display: 'block' } }, tt('Noch keine Marker. Taste S/E/N/H oder „+ Marker“.', 'Noch keine Marker. Über „+ Marker“ setzen.'))]));
+    }) : [h('li.muted', { style: { display: 'block' } }, tt('Noch keine Marker. Taste S/E/N/H oder Fähnchen in der Leiste.', 'Noch keine Marker. Über das Fähnchen in der Leiste setzen.'))]));
   }
 
   const notesIn = h('textarea', { placeholder: '5, 6, 7, 8 Anmerkungen …' }, rec.notes || '');
@@ -1031,14 +1031,26 @@ export async function renderTrain(root, recId) {
   const sameDay = !!cls.weekday && !!rec.recordedAt && WEEKDAYS[(new Date(rec.recordedAt).getDay() + 6) % 7] === cls.weekday;
   const panelBtn = h('button.ctl.icon-ctl.panel-btn', { type: 'button', title: 'Seitenpanel ein/aus (P)', 'aria-label': 'Seitenpanel ein/aus' });
   const panelIcon = open => { panelBtn.innerHTML = icon(open ? 'panelOpen' : 'panelClosed'); panelBtn.classList.toggle('on', open); };
+  // Titel und Interpret einzeilig (zu lang → „…“, beim Darüberfahren läuft er langsam durch), damit das Video mehr
+  // Höhe bekommt. Schmale Spalte (Handy): mehrzeilig, dort steht er über dem Video und kostet keine Bildbreite.
+  const titleInner = h('span.tt-inner',
+    inlineEdit((choreo.title || song?.title || 'Ohne Song').toUpperCase(), async v => { choreo.title = v; await db.put('choreos', choreo); }), song?.artist ? h('span.muted', { style: { fontWeight: 600 } }, ` — ${song.artist.toUpperCase()}`) : '');
+  const titleEl = h('h1.wide.train-title', titleInner);
+  titleEl.addEventListener('mouseenter', () => {
+    const shift = titleEl.scrollWidth - titleEl.clientWidth;
+    if (shift <= 2 || titleEl.querySelector('input')) return;
+    titleEl.style.setProperty('--shift', `${-shift - 4}px`);
+    titleEl.style.setProperty('--dur', `${Math.max(3, shift / 35 + 2)}s`); // ca. 35 px/s, Pausen an den Enden
+    titleEl.classList.add('marquee');
+  });
+  titleEl.addEventListener('mouseleave', () => titleEl.classList.remove('marquee'));
+  titleEl.addEventListener('click', () => titleEl.classList.remove('marquee'));
   const crumbs = h('div.crumbs',
     h('a.tag', { href: `#/class/${cls.id}`, style: { background: `#${color}`, color: textOn(color) } }, classTitle(cls).toUpperCase()),
     h('span.label', classMeta(cls)),
     h('span.label', titleEdit(), ` · ${recIndex + 1}/${recs.length} · ${sameDay ? fmtDate(rec.recordedAt) : fmtRecDate(rec.recordedAt)}`),
     panelBtn,
-    // Titel und Interpret einzeilig (zu lang → „…“, ganz im Tooltip), damit das Video mehr Höhe bekommt
-    h('h1.wide.train-title', { title: [choreo.title || song?.title || 'Ohne Song', song?.artist].filter(Boolean).join(' — ') },
-      inlineEdit((choreo.title || song?.title || 'Ohne Song').toUpperCase(), async v => { choreo.title = v; await db.put('choreos', choreo); }), song?.artist ? h('span.muted', { style: { fontWeight: 600 } }, ` — ${song.artist.toUpperCase()}`) : ''));
+    titleEl);
   const mainCol = h('div.train-main', crumbs, stage, timeline, controls);
   const trainEl = h(`div.train${panelState.open ? '' : '.panel-closed'}`, { style: { '--cc': `#${color}`, '--cc-text': textOn(color) } }, mainCol, side);
   const setPanel = open => {
