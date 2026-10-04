@@ -164,6 +164,9 @@ function syncTester() {
 }
 addEventListener('ct-settings', e => { if ('tester' in (e.detail || {})) syncTester(); });
 
+// Touch: Während gezogen wird (nach dem Halten), scrollt die Seite nicht mit
+addEventListener('touchmove', e => { if (document.body.classList.contains('touch-drag')) e.preventDefault(); }, { passive: false });
+
 // Dateien, die irgendwo außerhalb einer Dropzone landen, nicht im Tab öffnen
 addEventListener('dragover', e => e.preventDefault());
 addEventListener('drop', e => e.preventDefault());

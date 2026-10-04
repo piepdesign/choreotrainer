@@ -1,6 +1,6 @@
 // Base (Übersicht) und Class-Ansicht
 import { db, deleteChoreo, deleteClass, deleteRecording } from './db.js';
-import { h, fmt, fmtRecDate, fmtDuration, relDate, classTitle, classMeta, stripe, inlineEdit, PALETTE, textOn, WEEKDAYS, byClassOrder, CLASS_TITLES, CLASS_LEVELS } from './util.js';
+import { h, isTouch, onHold, holdGate, tt, fmt, fmtRecDate, fmtDuration, relDate, classTitle, classMeta, stripe, inlineEdit, PALETTE, textOn, WEEKDAYS, byClassOrder, CLASS_TITLES, CLASS_LEVELS } from './util.js';
 import { state, go, toast } from './app.js';
 import { baseStats } from './stats.js';
 import { settings, BASE_STATS } from './settings.js';
@@ -28,7 +28,7 @@ export function dropzone(onFile) {
   const zone = h('label.dropzone',
     input,
     h('strong', 'NEUE CHOREO'),
-    h('span.label', '(Video ablegen oder klicken zum Auswählen)'));
+    h('span.label', tt('(Video ablegen oder klicken zum Auswählen)', '(Tippen, um ein Video auszuwählen)')));
   const take = f => {
     if (!f) return;
     if (!f.type.startsWith('video/') && !/\.(mov|mp4|m4v|webm)$/i.test(f.name)) return toast('Bitte eine Videodatei wählen');
@@ -164,8 +164,10 @@ export function hoverVideo(rec, urls, cls) {
     v.load(); // Decoder freigeben, im Canvas bleibt der letzte Frame stehen
   }
 
-  box.addEventListener('mouseenter', enter);
-  box.addEventListener('mouseleave', leave);
+  // Maus: beim Überfahren. Touch: solange gehalten wird (ein kurzes Tippen öffnet wie gewohnt die Choreo)
+  box.addEventListener('mouseenter', () => { if (!isTouch()) enter(); });
+  box.addEventListener('mouseleave', () => { if (!isTouch()) leave(); });
+  onHold(box, enter, leave);
   return box;
 }
 
@@ -235,6 +237,7 @@ function sortableStripes(classes, render) {
   if (classes.length < 2) return box;
 
   let drag = null; // { el, startY, active, target, after }
+  const gate = holdGate(); // Touch: erst halten, dann ziehen (Wischen scrollt)
   const clearMarks = () => els.forEach(x => x.classList.remove('drop-before', 'drop-after'));
 
   els.forEach(el => {
@@ -243,7 +246,8 @@ function sortableStripes(classes, render) {
     el.addEventListener('dragstart', e => e.preventDefault()); // native Link-Drag aus
     el.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
-      drag = { el, startY: e.clientY, active: false, target: null, after: false };
+      gate.arm(e);
+      drag = { el, startY: e.clientY, active: false, target: null, after: false, touch: e.pointerType === 'touch' };
     });
     el.addEventListener('click', e => {
       if (el.dataset.justDragged) { e.preventDefault(); delete el.dataset.justDragged; }
@@ -253,7 +257,10 @@ function sortableStripes(classes, render) {
   const onMove = e => {
     if (!drag) return;
     if (!drag.active) {
-      if (Math.abs(e.clientY - drag.startY) < 6) return;
+      const g = gate.gate(e);
+      if (g === null) { drag = null; return; } // gescrollt
+      if (!g) return;
+      if (!drag.touch && Math.abs(e.clientY - drag.startY) < 6) return;
       drag.active = true;
       drag.el.classList.add('dragging');
       document.body.classList.add('is-sorting');
@@ -269,6 +276,7 @@ function sortableStripes(classes, render) {
   };
 
   const onUp = async () => {
+    gate.done();
     if (!drag) return;
     const { el, active, target, after } = drag;
     drag = null;
@@ -288,6 +296,7 @@ function sortableStripes(classes, render) {
 
   document.addEventListener('pointermove', onMove);
   document.addEventListener('pointerup', onUp);
+  document.addEventListener('pointercancel', onUp);
   // Aufräumen, sobald der Hub verlassen wird
   addEventListener('hashchange', () => {
     document.removeEventListener('pointermove', onMove);

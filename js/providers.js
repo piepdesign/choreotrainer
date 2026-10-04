@@ -1,7 +1,7 @@
 // Song im bevorzugten Musikprovider öffnen. Ohne Schlüssel: exakt bei Deezer (Track-ID) und
 // Apple Music (freie iTunes-Suche), sonst die Suche im Provider. Eine Anmeldung übernimmt der
 // Provider selbst (Browser bzw. App), die App speichert nur die Wahl.
-import { h } from './util.js';
+import { h, isTouch, onHold } from './util.js';
 import { brandIcon } from './brand-icons.js';
 import { searchSongs, songDetails } from './deezer.js';
 import { settings, saveSettings } from './settings.js';
@@ -184,6 +184,14 @@ async function previewUrl(song) {
 const PREVIEW_VOLUME = { off: 0, low: 0.25, mid: 0.55, on: 0.55, high: 0.9 };
 const player = new Audio();
 player.preload = 'none';
+// iOS spielt Ton nur nach einer Berührung ab. Beim ersten Tippen den Player einmal stumm „freischalten“,
+// damit die Hörprobe später beim Halten spielen darf.
+const SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+addEventListener('touchend', () => {
+  if (player.src) return;
+  player.src = SILENT;
+  player.play().then(() => player.pause()).catch(() => {});
+}, { once: true, capture: true });
 let owner = null, fadeTimer = null;
 function fadeTo(target, ms, done) {
   clearInterval(fadeTimer);
@@ -201,14 +209,15 @@ export function stopPreview() {
   if (!player.paused) fadeTo(0, 200, () => player.pause());
 }
 function previewOnHover(el, song) {
-  let timer = null;
-  el.addEventListener('mouseenter', () => {
-    // kurz warten, damit Überfahren mit der Maus nichts abspielt
+  let timer = null, wanted = false;
+  // Maus: Überfahren, Touch: Halten (kurzes Tippen öffnet weiterhin den Musikprovider)
+  const start = delay => {
     const level = PREVIEW_VOLUME[settings().hoverPreview] ?? PREVIEW_VOLUME.mid;
     if (!level) return; // in den Einstellungen abgeschaltet
+    wanted = true;
     timer = setTimeout(async () => {
       const url = await previewUrl(song);
-      if (!url || !el.matches(':hover')) return;
+      if (!url || !wanted) return;
       stopPreview();
       owner = el;
       if (player.src !== url) player.src = url;
@@ -220,8 +229,11 @@ function previewOnHover(el, song) {
         el.classList.add('previewing');
         fadeTo(level, 300);
       } catch { owner = null; } // ohne vorherigen Klick auf der Seite blockt der Browser den Ton
-    }, 250);
-  });
-  el.addEventListener('mouseleave', () => { clearTimeout(timer); if (owner === el) stopPreview(); });
+    }, delay);
+  };
+  const stop = () => { wanted = false; clearTimeout(timer); if (owner === el) stopPreview(); };
+  el.addEventListener('mouseenter', () => { if (!isTouch()) start(250); }); // kurz warten: Überfahren spielt nichts
+  el.addEventListener('mouseleave', () => { if (!isTouch()) stop(); });
+  onHold(el, () => start(0), stop);
 }
 player.addEventListener('ended', () => { owner?.classList.remove('previewing'); owner = null; });

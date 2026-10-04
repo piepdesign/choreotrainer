@@ -1,7 +1,7 @@
 // Intro beim ersten Öffnen: Wortmarke → Name → Classes → Präferenzen → „wird vorbereitet“.
 // Läuft einmal (auch für bestehende Nutzer*innen, vorhandene Classes sind vorbelegt).
 // Navigation unten fest: „<“ zurück, „Später“, „>“ weiter. Gleiche Größe und Stelle in jedem Schritt.
-import { h } from './util.js';
+import { h, isTouch, tt } from './util.js';
 import { settings, saveSettings, applyTheme, BASE_STATS } from './settings.js';
 import { classManager } from './classform.js';
 import { preferences } from './ui.js';
@@ -56,25 +56,17 @@ export async function runIntro() {
         const focus = () => { if (input.isConnected && document.activeElement !== input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); } };
         [0, 260, 500, 900].forEach(ms => setTimeout(focus, ms));
         addEventListener('focus', focus); // Fenster bekommt den Fokus erst später (z. B. nach dem Neuladen)
-        // Tippen landet immer im Feld: Zeichen, die nicht ankommen (Fokus fehlte oder wurde verschluckt), selbst einsetzen
+        // Tippen landet immer im Feld: hat das Feld (noch) keinen Fokus, Zeichen selbst einsetzen.
+        // Nur mit echter Tastatur; auf Handys kommt jedes Zeichen über die Bildschirmtastatur selbst an
+        // (das frühere „nachträglich einsetzen, falls verschluckt“ hat dort Buchstaben verdoppelt).
         const grab = e => {
           if (!input.isConnected) { removeEventListener('keydown', grab, true); removeEventListener('focus', focus); return; }
+          if (isTouch() || document.activeElement === input) return;
           if (e.key.length !== 1 || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
-          const before = input.value;
-          if (document.activeElement !== input) {
-            e.preventDefault();
-            focus();
-            input.value = before + e.key;
-            sync();
-            return;
-          }
-          setTimeout(() => {
-            if (input.value !== before) return; // normal angekommen
-            const a = input.selectionStart ?? before.length, b = input.selectionEnd ?? a;
-            input.value = before.slice(0, a) + e.key + before.slice(b);
-            input.setSelectionRange(a + 1, a + 1);
-            sync();
-          }, 0);
+          e.preventDefault();
+          focus();
+          input.value += e.key;
+          sync();
         };
         addEventListener('keydown', grab, true);
         // breite Linie bleibt, das Feld selbst ist so breit wie der Inhalt: Cursor steht direkt vor „DEIN NAME“

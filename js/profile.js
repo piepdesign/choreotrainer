@@ -2,7 +2,7 @@
 // und Präferenzen. Diagramme als schlankes SVG: Mengen in Graustufen (eine Skala), Identität über
 // Class-Farben, Werte immer in Textfarbe, Tooltip auf jedem Datenpunkt.
 import { db, deleteAllData } from './db.js';
-import { h, fmt, fmtDuration, relDate, fmtRecDate, classTitle, stripe, byClassOrder, WEEKDAYS, textOn, plural } from './util.js';
+import { h, tt, fmt, fmtDuration, relDate, fmtRecDate, classTitle, stripe, byClassOrder, WEEKDAYS, textOn, plural } from './util.js';
 import { loadAll, dots, choreoCard, recTitle, nextClass } from './hub.js';
 import { songLink } from './providers.js';
 import { baseStats, latestRating, choreoLength, weekStart, dayKey } from './stats.js';
@@ -346,7 +346,7 @@ export async function renderProfile(root, section) {
       { label: 'Verlauf', value: c => c.ratings?.length || 0, cell: c => sparkline(c.ratings), dir: -1 },
       { label: 'Zuletzt bewertet', value: c => c.ratings?.at(-1)?.ts || 0, cell: c => h('span.label', c.ratings?.length ? relDate(c.ratings.at(-1).ts) : 'nie'), dir: -1 },
     ], choreos, { sort: 1, key: 'ct-sort-status', href: c => ((recsByChoreo[c.id] || []).length ? `#/train/${recsByChoreo[c.id].at(-1).id}` : null) }),
-    h('p.label', 'Spaltenüberschrift anklicken zum Sortieren. Standard: die wackligsten zuerst.'));
+    h('p.label', `Spaltenüberschrift ${tt('anklicken', 'antippen')} zum Sortieren. Standard: die wackligsten zuerst.`));
 
   // ── Choreos: Galerie / Liste ──
   let view = 'gallery', gsort = 'recent';

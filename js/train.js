@@ -1,6 +1,6 @@
 // Trainingsansicht: Player mit Spiegeln, Tempo, Lautstärke, Bild, Loop, 8er-Count, Markern, Song-Zeitleiste
 import { db, uid, deleteRecording, deleteChoreo } from './db.js';
-import { h, fmt, fmtDate, WEEKDAYS, fmtRecDate, fmtDuration, relDate, parseTime, debounce, inlineEdit, fitInput, classTitle, classMeta, PALETTE, textOn } from './util.js';
+import { h, holdGate, isTouch, tt, fmt, fmtDate, WEEKDAYS, fmtRecDate, fmtDuration, relDate, parseTime, debounce, inlineEdit, fitInput, classTitle, classMeta, PALETTE, textOn } from './util.js';
 import { analyzeBeat } from './beat.js';
 import { songPicker, songKeyOf } from './song.js';
 import { alignToSong, checkAudio } from './align.js';
@@ -67,7 +67,14 @@ export async function renderTrain(root, recId) {
   const countBox = h('div.count', countBig, countEight);
   const status = h('div.status', '');
   const stage = h('div.stage', video, countBox, status);
-  video.addEventListener('click', () => togglePlay());
+  // Touch: doppelt Tippen = Vollbild (das erste Tippen wird dabei zurückgenommen)
+  let lastTap = 0;
+  video.addEventListener('click', () => {
+    togglePlay();
+    if (!isTouch()) return;
+    const now = Date.now();
+    if (now - lastTap < 320) { lastTap = 0; togglePlay(); toggleFull(); } else lastTap = now;
+  });
   const dur = () => (isFinite(video.duration) && video.duration) || rec.duration || 0;
 
   // ── Songdatei synchron zum Video ──
@@ -291,8 +298,10 @@ export async function renderTrain(root, recId) {
   const bCount = ctl('8er', { title: '8er-Count an/aus (C)', onclick: () => { P.countOn = !P.countOn; update(); } });
   const bBpm = fixed(ctl('', { title: 'Takt einstellen', onclick: e => popover(e.currentTarget, countPop) }), 9);
   const toggleFull = () => {
-    if (document.fullscreenElement) document.exitFullscreen();
-    else (stage.requestFullscreen || stage.webkitRequestFullscreen)?.call(stage);
+    if (document.fullscreenElement) { document.exitFullscreen(); return; }
+    const req = stage.requestFullscreen || stage.webkitRequestFullscreen;
+    // iPhone kennt Vollbild nur für das Video selbst (eigener Player, ohne 8er-Overlay)
+    if (req) req.call(stage); else video.webkitEnterFullscreen?.();
   };
   const bFull = ctl('Vollbild', { title: 'Vollbild (F)', onclick: toggleFull });
   // Video: Breite füllen (Bild wird oben/unten beschnitten) oder komplett zeigen
@@ -432,7 +441,7 @@ export async function renderTrain(root, recId) {
     h('div.btns', small('Zurücksetzen', () => { P.brightness = P.contrast = 100; update(); closePop(); })),
   ];
   const markPop = () => [
-    h('div.btns', Object.entries(MARKER_TYPES).map(([type, m]) => small(`${m.label} (${m.key})`, () => { addMarker(type); closePop(); }))),
+    h('div.btns', Object.entries(MARKER_TYPES).map(([type, m]) => small(tt(`${m.label} (${m.key})`, m.label), () => { addMarker(type); closePop(); }))),
     h('div.note', 'Setzt den Marker an der aktuellen Position. Start/Ende gibt es je einmal und begrenzen den Loop, solange kein In/Out gesetzt ist.'),
   ];
   const countPop = () => {
@@ -447,8 +456,8 @@ export async function renderTrain(root, recId) {
         small('−10 ms', () => { P.anchor -= 0.01; P.manualBeat = true; update(); }),
         small('+10 ms', () => { P.anchor += 0.01; P.manualBeat = true; update(); })),
       h('div.btns',
-        small('Anfangscount (1)', () => setOne()),
-        small('Tap (T)', () => tap())),
+        small(tt('Anfangscount (1)', 'Anfangscount'), () => setOne()),
+        small(tt('Tap (T)', 'Tap'), () => tap())),
       h('div.btns',
         small(P.click ? 'Klick an' : 'Klick aus', () => { P.click = !P.click; update(); refreshPop(); }, P.click),
         small('Neu analysieren', () => { closePop(); P.manualBeat = false; runAnalysis(true); })),
@@ -461,7 +470,7 @@ export async function renderTrain(root, recId) {
         small(C.plus ? 'Halbe „+“ an' : 'Halbe „+“ aus', () => { C.plus = !C.plus; saveCountView(C); update(); refreshPop(); }, C.plus),
         small(C.show ? 'Zähler sichtbar' : 'Zähler ausgeblendet', () => { C.show = !C.show; saveCountView(C); update(); refreshPop(); }, C.show)),
       h('div.note', 'Ausgeblendet zählt der Count weiter (z. B. nur mit Klick).'),
-      h('div.note', 'Zählt nicht richtig? Bei der „1“ einer Acht pausieren und „Anfangscount“ drücken. Oder ab einer „1“ mindestens viermal im Takt T tippen.',
+      h('div.note', `Zählt nicht richtig? Bei der „1“ einer Acht pausieren und „Anfangscount“ ${tt('drücken', 'antippen')}. Oder ab einer „1“ mindestens viermal im Takt ${tt('T', 'auf „Tap“')} tippen.`,
         song?.bpm ? ` Deezer kennt ${Math.round(song.bpm)} BPM für das Original.` : ''),
     ];
   };
@@ -563,7 +572,7 @@ export async function renderTrain(root, recId) {
     } catch (e) {
       console.warn(e);
       if (!P.bpm && song?.bpm) { P.bpm = song.bpm; P.anchor = 0; }
-      status.textContent = 'TAKT NICHT ERKANNT · TAPPEN (T)';
+      status.textContent = tt('TAKT NICHT ERKANNT · TAPPEN (T)', 'TAKT NICHT ERKANNT · TAP IM BPM-MENÜ');
     }
     rec.beatTried = true;
     update();
@@ -740,7 +749,7 @@ export async function renderTrain(root, recId) {
           }))));
       }
       return li;
-    }) : [h('li.muted', { style: { display: 'block' } }, 'Noch keine Marker. Taste S/E/N/H oder „+ Marker“.')]));
+    }) : [h('li.muted', { style: { display: 'block' } }, tt('Noch keine Marker. Taste S/E/N/H oder „+ Marker“.', 'Noch keine Marker. Über „+ Marker“ setzen.'))]));
   }
 
   const notesIn = h('textarea', { placeholder: '5, 6, 7, 8 Anmerkungen …' }, rec.notes || '');
@@ -870,7 +879,7 @@ export async function renderTrain(root, recId) {
     notes: ['Notizen', [notesIn]],
     status: ['Status', [ratingBox, ratingHint, h('div', { style: { marginTop: '8px' } }, statLine)]],
     recs: ['Aufnahmen', recsBody],
-    keys: ['Tasten', keysBody],
+    ...(isTouch() ? {} : { keys: ['Tasten', keysBody] }), // ohne Tastatur keine Tastenliste
   };
   const panelState = settings().panel;
   const side = h('aside.side');
@@ -903,14 +912,19 @@ export async function renderTrain(root, recId) {
   // Ganzer Abschnittskopf ist Griff: erst ab 6 px Bewegung wird gezogen, sonst bleibt es ein Klick (auf/zu)
   function sortableSection(sec, head) {
     head.title = 'Klicken: auf/zu · Ziehen: umsortieren';
+    const gate = holdGate(); // Touch: erst halten, dann ziehen (Wischen scrollt)
     head.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
       const y0 = e.clientY;
       let active = false;
+      gate.arm(e);
       const move = ev => {
-        if (!(ev.buttons & 1)) { up(); return; }
+        if (!(ev.buttons & 1) && ev.pointerType !== 'touch') { up(); return; }
         if (!active) {
-          if (Math.abs(ev.clientY - y0) < 6) return;
+          const g = gate.gate(ev);
+          if (g === null) { up(); return; }
+          if (!g) return;
+          if (ev.pointerType !== 'touch' && Math.abs(ev.clientY - y0) < 6) return;
           active = true;
           sec.classList.add('dragging');
           document.body.classList.add('dragging-now');
@@ -924,6 +938,7 @@ export async function renderTrain(root, recId) {
         removeEventListener('pointermove', move);
         removeEventListener('pointerup', up);
         removeEventListener('pointercancel', up);
+        gate.done();
         if (!active) return;
         sec.classList.remove('dragging');
         document.body.classList.remove('dragging-now');

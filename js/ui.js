@@ -1,5 +1,5 @@
 // Gemeinsame Bedienelemente: Auswahlliste mit „+ Neu …“, Präferenzen, Icons
-import { h } from './util.js';
+import { h, holdGate, tt } from './util.js';
 import { PROVIDERS } from './providers.js';
 import { BASE_STATS } from './settings.js';
 import { brandIcon } from './brand-icons.js';
@@ -110,22 +110,23 @@ export function preferences(values, onChange, statValues = null, { baseLabel = t
   // hints: im Intro ein Satz unter jedem Titel, was die Einstellung bewirkt
   const HINTS = {
     'Musikprovider': 'Hier öffnen sich erkannte Songs: in der App, wenn sie installiert ist, sonst im Browser.',
-    'Song-Cover Hörprobe': 'Fährst du mit der Maus über ein Song-Cover, spielt eine 30-Sekunden-Hörprobe in dieser Lautstärke.',
+    'Song-Cover Hörprobe': tt('Fährst du mit der Maus über ein Song-Cover, spielt eine 30-Sekunden-Hörprobe in dieser Lautstärke.', 'Hältst du ein Song-Cover gedrückt, spielt eine 30-Sekunden-Hörprobe in dieser Lautstärke.'),
     'Helfer*in': 'Blendet unten rechts einen Knopf ein, über den du Bugs und Ideen direkt per Mail meldest.',
-    'Statistiken': 'Diese Kennzahlen siehst du in deiner „Base“. Klicke oder ziehe Kacheln hinein oder heraus.',
+    'Statistiken': tt('Diese Kennzahlen siehst du in deiner „Base“. Klicke oder ziehe Kacheln hinein oder heraus.', 'Diese Kennzahlen siehst du in deiner „Base“. Tippe Kacheln an oder halte und ziehe sie hinein oder heraus.'),
     'Ansicht': 'Hell, dunkel oder automatisch passend zu deinem System.',
   };
   const block = (title, control) => h('div.pref-block', h('h3.p-sub', title), hints ? h('p.pref-hint', HINTS[title]) : null, control);
   // Einzelauswahl; render(neu) setzt die Markierung
   // Einzelauswahl als Kacheln (Musikprovider, Ansicht); key = Name der Einstellung
   const single = (key, options, value, content) => {
-    const el = h('div.provider-tiles', { role: 'radiogroup' });
-    const render = v => el.replaceChildren(...options.map(o => h(`button${o[0] === v ? '.on' : ''}`, {
-      type: 'button', role: 'radio', 'aria-checked': String(o[0] === v),
-      onclick: () => { render(o[0]); onChange({ [key]: o[0] }); },
-    }, content(o))));
-    render(value);
-    return el;
+    // Kacheln einmal bauen, beim Antippen nur die Markierung umschalten (Neuaufbau verschob die Ansicht)
+    const btns = options.map(o => h('button', {
+      type: 'button', role: 'radio',
+      onclick: () => { mark(o[0]); onChange({ [key]: o[0] }); },
+    }, content(o)));
+    const mark = v => btns.forEach((b, i) => { const on = options[i][0] === v; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
+    mark(value);
+    return h('div.provider-tiles', { role: 'radiogroup' }, btns);
   };
   const chips = statPicker(values.baseStats || [], statValues, list => onChange({ baseStats: list }), { baseLabel });
   return h('div.prefs',
@@ -151,7 +152,7 @@ export function statPicker(selected, values, onChange, { baseLabel = true } = {}
   const tile = id => h('div.stat.pick-tile', { 'data-id': id }, h('span.label', label(id)), h('b', vals[id]?.value ?? '—'));
   const shown = h('div.stats.stat-zone.zone-in');
   const rest = h('div.stats.stat-zone.zone-out');
-  const hintIn = h('p.zone-empty', 'Hierher ziehen oder unten anklicken');
+  const hintIn = h('p.zone-empty', tt('Hierher ziehen oder unten anklicken', 'Hierher ziehen oder unten antippen'));
   const hintOut = h('p.zone-empty', 'Alle Statistiken sind in deiner Base');
   let sel = selected.filter(id => BASE_STATS.some(x => x[0] === id));
   function render() {
@@ -169,15 +170,20 @@ export function statPicker(selected, values, onChange, { baseLabel = true } = {}
     return y < r.top || (y <= r.bottom && x < r.left + r.width / 2);
   }) || zone.querySelector('.zone-empty');
   const box = h('div.stat-picker', baseLabel ? h('span.label.zone-label', 'In deiner Base') : null, shown, h('span.label.zone-label', 'Weitere'), rest);
+  const gate = holdGate(); // Touch: erst halten, dann ziehen (Wischen scrollt)
   box.addEventListener('pointerdown', e => {
     const t = e.target.closest('.pick-tile');
     if (!t || e.button !== 0) return;
-    e.preventDefault();
+    if (e.pointerType !== 'touch') e.preventDefault();
+    gate.arm(e);
     const x0 = e.clientX, y0 = e.clientY;
-    let ghost = null;
+    let ghost = null, scrolled = false;
     const move = ev => {
       if (!ghost) {
-        if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return;
+        const g = gate.gate(ev);
+        if (g === null) { scrolled = true; return; }
+        if (!g) return;
+        if (ev.pointerType !== 'touch' && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return;
         const r = t.getBoundingClientRect();
         ghost = t.cloneNode(true);
         ghost.classList.add('pick-ghost');
@@ -195,12 +201,15 @@ export function statPicker(selected, values, onChange, { baseLabel = true } = {}
       const ref = before(zone, ev.clientX, ev.clientY, t);
       if (t.nextSibling !== ref || t.parentNode !== zone) zone.insertBefore(t, ref);
     };
-    const up = () => {
+    const up = ev => {
+      if (ev?.type === 'pointercancel') scrolled = true; // Browser hat das Wischen übernommen
       removeEventListener('pointermove', move);
       removeEventListener('pointerup', up);
       removeEventListener('pointercancel', up);
       document.body.classList.remove('is-sorting');
+      gate.done();
       if (ghost) { ghost.remove(); t.classList.remove('pick-hole'); commit(); return; }
+      if (scrolled) return; // gewischt, nicht angetippt
       // Klick: in die andere Fläche, oben ans Ende
       if (t.parentNode === shown) rest.prepend(t); else shown.insertBefore(t, hintIn);
       commit();

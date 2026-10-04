@@ -25,6 +25,52 @@ export function h(tag, attrs, ...children) {
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 
+// Ziehen auf Touch erst nach kurzem Halten, damit Wischen weiter scrollt.
+// arm(e) beim pointerdown, gate(e) im pointermove: true = ziehen, false = noch warten, null = abgebrochen (Finger
+// hat sich vorher bewegt, also wird gescrollt), done() beim Loslassen. Maus: sofort bereit.
+export function holdGate(ms = 300) {
+  let ready = false, dead = false, x0 = 0, y0 = 0, timer = null;
+  return {
+    arm(e) {
+      clearTimeout(timer);
+      dead = false; x0 = e.clientX; y0 = e.clientY;
+      ready = e.pointerType !== 'touch';
+      if (!ready) timer = setTimeout(() => { ready = true; document.body.classList.add('touch-drag'); navigator.vibrate?.(8); }, ms);
+    },
+    gate(e) {
+      if (dead) return null;
+      if (ready) return true;
+      if (Math.hypot(e.clientX - x0, e.clientY - y0) > 10) { dead = true; clearTimeout(timer); return null; }
+      return false;
+    },
+    done() { clearTimeout(timer); ready = false; document.body.classList.remove('touch-drag'); },
+  };
+}
+
+// Touch-Gerät (Handy/Tablet): Halten statt Hovern, Tippen statt Klicken, keine Tastenkürzel
+export const isTouch = () => document.documentElement.classList.contains('touch');
+// Text je nach Gerät: tt('Klick', 'Tipp')
+export const tt = (desktop, touch) => (isTouch() ? touch : desktop);
+
+// Halten auf Touch-Geräten: onStart nach `ms`, onEnd beim Loslassen. Bewegt sich der Finger vorher (Scrollen), passiert nichts.
+// Gibt zurück, ob das letzte Antippen ein Halten war (dann soll der folgende Klick nichts auslösen).
+export function onHold(el, onStart, onEnd, ms = 350) {
+  let timer = null, held = false, x0 = 0, y0 = 0;
+  const cancel = () => { clearTimeout(timer); timer = null; };
+  el.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'touch') return;
+    held = false; x0 = e.clientX; y0 = e.clientY;
+    timer = setTimeout(() => { timer = null; held = true; onStart(); }, ms);
+  });
+  el.addEventListener('pointermove', e => { if (timer && Math.hypot(e.clientX - x0, e.clientY - y0) > 10) cancel(); });
+  const up = () => { cancel(); if (held) onEnd(); };
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', () => { cancel(); if (held) { held = false; onEnd(); } });
+  el.addEventListener('contextmenu', e => { if (held || timer) e.preventDefault(); }); // kein Kontextmenü beim Halten
+  // Klick nach einem Halten unterdrücken (sonst öffnet z. B. der Musikprovider)
+  el.addEventListener('click', e => { if (held) { e.preventDefault(); e.stopImmediatePropagation(); held = false; } }, true);
+}
+
 // 83.4 → "1:23.4" (mit Zehnteln) bzw. "1:23"
 export function fmt(sec, tenths = false) {
   if (!isFinite(sec) || sec < 0) sec = 0;

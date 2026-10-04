@@ -145,8 +145,8 @@ a.mini { display: block; }
 .cc-meta:not(:empty)::before { content: '·'; margin: 0 .55em; }
 .stripes > .stripe, .cm-list > .cm-row { column-gap: 0; }
 .cc-right + .cc-right:not(:empty)::before { content: '·'; margin: 0 .55em; }
-.stripes > .stripe .cc-right:only-of-type { justify-self: end; }
-@media (max-width: 600px) { .cc-meta:nth-of-type(4) { display: none; } }
+.stripe .cc-gap + .cc-right:last-child { justify-self: end; padding-left: 12px; } /* einzelne Angabe rechts (z. B. Anzahl) */
+
 a.stripe:hover { filter: brightness(1.08); }
 body.is-sorting, body.is-sorting * { cursor: grabbing !important; user-select: none; }
 .stripe.dragging { opacity: .35; }
@@ -511,7 +511,7 @@ a.p-row:hover { background: var(--surface-2); }
 .seg { display: inline-flex; gap: 2px; }
 .p-add { margin-top: 12px; }
 .p-add summary { cursor: pointer; margin-bottom: 10px; list-style: none; }
-@media (max-width: 700px) { .p-row, .p-table.wide5 .p-row, .p-table.wide6 .p-row { grid-template-columns: 1.5fr 1fr; } .p-row span:nth-child(n+3) { display: none; } }
+@media (max-width: 700px) { .p-row, .p-table.wide5 .p-row, .p-table.wide6 .p-row { grid-template-columns: 1.5fr 1fr; } .p-row > :nth-child(n+3) { display: none; } }
 
 /* ── Class-Verwaltung (Intro, Profil) ───────── */
 .class-manager { display: grid; gap: 28px; }
@@ -577,14 +577,17 @@ a.stat-link:hover { background: var(--surface-2); }
 /* ── Präferenzen: Titel über der Auswahl, Breite begrenzt ── */
 .prefs { display: grid; gap: 30px; margin-top: 8px; }
 .pref-block .p-sub { margin: 0 0 12px; }
-.provider-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: var(--tile-gap); }
+/* Kacheln füllen jede Zeile (auch eine übrige letzte Kachel nimmt die volle Breite) */
+.provider-tiles { display: flex; flex-wrap: wrap; gap: var(--tile-gap); }
+.provider-tiles > button { flex: 1 1 118px; }
 .provider-tiles button { display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 92px; padding: 14px 8px; background: var(--surface); font-size: 12px; color: var(--muted); transition: background .15s, color .15s; }
 .provider-tiles button:hover { color: var(--fg); background: var(--surface-2); }
 .provider-tiles button.on { background: var(--fg); color: var(--bg); }
 .provider-tiles .brand { opacity: 1; }
 
 /* ── Konto: Kacheln wie Provider/Statistiken, Knopf unten an derselben Stelle ── */
-.acc { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--tile-gap); }
+.acc { display: flex; flex-wrap: wrap; gap: var(--tile-gap); }
+.acc > .acc-card { flex: 1 1 240px; }
 .acc-card { display: flex; flex-direction: column; gap: 14px; background: var(--surface); padding: 16px; min-height: 150px; }
 .acc-card .acc-text { flex: 1; }
 .acc-title { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--fg); margin-bottom: -4px; }
@@ -687,3 +690,32 @@ body.intro-open .tester-fab { display: none; }
 body.touring .tester-fab { display: none; }
 .tour-done { z-index: 95; }
 .tour-done .modal-card p { margin: 0; font-size: 13px; line-height: 1.55; }
+
+/* ── Handy (schmale Bildschirme) ── */
+html, body { overflow-x: clip; } /* nichts darf seitlich herausragen und die Seite verschiebbar machen */
+@media (max-width: 600px) {
+  .topbar { gap: 10px; padding-top: 14px; padding-bottom: 14px; }
+  .wordmark { font-size: 12px; white-space: nowrap; }
+  .brand { gap: 8px; min-width: 0; }
+  .topbar nav { gap: 12px; font-size: 11px; }
+  .topbar nav .icon-link { margin-right: -6px; }
+  .tester-fab { right: 12px; bottom: 12px; }
+  /* Class-Zeilen: Knöpfe (Bearbeiten/Löschen) in eigene Zeile, damit nichts abgeschnitten wird */
+  .cm-list .cm-actions { grid-column: 1 / -1; justify-self: start; padding-top: 6px; }
+  .cm-row { flex-wrap: wrap; }
+  /* Kacheln füllen die Breite: eine allein über die volle Breite, mehrere je 75 % (Rest lädt zum Wischen ein) */
+  .cards.hscroll > .card { flex: 1 0 75%; }
+  .cards:not(.hscroll) { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+}
+
+/* Touch: Ziehen erst nach Halten, bis dahin scrollt Wischen wie gewohnt */
+.touch .pick-tile, .touch .panel-head { touch-action: pan-y; }
+body.touch-drag, body.touch-drag * { user-select: none; -webkit-user-select: none; }
+/* kein Kontextmenü/Lupe beim Halten von Cover und Video */
+.cover-wrap img, .card .thumb, .mini-thumb, .stripe { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+/* Doppeltippen zoomt nicht (verschiebt sonst die Ansicht), Eingabefelder ab 16 px: Safari zoomt sonst beim Antippen */
+html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
+.touch input:not(.intro-input), .touch select, .touch textarea { font-size: 16px !important; }
+/* Intro: seitlich nicht verschiebbar (die Pfeile ragen bewusst in den Rand) */
+.intro { overflow-x: hidden; overscroll-behavior: contain; touch-action: pan-y; }
+@media (max-width: 600px) { .intro-nav .intro-arrow:first-child { margin-left: -12px; } .intro-nav .intro-arrow:last-child { margin-right: -12px; } }

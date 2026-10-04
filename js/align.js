@@ -5,6 +5,7 @@
 // Pop/Hip-Hop wiederholt das Schlagzeug alle 4 Takte, erst Stimme und Melodie machen die Stelle eindeutig.
 // Suche grob über den ganzen Song (~46 ms), dann fein um die besten Kandidaten (~11,6 ms).
 // Grenze: Spielt der Kurs den Song verlangsamt, passt nichts zusammen.
+import { decodeAudio } from './audio.js';
 
 const SR = 11025;
 const N = 512; // FFT-Größe (~46 ms)
@@ -56,7 +57,7 @@ export async function checkAudio(file) {
 
 async function decode(blob, label) {
   try {
-    return await new OfflineAudioContext(1, 1, SR).decodeAudioData(await blob.arrayBuffer());
+    return await decodeAudio(blob, SR);
   } catch {
     throw new Error(label === 'song'
       ? 'Die Songdatei lässt sich nicht lesen. Bitte unter SONG ersetzen (mp3, m4a, wav oder flac).'

@@ -10,7 +10,7 @@ Alle Videos und Daten bleiben **lokal im Browser** (IndexedDB). Es gibt keinen S
 
 ## Nutzen
 
-Online: **https://piepdesign.github.io/choreotrainer/**
+Online: **https://tinyurl.com/choreotrainer** (leitet weiter auf https://piepdesign.github.io/choreotrainer/)
 
 Lokal (mit eigenem Durchreicher für die Songerkennung):
 

@@ -1,7 +1,7 @@
 // Tutorial: führt Schritt für Schritt durch die App. Der Rest der Seite wird abgedunkelt, die markierte Stelle
 // bleibt frei. Weiter geht es nur per Klick auf die markierte Stelle (nicht auf einen Weiter-Knopf).
 // Teil 1 (Base, Profil, Einstellungen) läuft nach dem Intro, Teil 2 beim ersten Öffnen einer Choreo.
-import { h } from './util.js';
+import { h, tt } from './util.js';
 import { settings, saveSettings } from './settings.js';
 
 let active = false;
@@ -24,7 +24,8 @@ async function find(step) {
 
 // steps: [{ target, title, text, route?, block?, when?, before? }]
 // block: Klick auf die Stelle löst die eigentliche Aktion nicht aus (z. B. Dateiauswahl), führt nur weiter
-export function runTour(steps, { finish, onEnd } = {}) {
+// scope: Teil gilt nur auf diesen Seiten; wer sie verlässt, beendet ihn (ohne ihn als gesehen zu markieren)
+export function runTour(steps, { finish, onEnd, scope = null } = {}) {
   if (active) return Promise.resolve();
   active = true;
   const spot = h('div.tour-spot');
@@ -33,7 +34,7 @@ export function runTour(steps, { finish, onEnd } = {}) {
   const text = h('p.tour-text');
   const skip = h('button.linkbtn', { type: 'button' }, 'Überspringen');
   const card = h('div.tour-card', { role: 'dialog', 'aria-live': 'polite' },
-    h('div.tour-top', num, skip), title, text, h('p.label.tour-hint', 'Klicke auf die markierte Stelle'));
+    h('div.tour-top', num, skip), title, text, h('p.label.tour-hint', tt('Klicke auf die markierte Stelle', 'Tippe auf die markierte Stelle')));
   const root = h('div.tour', spot, card);
   document.body.append(root);
   document.body.classList.add('touring');
@@ -79,12 +80,15 @@ export function runTour(steps, { finish, onEnd } = {}) {
     cancelAnimationFrame(raf);
     ['click', 'pointerdown', 'mousedown', 'dblclick'].forEach(t => removeEventListener(t, guard, true));
     removeEventListener('keydown', onKey, true);
+    removeEventListener('hashchange', onHash);
     root.remove();
     document.body.classList.remove('touring');
     active = false;
     resolveStep?.();
   }
   skip.addEventListener('click', () => { end(); onEnd?.(false); });
+  const onHash = () => { if (scope && !scope.test(location.hash)) end(); };
+  addEventListener('hashchange', onHash);
 
   return (async () => {
     place();
@@ -129,11 +133,11 @@ const panelOpen = () => {
 
 export function mainTour() {
   return runTour([
-    { route: /^#\/?$/, target: '.dropzone', block: true, title: 'Neue Choreo', text: 'Lege hier ein Video aus dem Kurs ab oder klicke zum Auswählen. Daraus wird eine Choreo zum Üben.' },
-    { route: /^#\/?$/, target: '.stats', block: true, title: 'Deine Statistiken', text: 'Kennzahlen zu deinem Üben. Ein Klick auf eine Kachel führt später zur passenden Auswertung im Profil.' },
-    { route: /^#\/?$/, target: '.stripes', block: true, when: () => !!document.querySelector('.stripes .stripe'), title: 'Deine Classes', text: 'Jede Class mit eigener Farbe. Klick öffnet die Class mit allen Choreos, Ziehen sortiert die Reihenfolge.' },
+    { route: /^#\/?$/, target: '.dropzone', block: true, title: 'Neue Choreo', text: tt('Lege hier ein Video aus dem Kurs ab oder klicke zum Auswählen.', 'Tippe hier, um ein Video aus dem Kurs auszuwählen.') + ' Daraus wird eine Choreo zum Üben.' },
+    { route: /^#\/?$/, target: '.stats', block: true, title: 'Deine Statistiken', text: `Kennzahlen zu deinem Üben. ${tt('Ein Klick', 'Ein Tipp')} auf eine Kachel führt später zur passenden Auswertung im Profil.` },
+    { route: /^#\/?$/, target: '.stripes', block: true, when: () => !!document.querySelector('.stripes .stripe'), title: 'Deine Classes', text: tt('Jede Class mit eigener Farbe. Klick öffnet die Class mit allen Choreos, Ziehen sortiert die Reihenfolge.', 'Jede Class mit eigener Farbe. Tippen öffnet die Class mit allen Choreos, Halten und Ziehen sortiert die Reihenfolge.') },
     { target: '[data-nav="profile"]', title: 'Profil', text: 'Hier findest du deine Auswertungen: Übungszeit, Status und alle Choreos.' },
-    { route: /^#\/profile/, target: '.p-nav', title: 'Reiter', text: 'Wechsle zwischen Übersicht, Übungszeit, Status und Choreos. Klicke auf einen Reiter.' },
+    { route: /^#\/profile/, target: '.p-nav', title: 'Reiter', text: `Wechsle zwischen Übersicht, Übungszeit, Status und Choreos. ${tt('Klicke', 'Tippe')} auf einen Reiter.` },
     { target: '[data-nav="settings"]', title: 'Einstellungen', text: 'Musikprovider, Hörprobe, Statistiken der Base, Classes verwalten und dein Konto.' },
     { route: /^#\/settings/, target: '.theme-toggle', block: true, title: 'Ansicht', text: 'Hier wechselst du jederzeit zwischen Hell, Dunkel und System.' },
     { target: '[data-nav="hub"]', title: 'Zurück zur Base', text: 'Von der Base aus startest du jede neue Choreo.' },
@@ -145,17 +149,18 @@ export function mainTour() {
 
 export function trainTour() {
   return runTour([
-    { target: '.stage', block: true, title: 'Video', text: 'Klick spielt oder pausiert, Doppelklick öffnet das Vollbild.' },
-    { target: '.timeline .tl-row:first-child .track', block: true, title: 'Zeitleiste', text: 'Klicken oder ziehen, um an eine Stelle zu springen. Marker und Loop siehst du hier ebenfalls.' },
-    { target: '.track.eights', block: true, title: '8er-Count', text: 'Jedes Feld ist eine Acht. Klick loopt diese Acht, Ziehen markiert mehrere hintereinander.' },
-    { target: '.controls .ctl[title^="Loop an/aus"]', block: true, title: 'Loop', text: 'Wiederholt einen Abschnitt: In/Out, sonst zwischen Start- und Ende-Marker (Taste L).' },
-    { target: '.controls .ctl[title^="Spiegeln"]', block: true, title: 'Spiegeln', text: 'Spiegelt das Video, damit du wie vor dem Spiegel mittanzt (Taste M).' },
-    { target: '.controls .ctl[title^="Tempo"]', block: true, title: 'Tempo', text: 'Langsamer üben, ohne dass sich die Tonhöhe ändert (Pfeiltasten ↑ ↓).' },
+    { target: '.stage', block: true, title: 'Video', text: tt('Klick spielt oder pausiert, Doppelklick öffnet das Vollbild.', 'Tippen spielt oder pausiert, doppelt Tippen öffnet das Vollbild.') },
+    { target: '.timeline .tl-row:first-child .track', block: true, title: 'Zeitleiste', text: `${tt('Klicken', 'Tippen')} oder ziehen, um an eine Stelle zu springen. Marker und Loop siehst du hier ebenfalls.` },
+    { target: '.track.eights', block: true, title: '8er-Count', text: `Jedes Feld ist eine Acht. ${tt('Klick', 'Tippen')} loopt diese Acht, Ziehen markiert mehrere hintereinander.` },
+    { target: '.controls .ctl[title^="Loop an/aus"]', block: true, title: 'Loop', text: `Wiederholt einen Abschnitt: In/Out, sonst zwischen Start- und Ende-Marker${tt(' (Taste L)', '')}.` },
+    { target: '.controls .ctl[title^="Spiegeln"]', block: true, title: 'Spiegeln', text: `Spiegelt das Video, damit du wie vor dem Spiegel mittanzt${tt(' (Taste M)', '')}.` },
+    { target: '.controls .ctl[title^="Tempo"]', block: true, title: 'Tempo', text: `Langsamer üben, ohne dass sich die Tonhöhe ändert${tt(' (Pfeiltasten ↑ ↓)', '')}.` },
     { target: '.controls .ctl[title="Marker setzen"]', block: true, title: 'Marker', text: 'Setze Start, Ende, Gedanken und Highlights an der aktuellen Stelle.' },
-    { target: '.panel-btn', block: true, title: 'Seitenpanel', text: 'Ein- und ausblenden. Darin: Song, Marker, Notizen, Status, Aufnahmen und Tasten.' },
+    { target: '.panel-btn', block: true, title: 'Seitenpanel', text: `Ein- und ausblenden. Darin: Song, Marker, Notizen, Status${tt(', Aufnahmen und Tasten', ' und Aufnahmen')}.` },
     { target: '.panel-sec[data-k="status"]', block: true, before: panelOpen, title: 'Status', text: 'Bewerte von 1 bis 5, wie gut du die Choreo schon kannst. Daraus entsteht dein Verlauf im Profil.' },
   ], {
-    finish: { title: 'VIEL SPASS BEIM ÜBEN!', text: 'Alle Tastenkürzel findest du jederzeit im Seitenpanel unter „Tasten“.' },
+    scope: /^#\/train\//,
+    finish: { title: 'VIEL SPASS BEIM ÜBEN!', text: tt('Alle Tastenkürzel findest du jederzeit im Seitenpanel unter „Tasten“.', 'Song, Marker, Notizen und Status findest du im Seitenpanel unter dem Video.') },
     onEnd: () => saveSettings({ tourTrainDone: true }),
   });
 }

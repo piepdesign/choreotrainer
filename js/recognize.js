@@ -1,6 +1,7 @@
 // Songerkennung aus der Tonspur: Fingerabdruck per vibra (WebAssembly, im Browser),
 // Abfrage über den lokalen Durchreicher /api/shazam (server.py). Inoffiziell, kann jederzeit brechen.
 import { searchSongs, songDetails } from './deezer.js';
+import { decodeAudio } from './audio.js';
 
 const SR = 16000;
 const SNIPPET = 10; // Sekunden je Versuch
@@ -69,7 +70,7 @@ export async function scanTrack(blob, onProgress = () => {}) {
   onProgress('Lade Erkennung …');
   await loadVibra();
   onProgress('Lese Tonspur …');
-  const audio = await new OfflineAudioContext(1, 1, SR).decodeAudioData(await blob.arrayBuffer());
+  const audio = await decodeAudio(blob, SR, onProgress); // auf Handys ggf. per Mithören
   const pcm = audio.getChannelData(0);
   const dur = audio.duration;
   const step = Math.min(12, Math.max(5, dur / 20));
