@@ -23,8 +23,11 @@ Dann `http://localhost:8417` öffnen.
 ## Dienste
 
 - Songsuche und BPM: [Deezer API](https://developers.deezer.com/api), ohne Schlüssel
+- Videos verkleinern: im Browser per WebCodecs ([Mediabunny](https://github.com/Vanilagy/mediabunny)), höchstens 1080p, Ton unverändert, nichts verlässt das Gerät
 - Songerkennung: Shazam-kompatibler Fingerabdruck per [vibra](https://github.com/BayernMuller/vibra) (WebAssembly, im Browser). Die Abfrage läuft lokal über `server.py`, online über den öffentlichen Durchreicher des vibra-Projekts. Inoffizielle Schnittstelle, sie kann jederzeit ausfallen. Übertragen wird nur der Fingerabdruck, kein Audio.
 
 ## Lizenz
 
 GPL-3.0, wegen des enthaltenen vibra-Moduls (`vendor/vibra/`, ebenfalls GPL-3.0).
+
+Enthalten außerdem [Mediabunny](https://github.com/Vanilagy/mediabunny) (`vendor/mediabunny/`, MPL-2.0, unverändert) zum Verkleinern der Videos beim Hochladen.

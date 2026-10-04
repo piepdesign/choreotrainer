@@ -664,6 +664,7 @@ a.stat-link:hover { background: var(--surface-2); }
 
 /* Cover spielt gerade die Hörprobe */
 /* Hörprobe: Rahmen innen auf dem Cover als Negativ des Bildes (Differenz), sichtbar auf hellen und dunklen Covern */
+.pack-info { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin-top: 6px; } /* Upload: Verkleinern */
 .cover-wrap { position: relative; display: block; flex: none; width: fit-content; height: fit-content; align-self: start; justify-self: start; line-height: 0; }
 .cover-wrap::after { content: ''; position: absolute; inset: 0; border: 3px solid #fff; mix-blend-mode: difference; opacity: 0; pointer-events: none; transition: opacity .15s; }
 .cover-wrap.previewing::after { opacity: 1; animation: preview-pulse 1.2s ease-in-out infinite; }

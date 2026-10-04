@@ -7,6 +7,7 @@ import { alignToSong, checkAudio } from './align.js';
 import { classPickers } from './ui.js';
 import { dropzone } from './hub.js';
 import { state, go, toast } from './app.js';
+import { compressVideo } from './compress.js';
 
 
 const norm = s => String(s || '').trim().toLowerCase();
@@ -15,6 +16,32 @@ export async function renderUpload(root, kind, refId) {
   let file = state.pendingFile;
   state.pendingFile = null;
   let previewUrl = null;
+  // Komprimieren läuft ab der Videoauswahl im Hintergrund, Speichern wartet darauf (oder nimmt das Original)
+  let job = null, packed = null, packing = false, keepOriginal = false;
+  const packInfo = h('span.label.pack-info');
+  const mbOf = b => `${Math.max(1, Math.round(b / 1e6))} MB`;
+  function startPack() {
+    job?.cancel();
+    packed = null; keepOriginal = false;
+    if (!file) { job = null; return; }
+    packing = true;
+    const mine = compressVideo(file, p => {
+      if (job !== mine) return;
+      packInfo.replaceChildren(`Verkleinere … ${Math.round(p * 100)} %`, ' ', h('button.linkbtn', { type: 'button', onclick: useOriginal }, 'Original behalten'));
+      if (saving) saveBtn.textContent = `Verkleinere … ${Math.round(p * 100)} %`;
+    });
+    job = mine;
+    packInfo.replaceChildren('Prüfe Video …');
+    mine.promise.then(f => {
+      if (job !== mine) return;
+      packing = false;
+      packed = keepOriginal ? null : f;
+      packInfo.replaceChildren(packed ? `Verkleinert: ${mbOf(file.size)} → ${mbOf(packed.size)}` : keepOriginal ? 'Original wird gespeichert' : 'Original wird gespeichert (schon klein genug oder Browser kann es nicht)');
+      if (saving) save();
+    });
+  }
+  function useOriginal() { keepOriginal = true; job?.cancel(); }
+  let saving = false;
 
   const classes = (await db.all('classes')).sort(byClassOrder);
   let preChoreo = null, preClass = null;
@@ -102,6 +129,7 @@ export async function renderUpload(root, kind, refId) {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = null;
     if (!file) {
+      job?.cancel(); job = null; packed = null; packing = false;
       left.replaceChildren(dropzone(f => { file = f; renderLeft(); }));
     } else {
       previewUrl = URL.createObjectURL(file);
@@ -109,7 +137,9 @@ export async function renderUpload(root, kind, refId) {
         h('video', { src: previewUrl, controls: true, playsinline: true, preload: 'metadata' }),
         h('div.actions', { style: { marginTop: '8px', justifyContent: 'space-between' } },
           h('span.label', `${file.name} · ${(file.size / 1e6).toFixed(0)} MB`),
-          h('button.linkbtn', { onclick: () => { file = null; renderLeft(); } }, 'Anderes Video')));
+          h('button.linkbtn', { onclick: () => { file = null; renderLeft(); } }, 'Anderes Video')),
+        packInfo);
+      startPack();
       if (!dateIn.dataset.touched && file.lastModified) dateIn.value = isoDate(file.lastModified);
       // Song automatisch erkennen, solange noch keiner gewählt ist
       if (!picker.get() && !picker.typed()) picker.recognize(true);
@@ -145,6 +175,9 @@ export async function renderUpload(root, kind, refId) {
     if (!cls.category) { toast('Bitte mindestens den Style der Class angeben'); f.category.focus(); return; }
 
     saveBtn.disabled = true;
+    // noch am Verkleinern: warten (Fortschritt im Knopf), danach geht es von selbst weiter
+    if (packing && !keepOriginal) { saving = true; saveBtn.textContent = 'Verkleinere …'; return; }
+    saving = false;
     saveBtn.textContent = 'Speichere …';
     try {
       // Class finden oder anlegen
@@ -184,7 +217,8 @@ export async function renderUpload(root, kind, refId) {
         markers: [],
         player: {},
       };
-      await db.put('videos', file, rec.id);
+      if (packed) rec.storedSize = packed.size; // fileName/size bleiben die des Originals (zum Wiederfinden beim Zuordnen)
+      await db.put('videos', packed || file, rec.id);
       if (songFile) await db.put('videos', songFile, `song:${choreo.id}`);
       await db.put('recordings', rec);
       requestPersist(); // spätestens jetzt liegen Daten vor: Browser bitten, sie nicht selbst zu räumen
@@ -198,7 +232,7 @@ export async function renderUpload(root, kind, refId) {
     }
   }
 
-  return () => { if (previewUrl) URL.revokeObjectURL(previewUrl); };
+  return () => { job?.cancel(); if (previewUrl) URL.revokeObjectURL(previewUrl); };
 }
 
 // Dauer + Vorschaubild (Frame bei ~1 s)
