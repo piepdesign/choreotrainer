@@ -318,8 +318,8 @@ export async function renderTrain(root, recId) {
     },
   });
   // „1“ und „Tap“ direkt in der Leiste (ohne Tastatur sonst nur im Menü erreichbar, das dann das Video verdeckt)
-  const bOne = ctl('1', { class: 'ctl touch-only', title: 'Anfangscount: hier ist die 1', onclick: () => setOne() });
-  const bTap = ctl('Tap', { class: 'ctl touch-only', title: 'Im Takt tippen (ab einer „1“ mindestens viermal)', onclick: () => tap() });
+  const bOne = ctl('1', { title: 'Anfangscount: hier ist die 1 (Taste 1)', onclick: () => setOne() });
+  const bTap = ctl('Tap', { title: 'Im Takt tippen, ab einer „1“ mindestens viermal (Taste T)', onclick: () => tap() });
   const bBpm = fixed(ctl('', { title: 'Takt einstellen', onclick: e => popover(e.currentTarget, countPop) }), 9);
   const toggleFull = () => {
     if (document.fullscreenElement) { document.exitFullscreen(); return; }
@@ -402,20 +402,19 @@ export async function renderTrain(root, recId) {
   };
   const bAudio = fixed(ctl('', { title: 'Ton: Video oder Song (A)', onclick: toggleAudio }), 10);
   const timeView = h('span.timeview', '');
-  // Am Handy in logischen Zeilen (je Zeile gleich breite Knöpfe): Wiedergabe · Loop · Count · Bild/Marker · Ansicht.
-  // Knöpfe, die erst bei Bedarf erscheinen (×, Ton), quetschen ihre Zeile nur, statt umzubrechen.
-  const br = () => h('span.ctl-break');
-  const controls = isTouch()
-    ? h('div.controls.rows', { style: { position: 'relative' } },
-      bPlay, bRate, bVol, bAudio, br(),
-      bIn, bOut, bLoop, bClear, br(),
-      bCount, bBpm, bOne, bTap, br(),
-      bMirror, bImg, bMark, br(),
-      bFitW, bFitA, bFull, br(),
-      timeView)
-    : h('div.controls', { style: { position: 'relative' } },
-      bPlay, h('span.ctl-sep'), bMirror, bRate, bVol, bImg, h('span.ctl-sep'), bIn, bOut, bLoop, bClear,
-      h('span.ctl-sep'), bCount, bBpm, bOne, bTap, h('span.ctl-sep'), bAudio, bMark, h('span.ctl-sep'), bFitW, bFitA, bFull, timeView);
+  // Bedienleiste in festen Gruppen, überall gleich: Wiedergabe · Loop · Count · Bild · Ansicht.
+  // Breit: eine Zeile, Gruppen durch Linien getrennt. Schmaler: Gruppen untereinander bzw. nebeneinander,
+  // Linien zwischen allen Zeilen und Spalten (CSS-Container-Abfrage). Knöpfe einer Gruppe sind gleich breit;
+  // erscheinen × oder Ton, wird ihre Gruppe nur enger.
+  const group = (...items) => h('div.ctl-group', ...items);
+  const controls = h('div.controls', { style: { position: 'relative' } },
+    group(bPlay, bRate, bVol, bAudio),
+    group(bIn, bOut, bLoop, bClear),
+    group(bCount, bBpm, bOne, bTap),
+    group(bMirror, bImg, bMark),
+    group(bFitW, bFitA, bFull));
+  // Zeitangabe als kleine eigene Zeile direkt unter den Zeitleisten
+  timeline.append(h('div.tl-time', timeView));
 
   function update() {
     applyVideo();
@@ -431,7 +430,7 @@ export async function renderTrain(root, recId) {
     bCount.classList.toggle('on', P.countOn);
     bBpm.textContent = P.bpm ? `${Math.round(P.bpm * 10) / 10} BPM` : 'BPM ?';
     bAudio.hidden = !songBlob;
-    bAudio.textContent = songMode() ? 'Ton: Song' : 'Ton: Video';
+    bAudio.textContent = songMode() ? '♪ Song' : '♪ Video'; // kurz, damit es in der Gruppe nicht abgeschnitten wird
     bAudio.classList.toggle('on', songMode());
     renderStatic();
     persist();
@@ -450,6 +449,12 @@ export async function renderTrain(root, recId) {
     controls.append(pop);
     pop.style.bottom = `${controls.clientHeight - btn.offsetTop + 6}px`;
     pop.style.left = `${Math.max(0, Math.min(btn.offsetLeft, controls.clientWidth - pop.offsetWidth))}px`;
+    // passt das Menü nach oben nicht auf den Bildschirm (Handy), unter dem Knopf öffnen
+    if (pop.getBoundingClientRect().top < 70) {
+      pop.style.bottom = '';
+      pop.style.top = `${btn.offsetTop + btn.offsetHeight + 6}px`;
+      pop.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
   }
   const onDocClick = e => { if (pop && !pop.contains(e.target) && !controls.contains(e.target)) closePop(); };
   document.addEventListener('pointerdown', onDocClick);
