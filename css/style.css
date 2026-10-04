@@ -707,8 +707,13 @@ body.intro-open .tester-fab { display: none; }
 .tour-text { margin: 0; font-size: 13px; line-height: 1.5; }
 /* Stichwort links (Mono-Label), Erklärung rechts */
 .tour-list { display: grid; grid-template-columns: max-content 1fr; gap: 5px 12px; margin: 2px 0 0; }
-.tour-list dt { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding-top: 2px; }
+.tour-list dt { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .tour-list dd { margin: 0; }
+.tour-list { align-items: center; }
+.tour-ico, .tour-chip { display: inline-grid; place-items: center; min-width: 32px; height: 26px; border: 1px solid var(--rule); color: var(--fg); background: var(--surface); }
+.tour-chip { padding: 0 7px; font-size: 10.5px; letter-spacing: .06em; }
+.tour-ico svg { display: block; }
+.tour-list .tour-note { grid-column: 1 / -1; color: var(--muted); }
 .tour-hint { margin: 4px 0 0; }
 body.touring .tester-fab { display: none; }
 .tour-done { z-index: 95; }
