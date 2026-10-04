@@ -52,19 +52,39 @@ export function runTour(steps, { finish, onEnd, scope = null } = {}) {
   document.body.classList.add('touring');
 
   let target = null, step = null, raf = 0, resolveStep = null;
-  const list = steps;
+  // Schritte ohne passende Stelle (z. B. Tasten am Handy) gleich weglassen, damit die Zählung „x / n“ stimmt
+  const list = steps.filter(st => !st.when || st.when());
 
-  // Markierung und Textkarte folgen der Stelle (Scrollen, Größe, Umbau der Seite)
+  // Markierung und Textkarte folgen der Stelle (Scrollen, Größe, Umbau der Seite). Die Karte darf die Stelle nie
+  // verdecken: unter, über, links oder rechts davon, je nachdem, wo Platz ist.
+  const PAD = 6, GAP = 14, M = 12;
+  function cardPos(r, cw, ch) {
+    const cx = Math.min(innerWidth - cw - M, Math.max(M, r.left + r.width / 2 - cw / 2));
+    const cy = Math.min(innerHeight - ch - M, Math.max(M, r.top));
+    if (r.bottom + PAD + GAP + ch <= innerHeight - M) return [cx, r.bottom + PAD + GAP];
+    if (r.top - PAD - GAP - ch >= M - 1) return [cx, r.top - PAD - GAP - ch];
+    if (r.left - PAD - GAP - cw >= M) return [r.left - PAD - GAP - cw, cy];
+    if (r.right + PAD + GAP + cw <= innerWidth - M) return [r.right + PAD + GAP, cy];
+    return [cx, M];
+  }
   function place() {
     raf = requestAnimationFrame(place);
     if (!target?.isConnected) return;
-    const r = target.getBoundingClientRect(), pad = 6;
-    Object.assign(spot.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
-    const cw = card.offsetWidth, ch = card.offsetHeight, gap = 14;
-    const below = r.bottom + pad + gap + ch < innerHeight;
-    const top = below ? r.bottom + pad + gap : Math.max(12, r.top - pad - gap - ch);
-    const left = Math.min(innerWidth - cw - 12, Math.max(12, r.left + r.width / 2 - cw / 2));
-    Object.assign(card.style, { left: `${left}px`, top: `${Math.min(top, innerHeight - ch - 12)}px` });
+    const r = target.getBoundingClientRect();
+    Object.assign(spot.style, { left: `${r.left - PAD}px`, top: `${r.top - PAD}px`, width: `${r.width + PAD * 2}px`, height: `${r.height + PAD * 2}px` });
+    const [left, top] = cardPos(r, card.offsetWidth, card.offsetHeight);
+    Object.assign(card.style, { left: `${left}px`, top: `${top}px` });
+  }
+  // Hohe Stelle ohne Platz daneben (z. B. Song-Abschnitt am Handy): so scrollen, dass sie direkt unter der Karte beginnt
+  function reveal() {
+    const r = target.getBoundingClientRect(), cw = card.offsetWidth, ch = card.offsetHeight;
+    const side = r.left - PAD - GAP - cw >= M || r.right + PAD + GAP + cw <= innerWidth - M;
+    const fits = r.height + PAD * 2 + GAP + ch + M * 2 <= innerHeight;
+    if (side || (fits && r.height < innerHeight * 0.4)) { target.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); return; }
+    target.style.scrollMarginTop = `${M + ch + GAP + PAD}px`;
+    target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    const t = target;
+    setTimeout(() => { t.style.scrollMarginTop = ''; }, 1000);
   }
 
   // Klicks außerhalb der markierten Stelle und der Karte sperren; Klick auf die Stelle führt weiter
@@ -110,11 +130,11 @@ export function runTour(steps, { finish, onEnd, scope = null } = {}) {
       await step.before?.();
       target = await find(step);
       if (!target || stopped) continue; // Stelle nicht da (z. B. keine Classes): Schritt auslassen
-      target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       num.textContent = `${i + 1} / ${list.length}`;
       title.textContent = step.title;
       fill(text, typeof step.text === 'function' ? step.text() : step.text);
       card.classList.remove('in'); void card.offsetWidth; card.classList.add('in');
+      reveal(); // nach dem Befüllen, damit die Kartengröße stimmt
       await new Promise(r => { resolveStep = r; });
     }
     if (stopped) return;
@@ -148,12 +168,16 @@ const panelOpen = () => {
 const key = k => tt(h('span.tour-kbd', ` (${k})`), '');
 const IO = 'In / Out';
 
+// Hinweis im ersten Schritt beider Teile
+const REPEAT = [null, 'Das Tutorial kannst du jederzeit unter Einstellungen › Konto wiederholen.'];
+
 // Grundsatz der Texte: beschreiben, was ein Element tut, nicht die Umstände drumherum
 export function mainTour() {
   const tap = tt('Klick', 'Tippen');
   return runTour([
     { route: /^#\/?$/, target: '.dropzone', block: true, title: 'Neue Choreo', text: [
-      [tt('Ablegen / Klick', 'Tippen'), 'Legt aus einem Kursvideo eine neue Choreo an']] },
+      [tt('Ablegen / Klick', 'Tippen'), 'Legt aus einem Kursvideo eine neue Choreo an'],
+      REPEAT] },
     { route: /^#\/?$/, target: '.stats', block: true, title: 'Statistiken', text: [
       ['Kacheln', 'Zeigen Kennzahlen zu deinem Üben'],
       [tap, 'Öffnet die passende Auswertung im Profil']] },
@@ -171,8 +195,7 @@ export function mainTour() {
     { target: '[data-nav="hub"]', title: 'Base', text: [[tap, 'Führt zurück zur Startseite']] },
   ], {
     finish: { title: 'GESCHAFFT!', text: [
-      ['Teil 2', 'Zeigt die Trainingsansicht, sobald du deine erste Choreo öffnest'],
-      ['Wiederholen', 'Einstellungen › Konto']] },
+      ['Teil 2', 'Zeigt die Trainingsansicht, sobald du deine erste Choreo öffnest']] },
     onEnd: () => saveSettings({ tourDone: true }),
   });
 }
@@ -183,7 +206,8 @@ export function trainTour() {
   return runTour([
     { target: '.stage', block: true, title: 'Video', text: [
       [tap, 'Play / Pause'],
-      [tt('Doppelklick', 'Doppelt tippen'), 'Vollbild']] },
+      [tt('Doppelklick', 'Doppelt tippen'), 'Vollbild'],
+      REPEAT] },
     { target: '.timeline .tl-row:first-child .track', block: true, title: 'Zeitleiste', text: [
       [`${tap} / Ziehen`, 'Springt an die Stelle'],
       ['Striche', 'Zeigen Marker und Loop']] },
