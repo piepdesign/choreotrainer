@@ -152,10 +152,12 @@ export function trainTour() {
     { target: '.stage', block: true, title: 'Video', text: tt('Klick spielt oder pausiert, Doppelklick öffnet das Vollbild.', 'Tippen spielt oder pausiert, doppelt Tippen öffnet das Vollbild.') },
     { target: '.timeline .tl-row:first-child .track', block: true, title: 'Zeitleiste', text: `${tt('Klicken', 'Tippen')} oder ziehen, um an eine Stelle zu springen. Marker und Loop siehst du hier ebenfalls.` },
     { target: '.track.eights', block: true, title: '8er-Count', text: `Jedes Feld ist eine Acht. ${tt('Klick', 'Tippen')} loopt diese Acht, Ziehen markiert mehrere hintereinander.` },
-    { target: '.controls .ctl[title^="Loop an/aus"]', block: true, title: 'Loop', text: `Wiederholt einen Abschnitt: In/Out, sonst zwischen Start- und Ende-Marker${tt(' (Taste L)', '')}.` },
-    { target: '.controls .ctl[title^="Spiegeln"]', block: true, title: 'Spiegeln', text: `Spiegelt das Video, damit du wie vor dem Spiegel mittanzt${tt(' (Taste M)', '')}.` },
-    { target: '.controls .ctl[title^="Tempo"]', block: true, title: 'Tempo', text: `Langsamer üben, ohne dass sich die Tonhöhe ändert${tt(' (Pfeiltasten ↑ ↓)', '')}.` },
-    { target: '.controls .ctl[title="Marker setzen"]', block: true, title: 'Marker', text: 'Setze Start, Ende, Gedanken und Highlights an der aktuellen Stelle.' },
+    // Bedienleiste: je Gruppe ein Schritt, von links nach rechts
+    { target: '.controls > .ctl-group:nth-child(1)', block: true, title: 'Wiedergabe', text: `Play/Pause${tt(' (Leertaste)', '')}. Stoppuhr: Tempo, langsamer üben, ohne dass sich die Tonhöhe ändert${tt(' (↑ ↓)', '')}. Lautsprecher: Lautstärke. Note: Ton vom Video oder von der Songdatei${tt(' (A)', '')}, erscheint, sobald unter Song eine Datei geladen ist.` },
+    { target: '.controls > .ctl-group:nth-child(2)', block: true, title: 'Loop', text: `In und Out setzen Anfang und Ende an der aktuellen Stelle${tt(' (I / O)', '')}, Loop wiederholt den Abschnitt${tt(' (L)', '')}, × löscht In/Out. Ohne In/Out loopt er zwischen Start- und Ende-Marker.` },
+    { target: '.controls > .ctl-group:nth-child(3)', block: true, title: 'Count', text: `8er blendet den Zähler im Video ein. BPM öffnet das Takt-Menü (Tempo, Verschieben, Klick, Anzeige). Zählt er falsch: bei der „1“ einer Acht pausieren und „1“ ${tt('drücken', 'antippen')}, oder ab einer „1“ mindestens viermal im Takt „Tap“${tt(' (T)', '')}.` },
+    { target: '.controls > .ctl-group:nth-child(4)', block: true, title: 'Bild', text: `Spiegeln, damit du wie vor dem Spiegel mittanzt${tt(' (M)', '')}. Regler: Helligkeit und Kontrast. Fähnchen: Marker setzen (Start, Ende, Gedanke, Highlight). Start und Ende gibt es je einmal, sie begrenzen den Loop, solange kein In/Out gesetzt ist.` },
+    { target: '.controls > .ctl-group:nth-child(5)', block: true, title: 'Ansicht', text: `Video in voller Breite (oben und unten beschnitten), komplett zeigen oder Vollbild${tt(' (F)', '')}.` },
     { target: '.panel-btn', block: true, title: 'Seitenpanel', text: `Ein- und ausblenden. Darin: Song, Marker, Notizen, Status${tt(', Aufnahmen und Tasten', ' und Aufnahmen')}.` },
     { target: '.panel-sec[data-k="status"]', block: true, before: panelOpen, title: 'Status', text: 'Bewerte von 1 bis 5, wie gut du die Choreo schon kannst. Daraus entsteht dein Verlauf im Profil.' },
   ], {

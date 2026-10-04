@@ -335,7 +335,6 @@ main:has(.train) { padding-bottom: 0; }
 .ctl.icon-ctl svg { display: block; }
 .panel-btn.on { background: none; color: var(--fg); }
 .panel-btn.on:hover { background-color: var(--hover-fill); }
-.ctl.play { font-size: 13px; min-width: 42px; }
 .ctl-sep { width: 1px; height: 18px; background: var(--line); margin: 0 6px; }
 .timeview { font-variant-numeric: tabular-nums; }
 
@@ -747,7 +746,7 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 /* Menüs (Tempo, BPM, Lautstärke …): feste Breite, Knöpfe einer Zeile gleich breit */
 .pop { width: 300px; max-width: calc(100vw - 32px); }
 .pop .btns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; }
-.pop .btns.btns-2 { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); } /* Marker: 2 × 2 */
+.pop .btns.btns-col { grid-auto-flow: row; grid-template-columns: 1fr; } /* Marker: untereinander */
 .pop .btns .btn { justify-content: center; text-align: center; white-space: nowrap; padding-left: 4px; padding-right: 4px; }
 
 @media (max-width: 600px) {

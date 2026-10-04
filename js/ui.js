@@ -104,6 +104,9 @@ const ICONS = {
   image: '<path d="M2.5 5.5h2.5M9 5.5h8.5M2.5 12.5h8.5M15 12.5h2.5"/><circle cx="7" cy="5.5" r="2"/><circle cx="13" cy="12.5" r="2"/>',
   // Marker setzen: Fähnchen mit Plus
   marker: '<path d="M4 16.5V2"/><path d="M4 2.5h9l-2.2 3 2.2 3H4"/><path d="M15.5 11.5v5M13 14h5"/>',
+  // Wiedergabe: Dreieck bzw. zwei Balken, gleiche Strichstärke wie die übrigen Icons
+  play: '<path d="M6.5 3.5v11l8.5-5.5z" stroke-linejoin="round"/>',
+  pause: '<rect x="5.5" y="3.5" width="3" height="11" rx=".8"/><rect x="11.5" y="3.5" width="3" height="11" rx=".8"/>',
   // Tempo: Stoppuhr
   tempo: '<circle cx="10" cy="10.5" r="6"/><path d="M8.5 1.8h3M10 1.8v2.7M10 10.5V7.5M15.2 5.3l1.1-1.1"/>',
   // Lautstärke: Lautsprecher mit 0–2 Wellen bzw. Kreuz (stumm)

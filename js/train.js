@@ -299,7 +299,7 @@ export async function renderTrain(root, recId) {
   const ctl = (label, attrs = {}) => h('button.ctl', { type: 'button', ...attrs }, label);
   // Feste Breite für Schalter mit wechselndem Text (Mono-Schrift: Zeichen × Laufweite), damit nichts springt
   const fixed = (el, chars) => { el.classList.add('fixed'); el.style.width = `calc(${chars}ch + ${chars * 0.08}em + 20px)`; return el; };
-  const bPlay = ctl('▶', { class: 'ctl play fixed', title: 'Play/Pause (Leertaste)', onclick: () => togglePlay() });
+  const bPlay = h('button.ctl.icon-ctl', { type: 'button', title: tt('Play/Pause (Leertaste)', 'Play/Pause'), 'aria-label': 'Play/Pause', html: icon('play'), onclick: () => togglePlay() });
   const bMirror = h('button.ctl.icon-ctl', { type: 'button', title: tt('Spiegeln (M)', 'Spiegeln'), 'aria-label': 'Spiegeln', html: icon('mirror'), onclick: () => { P.mirror = !P.mirror; update(); } });
   const bRate = h('button.ctl.icon-ctl', { type: 'button', title: 'Tempo', 'aria-label': 'Tempo', html: icon('tempo'), onclick: e => popover(e.currentTarget, ratePop) });
   const bVol = h('button.ctl.icon-ctl', { type: 'button', title: 'Lautstärke', 'aria-label': 'Lautstärke', onclick: e => popover(e.currentTarget, volPop) });
@@ -487,8 +487,7 @@ export async function renderTrain(root, recId) {
     h('div.btns', small('Zurücksetzen', () => { P.brightness = P.contrast = 100; update(); closePop(); })),
   ];
   const markPop = () => [
-    h('div.btns.btns-2', Object.entries(MARKER_TYPES).map(([type, m]) => small(tt(`${m.label} (${m.key})`, m.label), () => { addMarker(type); closePop(); }))),
-    h('div.note', 'Setzt den Marker an der aktuellen Position. Start/Ende gibt es je einmal und begrenzen den Loop, solange kein In/Out gesetzt ist.'),
+    h('div.btns.btns-col', Object.entries(MARKER_TYPES).map(([type, m]) => small(tt(`${m.label} (${m.key})`, m.label), () => { addMarker(type); closePop(); }))),
   ];
   const countPop = () => {
     const bpmIn = h('input.bpm-input', { type: 'number', step: '0.1', min: '40', max: '240', value: P.bpm ? Math.round(P.bpm * 10) / 10 : '' });
@@ -521,9 +520,6 @@ export async function renderTrain(root, recId) {
       h('div.btns',
         small(C.plus ? 'Halbe „+“ an' : 'Halbe „+“ aus', () => { C.plus = !C.plus; saveCountView(C); update(); refreshPop(); }, C.plus),
         small(C.show ? 'Zähler sichtbar' : 'Zähler ausgeblendet', () => { C.show = !C.show; saveCountView(C); update(); refreshPop(); }, C.show)),
-      h('div.note', 'Ausgeblendet zählt der Count weiter (z. B. nur mit Klick).'),
-      h('div.note', `Zählt nicht richtig? Bei der „1“ einer Acht pausieren und „Anfangscount“ ${tt('drücken', 'antippen')}. Oder ab einer „1“ mindestens viermal im Takt ${tt('T', 'auf „Tap“')} tippen.`,
-        song?.bpm ? ` Deezer kennt ${Math.round(song.bpm)} BPM für das Original.` : ''),
     ];
   };
 
@@ -681,7 +677,8 @@ export async function renderTrain(root, recId) {
     vFill.style.width = vPh.style.left = `${(t / d) * 100}%`;
     const songPos = song?.duration && rec.songOffset != null ? ` · Song ${fmt(rec.songOffset + t)}` : '';
     setText(timeView, `${fmt(t, true)} / ${fmt(d, true)}${songPos}`);
-    setText(bPlay, video.paused ? '▶' : '❚❚');
+    const playIcon = video.paused ? 'play' : 'pause';
+    if (bPlay.dataset.icon !== playIcon) { bPlay.innerHTML = icon(playIcon); bPlay.dataset.icon = playIcon; }
     // im Bildtakt abgleichen, auf dem Handy nur alle 0,4 s
     if (songMode() && !video.paused && (!isTouch() || performance.now() - lastSync > 400)) { lastSync = performance.now(); syncSong(); }
     if (song?.duration && rec.songOffset != null) {
