@@ -411,7 +411,8 @@ export async function renderTrain(root, recId) {
     group(bPlay, bRate, bVol, bAudio),
     group(bIn, bOut, bLoop, bClear),
     group(bCount, bBpm, bOne, bTap),
-    group(bMirror, bImg, bMark, bFitW, bFitA, bFull));
+    group(bMirror, bImg, bMark),
+    group(bFitW, bFitA, bFull));
   // Zeitangabe als kleine eigene Zeile direkt unter den Zeitleisten
   timeline.append(h('div.tl-time', timeView));
 

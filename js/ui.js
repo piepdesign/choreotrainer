@@ -100,8 +100,8 @@ const ICONS = {
   full: '<path d="M2 7V4.5A1.5 1.5 0 0 1 3.5 3H6M14 3h2.5A1.5 1.5 0 0 1 18 4.5V7M18 11v2.5a1.5 1.5 0 0 1-1.5 1.5H14M6 15H3.5A1.5 1.5 0 0 1 2 13.5V11"/>',
   // Spiegeln: zwei Dreiecke an einer gestrichelten Achse
   mirror: '<path d="M10 1.5v15" stroke-dasharray="1.6 2"/><path d="M7.5 4L2.5 14h5z"/><path d="M12.5 4l5 10h-5z"/>',
-  // Bild (Helligkeit/Kontrast): halb gefüllter Kreis
-  image: '<circle cx="10" cy="9" r="6.5"/><path d="M10 2.5a6.5 6.5 0 0 1 0 13z" fill="currentColor" stroke="none"/>',
+  // Bild (Helligkeit/Kontrast): zwei Regler (nicht der Halbkreis, der steht schon für Hell/Dunkel)
+  image: '<path d="M2.5 5.5h2.5M9 5.5h8.5M2.5 12.5h8.5M15 12.5h2.5"/><circle cx="7" cy="5.5" r="2"/><circle cx="13" cy="12.5" r="2"/>',
   // Marker setzen: Fähnchen mit Plus
   marker: '<path d="M4 16.5V2"/><path d="M4 2.5h9l-2.2 3 2.2 3H4"/><path d="M15.5 11.5v5M13 14h5"/>',
   grip: '<circle cx="7" cy="5" r="1.2"/><circle cx="13" cy="5" r="1.2"/><circle cx="7" cy="9" r="1.2"/><circle cx="13" cy="9" r="1.2"/><circle cx="7" cy="13" r="1.2"/><circle cx="13" cy="13" r="1.2"/>',
