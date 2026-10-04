@@ -321,6 +321,7 @@ export async function renderTrain(root, recId) {
   const bOne = ctl('1', { title: 'Anfangscount: hier ist die 1 (Taste 1)', onclick: () => setOne() });
   const bTap = ctl('Tap', { title: 'Im Takt tippen, ab einer „1“ mindestens viermal (Taste T)', onclick: () => tap() });
   const bBpm = fixed(ctl('', { title: 'Takt einstellen', onclick: e => popover(e.currentTarget, countPop) }), 9);
+  bBpm.classList.add('bpm');
   const toggleFull = () => {
     if (document.fullscreenElement) { document.exitFullscreen(); return; }
     const req = stage.requestFullscreen || stage.webkitRequestFullscreen;
@@ -423,7 +424,7 @@ export async function renderTrain(root, recId) {
     bRate.title = `Tempo ${P.rate.toFixed(2)}×${tt(' (↑ / ↓)', '')}`;
     bRate.classList.toggle('on', P.rate !== 1);
     // abweichendes Tempo zusätzlich als Faktor neben der Stoppuhr
-    const rateVal = P.rate !== 1 ? `${+P.rate.toFixed(2)}×` : '';
+    const rateVal = P.rate !== 1 ? `${P.rate.toFixed(2)}×` : ''; // immer zwei Stellen, z. B. 0.90×
     if (bRate.dataset.val !== rateVal) {
       bRate.innerHTML = icon('tempo') + (rateVal ? `<span class="ctl-val">${rateVal}</span>` : '');
       bRate.dataset.val = rateVal;

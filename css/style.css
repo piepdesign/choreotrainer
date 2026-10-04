@@ -311,8 +311,9 @@ main:has(.train) { padding-bottom: 0; }
 .ctl-group { display: flex; gap: 2px; align-items: center; background: var(--surface); padding: 2px 4px; min-width: 0; }
 .ctl-group > .ctl { flex: 1 1 0; min-width: 0; width: auto !important; text-align: center; justify-content: center; white-space: nowrap; padding-left: 4px; padding-right: 4px; }
 .ctl-group > .ctl.icon-ctl { display: grid; place-items: center; }
-.ctl-group > .ctl.icon-ctl.has-val { grid-auto-flow: column; gap: 3px; flex-grow: 2.4; padding-left: 2px; padding-right: 2px; } /* Tempo ≠ 1×: Icon + Faktor, Knopf breiter */
-.ctl-val { font-size: 10px; letter-spacing: 0; }
+.ctl-group > .ctl.icon-ctl.has-val { grid-auto-flow: column; gap: 3px; flex-grow: 2.8; padding-left: 2px; padding-right: 2px; } /* Tempo ≠ 1×: Icon + Faktor, Knopf breiter */
+.ctl-group > .ctl.bpm { flex-grow: 1.6; } /* „95.5 BPM“ braucht mehr Platz als 8er / 1 / Tap */
+.ctl-val { display: inline-block; width: calc(5ch + .25em); text-align: left; font-variant-numeric: tabular-nums; } /* Schrift wie BPM, feste Breite: kein Springen bei 0.90× / 0.95× */
 .ctl-group > .ctl[hidden] { display: none; }
 /* Zeitangabe: kleine eigene Zeile unter den Zeitleisten */
 .tl-time { display: grid; grid-template-columns: 52px 1fr; gap: 10px; padding-top: 2px; }
