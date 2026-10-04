@@ -5,7 +5,22 @@
 // ohne Tonhöhenkorrektur: Der Ton ist nur gestaucht, die Samples werden danach auf die Zielrate umgerechnet.
 
 const MOBILE_LIMIT = 150e6; // ab dieser Größe auf Handys gleich Weg 2 (Speicher)
-const RATE = 2; // Abspielgeschwindigkeit beim Mitschneiden
+// Abspielgeschwindigkeit beim Mitschneiden. Am Rechner doppelt (ohne Tonhöhenkorrektur, danach umgerechnet).
+// Auf Handys normal: iOS ignoriert „Tonhöhe nicht korrigieren“, bei doppeltem Tempo kam der Ton dort eine Oktave
+// verfälscht an, Shazam und der Abgleich fanden dann nichts.
+const rate = () => (touch() ? 1 : 2);
+// Mitgehörter Ton je Datei, damit Startpunkt (Scan + Abgleich) und Takt nicht mehrfach mithören müssen
+const heard = new WeakMap();
+function resample(raw, fromRate, sampleRate) {
+  const ratio = fromRate / sampleRate;
+  const outLen = Math.floor(raw.length / ratio);
+  const out = new Float32Array(outLen);
+  for (let i = 0; i < outLen; i++) {
+    const x = i * ratio, k = Math.floor(x), f = x - k;
+    out[i] = raw[k] * (1 - f) + (raw[k + 1] ?? raw[k]) * f;
+  }
+  return { duration: outLen / sampleRate, sampleRate, numberOfChannels: 1, length: outLen, getChannelData: () => out };
+}
 
 const touch = () => matchMedia('(hover: none) and (pointer: coarse)').matches;
 
@@ -47,6 +62,8 @@ function makeVideo(url) {
 
 // gibt ein Objekt wie AudioBuffer zurück: { duration, sampleRate, numberOfChannels, getChannelData(c) }
 export async function decodeAudio(blob, sampleRate, onProgress = () => {}) {
+  const known = heard.get(blob);
+  if (known) return resample(known.raw, known.rate, sampleRate);
   if (!window.ctForceCapture && !(touch() && blob.size > MOBILE_LIMIT)) { // ctForceCapture: zum Testen des Ersatzwegs
     try {
       return await new OfflineAudioContext(1, 1, sampleRate).decodeAudioData(await blob.arrayBuffer());
@@ -87,7 +104,8 @@ export async function capture(blob, sampleRate, onProgress = () => {}) {
     src.connect(proc);
     proc.connect(ctx.destination);
     v.preservesPitch = false; v.webkitPreservesPitch = false; v.mozPreservesPitch = false;
-    v.playbackRate = RATE;
+    const speed = rate();
+    v.playbackRate = speed;
     v.muted = false;
     v.volume = 1;
     const tick = setInterval(() => onProgress(`Höre Tonspur ab … ${Math.round((v.currentTime / dur) * 100)} %`), 500);
@@ -96,7 +114,7 @@ export async function capture(blob, sampleRate, onProgress = () => {}) {
       await new Promise((resolve, reject) => {
         v.onended = resolve;
         v.onerror = () => reject(new Error('Wiedergabe abgebrochen'));
-        setTimeout(() => reject(new Error('Mithören dauert zu lange')), (dur / RATE + 30) * 1000);
+        setTimeout(() => reject(new Error('Mithören dauert zu lange')), (dur / speed + 30) * 1000);
         // hängt die Wiedergabe (z. B. vom Handy angehalten), nicht ewig warten
         let last = -1, still = 0;
         const watch = setInterval(() => {
@@ -113,15 +131,13 @@ export async function capture(blob, sampleRate, onProgress = () => {}) {
     const raw = new Float32Array(n);
     let o = 0;
     for (const c of chunks) { raw.set(c, o); o += c.length; }
-    const effRate = ctx.sampleRate / RATE;
-    const ratio = effRate / sampleRate;
-    const outLen = Math.floor(raw.length / ratio);
-    const out = new Float32Array(outLen);
-    for (let i = 0; i < outLen; i++) {
-      const x = i * ratio, k = Math.floor(x), f = x - k;
-      out[i] = raw[k] * (1 - f) + (raw[k + 1] ?? raw[k]) * f;
-    }
-    return { duration: outLen / sampleRate, sampleRate, numberOfChannels: 1, length: outLen, getChannelData: () => out };
+    // Kam überhaupt Ton an? (Manche Handy-Browser leiten den Ton eines Videos nicht in Web Audio weiter)
+    let e = 0;
+    for (let i = 0; i < raw.length; i += 97) e += raw[i] * raw[i];
+    if (!raw.length || Math.sqrt(e / Math.ceil(raw.length / 97)) < 1e-4) throw new Error('Beim Mithören kam kein Ton an. Bitte Lautlos-Schalter prüfen oder am Rechner erkennen.');
+    const effRate = ctx.sampleRate / speed;
+    heard.set(blob, { raw, rate: effRate });
+    return resample(raw, effRate, sampleRate);
   } finally {
     ctx?.close();
     v.pause();

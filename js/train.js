@@ -389,9 +389,20 @@ export async function renderTrain(root, recId) {
   };
   const bAudio = fixed(ctl('', { title: 'Ton: Video oder Song (A)', onclick: toggleAudio }), 10);
   const timeView = h('span.timeview', '');
-  const controls = h('div.controls', { style: { position: 'relative' } },
-    bPlay, h('span.ctl-sep'), bMirror, bRate, bVol, bImg, h('span.ctl-sep'), bIn, bOut, bLoop, bClear,
-    h('span.ctl-sep'), bCount, bBpm, bOne, bTap, h('span.ctl-sep'), bAudio, bMark, h('span.ctl-sep'), bFitW, bFitA, bFull, timeView);
+  // Am Handy in logischen Zeilen (je Zeile gleich breite Knöpfe): Wiedergabe · Loop · Count · Bild/Marker · Ansicht.
+  // Knöpfe, die erst bei Bedarf erscheinen (×, Ton), quetschen ihre Zeile nur, statt umzubrechen.
+  const br = () => h('span.ctl-break');
+  const controls = isTouch()
+    ? h('div.controls.rows', { style: { position: 'relative' } },
+      bPlay, bRate, bVol, bAudio, br(),
+      bIn, bOut, bLoop, bClear, br(),
+      bCount, bBpm, bOne, bTap, br(),
+      bMirror, bImg, bMark, br(),
+      bFitW, bFitA, bFull, br(),
+      timeView)
+    : h('div.controls', { style: { position: 'relative' } },
+      bPlay, h('span.ctl-sep'), bMirror, bRate, bVol, bImg, h('span.ctl-sep'), bIn, bOut, bLoop, bClear,
+      h('span.ctl-sep'), bCount, bBpm, bOne, bTap, h('span.ctl-sep'), bAudio, bMark, h('span.ctl-sep'), bFitW, bFitA, bFull, timeView);
 
   function update() {
     applyVideo();
@@ -467,9 +478,9 @@ export async function renderTrain(root, recId) {
         small('×2', () => { if (P.bpm) { P.bpm *= 2; P.manualBeat = true; update(); bpmIn.value = Math.round(P.bpm * 10) / 10; } }),
       ),
       h('div.btns',
-        // ±10 ms war nicht wahrnehmbar: ganze Zählzeit verschieben (welcher Schlag die „1“ ist) und fein ±25 ms
-        small('« 1 Schlag', () => shiftAnchor(-1, 'beat')),
-        small('1 Schlag »', () => shiftAnchor(1, 'beat'))),
+        // ±10 ms war nicht wahrnehmbar: ganzen Count verschieben (welcher Count die „1“ ist) und fein ±25 ms
+        small('« 1 Count', () => shiftAnchor(-1, 'beat')),
+        small('1 Count »', () => shiftAnchor(1, 'beat'))),
       h('div.btns',
         small('−25 ms', () => shiftAnchor(-0.025)),
         small('+25 ms', () => shiftAnchor(0.025))),
@@ -515,7 +526,7 @@ export async function renderTrain(root, recId) {
     P.anchor += unit === 'beat' ? n * (60 / P.bpm) : n;
     P.manualBeat = true;
     update();
-    status.textContent = unit === 'beat' ? `„1“ ${n > 0 ? 'EINEN SCHLAG SPÄTER' : 'EINEN SCHLAG FRÜHER'}` : `ZÄHLUNG ${n > 0 ? '+' : '−'}25 MS`;
+    status.textContent = unit === 'beat' ? `„1“ ${n > 0 ? 'EINEN COUNT SPÄTER' : 'EINEN COUNT FRÜHER'}` : `ZÄHLUNG ${n > 0 ? '+' : '−'}25 MS`;
     clearTimeout(shiftAnchor.t);
     shiftAnchor.t = setTimeout(() => { status.textContent = ''; }, 1600);
   }

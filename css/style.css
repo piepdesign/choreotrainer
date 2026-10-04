@@ -744,3 +744,11 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 @media (max-width: 340px) { .wordmark { font-size: 11px; } .topbar nav { gap: 10px; } }
 /* Fallback für ältere iOS-Versionen ohne overflow: clip */
 @supports not (overflow: clip) { html, body { overflow-x: hidden; } }
+
+/* Handy-Leiste in Zeilen: Zeilenumbruch nur an den Trennstellen, Knöpfe einer Zeile teilen sich die Breite */
+.ctl-break { display: none; }
+.controls.rows { flex-wrap: wrap; gap: 4px; padding: 6px; }
+.controls.rows .ctl-break { display: block; flex-basis: 100%; height: 0; }
+.controls.rows > .ctl { flex: 1 1 0; min-width: 0; width: auto !important; text-align: center; justify-content: center; white-space: nowrap; padding-left: 2px; padding-right: 2px; font-size: 10px; min-height: 34px; }
+.controls.rows > .ctl.icon-ctl { display: grid; place-items: center; }
+.controls.rows .timeview { flex: 1 1 100%; text-align: right; padding: 2px 4px; }
