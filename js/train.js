@@ -422,6 +422,13 @@ export async function renderTrain(root, recId) {
     // Werte nur im Tooltip, die Leiste zeigt Icons; „on“ = vom Normalwert abweichend
     bRate.title = `Tempo ${P.rate.toFixed(2)}×${tt(' (↑ / ↓)', '')}`;
     bRate.classList.toggle('on', P.rate !== 1);
+    // abweichendes Tempo zusätzlich als Faktor neben der Stoppuhr
+    const rateVal = P.rate !== 1 ? `${+P.rate.toFixed(2)}×` : '';
+    if (bRate.dataset.val !== rateVal) {
+      bRate.innerHTML = icon('tempo') + (rateVal ? `<span class="ctl-val">${rateVal}</span>` : '');
+      bRate.dataset.val = rateVal;
+      bRate.classList.toggle('has-val', !!rateVal);
+    }
     const vol = P.muted ? 0 : Math.round(P.volume * 100);
     const volIcon = vol === 0 ? 'vol0' : vol < 50 ? 'vol1' : 'vol2';
     if (bVol.dataset.icon !== volIcon) { bVol.innerHTML = icon(volIcon); bVol.dataset.icon = volIcon; }

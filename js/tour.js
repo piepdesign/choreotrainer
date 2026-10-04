@@ -58,13 +58,17 @@ export function runTour(steps, { finish, onEnd, scope = null } = {}) {
   // Markierung und Textkarte folgen der Stelle (Scrollen, Größe, Umbau der Seite). Die Karte darf die Stelle nie
   // verdecken: unter, über, links oder rechts davon, je nachdem, wo Platz ist.
   const PAD = 6, GAP = 14, M = 12;
-  function cardPos(r, cw, ch) {
+  function cardPos(r, cw, ch, side) {
     const cx = Math.min(innerWidth - cw - M, Math.max(M, r.left + r.width / 2 - cw / 2));
     const cy = Math.min(innerHeight - ch - M, Math.max(M, r.top));
+    const left = r.left - PAD - GAP - cw >= M, right = r.right + PAD + GAP + cw <= innerWidth - M;
+    // side: Abschnitte im Seitenpanel, Karte daneben statt darunter (sonst liegt sie auf den nächsten Abschnitten)
+    if (side && left) return [r.left - PAD - GAP - cw, cy];
+    if (side && right) return [r.right + PAD + GAP, cy];
     if (r.bottom + PAD + GAP + ch <= innerHeight - M) return [cx, r.bottom + PAD + GAP];
     if (r.top - PAD - GAP - ch >= M - 1) return [cx, r.top - PAD - GAP - ch];
-    if (r.left - PAD - GAP - cw >= M) return [r.left - PAD - GAP - cw, cy];
-    if (r.right + PAD + GAP + cw <= innerWidth - M) return [r.right + PAD + GAP, cy];
+    if (left) return [r.left - PAD - GAP - cw, cy];
+    if (right) return [r.right + PAD + GAP, cy];
     return [cx, M];
   }
   function place() {
@@ -72,8 +76,8 @@ export function runTour(steps, { finish, onEnd, scope = null } = {}) {
     if (!target?.isConnected) return;
     const r = target.getBoundingClientRect();
     Object.assign(spot.style, { left: `${r.left - PAD}px`, top: `${r.top - PAD}px`, width: `${r.width + PAD * 2}px`, height: `${r.height + PAD * 2}px` });
-    const [left, top] = cardPos(r, card.offsetWidth, card.offsetHeight);
-    Object.assign(card.style, { left: `${left}px`, top: `${top}px` });
+    const [x, y] = cardPos(r, card.offsetWidth, card.offsetHeight, step?.side);
+    Object.assign(card.style, { left: `${x}px`, top: `${y}px` });
   }
   // Hohe Stelle ohne Platz daneben (z. B. Song-Abschnitt am Handy): so scrollen, dass sie direkt unter der Karte beginnt
   function reveal() {
@@ -245,26 +249,26 @@ export function trainTour() {
       [ico('panelOpen'), ['Blendet das Seitenpanel ein und aus', key('P')]],
       [ico('grip'), `${tt('Ziehen', 'Halten + Ziehen')} verschiebt einen Abschnitt`],
       [chip('▾'), 'Klappt einen Abschnitt auf und zu']] },
-    { target: sec('song'), block: true, before: panelOpen, title: 'Song', text: [
+    { target: sec('song'), block: true, side: true, before: panelOpen, title: 'Song', text: [
       ['Erkennen', 'Erkennt den Song aus dem Video'],
       ['Ändern', 'Song von Hand suchen'],
       ['Cover', `Öffnet den Song beim Musikprovider, Hörprobe beim ${tt('Darüberfahren', 'Halten')}`],
       ['Startpunkt', 'Erkennt oder setzt, wo im Song das Video beginnt'],
       ['Songdatei', 'Lädt eine Songdatei als Tonquelle']] },
-    { target: sec('marker'), block: true, before: panelOpen, title: 'Marker', text: [
+    { target: sec('marker'), block: true, side: true, before: panelOpen, title: 'Marker', text: [
       ['Zeit', 'Springt zum Marker'],
       ['Name', 'Umbenennen, auf jetzt setzen, Art wechseln, löschen']] },
-    { target: sec('notes'), block: true, before: panelOpen, title: 'Notizen', text: [
+    { target: sec('notes'), block: true, side: true, before: panelOpen, title: 'Notizen', text: [
       ['Feld', 'Eigene Notizen zur Aufnahme, speichert automatisch']] },
-    { target: sec('status'), block: true, before: panelOpen, title: 'Status', text: [
+    { target: sec('status'), block: true, side: true, before: panelOpen, title: 'Status', text: [
       ['1 bis 5', 'Bewertet, wie gut du die Choreo kannst'],
       ['Darunter', 'Übungszeit und wann zuletzt geübt']] },
-    { target: sec('recs'), block: true, before: panelOpen, title: 'Aufnahmen', text: [
+    { target: sec('recs'), block: true, side: true, before: panelOpen, title: 'Aufnahmen', text: [
       ['Liste', 'Wechselt zu einer anderen Aufnahme der Choreo'],
       ['Name', 'Benennt die aktuelle Aufnahme um'],
       ['+ Aufnahme', 'Fügt ein weiteres Video hinzu'],
       ['Löschen', 'Löscht die aktuelle Aufnahme']] },
-    { target: sec('keys'), block: true, before: panelOpen, when: () => !!document.querySelector(sec('keys')), title: 'Tasten', text: [
+    { target: sec('keys'), block: true, side: true, before: panelOpen, when: () => !!document.querySelector(sec('keys')), title: 'Tasten', text: [
       ['Liste', 'Alle Tastenkürzel']] },
   ], {
     scope: /^#\/train\//,
