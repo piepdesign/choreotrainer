@@ -15,7 +15,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 const ico = name => h('span.tour-ico', { html: icon(name) });
 const svgIco = svg => h('span.tour-ico', { html: svg || '' });
 const chip = text => h('span.tour-chip', text);
-const fill = (el, content) => el.replaceChildren(Array.isArray(content)
+const fill = (el, content) => !content ? el.replaceChildren() : el.replaceChildren(Array.isArray(content)
   ? h('dl.tour-list', content.flatMap(([k, v]) => k == null ? [h('dd.tour-note', ...[v].flat())] : [h('dt', k), h('dd', ...[v].flat())])) // ohne Stichwort: Zusatz über die volle Breite
   : content);
 
@@ -70,10 +70,12 @@ function tour(steps, { finish, onEnd, scope = null } = {}) {
   // Markierung und Textkarte folgen der Stelle (Scrollen, Größe, Umbau der Seite). Die Karte darf die Stelle nie
   // verdecken: unter, über, links oder rechts davon, je nachdem, wo Platz ist.
   const PAD = 6, GAP = 14, M = 12;
-  function cardPos(r, cw, ch, side) {
+  function cardPos(r, cw, ch, side, below) {
     const cx = Math.min(innerWidth - cw - M, Math.max(M, r.left + r.width / 2 - cw / 2));
     const cy = Math.min(innerHeight - ch - M, Math.max(M, r.top));
     const left = r.left - PAD - GAP - cw >= M, right = r.right + PAD + GAP + cw <= innerWidth - M;
+    // below: immer mittig unter der Stelle; ist darunter kein Platz, über ihren unteren Rand gelegt (großes Video)
+    if (below) return [cx, Math.min(r.bottom + PAD + GAP, innerHeight - ch - M)];
     // side: Abschnitte im Seitenpanel, Karte daneben statt darunter (sonst liegt sie auf den nächsten Abschnitten)
     if (side && left) return [r.left - PAD - GAP - cw, cy];
     if (side && right) return [r.right + PAD + GAP, cy];
@@ -88,7 +90,7 @@ function tour(steps, { finish, onEnd, scope = null } = {}) {
     if (!target?.isConnected) return;
     const r = target.getBoundingClientRect();
     Object.assign(spot.style, { left: `${r.left - PAD}px`, top: `${r.top - PAD}px`, width: `${r.width + PAD * 2}px`, height: `${r.height + PAD * 2}px` });
-    const [x, y] = cardPos(r, card.offsetWidth, card.offsetHeight, step?.side);
+    const [x, y] = cardPos(r, card.offsetWidth, card.offsetHeight, step?.side, step?.below);
     Object.assign(card.style, { left: `${x}px`, top: `${y}px` });
   }
   // Hohe Stelle ohne Platz daneben (z. B. Song-Abschnitt am Handy): so scrollen, dass sie direkt unter der Karte beginnt
@@ -225,7 +227,7 @@ export function trainTour() {
   const tap = tt('Klick', 'Tippen');
   const sec = k => `.panel-sec[data-k="${k}"]`;
   return runTour([
-    { target: '.stage', block: true, title: 'Video', text: [
+    { target: '.stage', block: true, below: true, title: 'Video', text: [
       [tap, 'Play / Pause'],
       [tt('Doppelklick', 'Doppelt tippen'), 'Vollbild']] },
     { target: '.timeline .tl-row:first-child .track', block: true, title: 'Zeitleiste', text: [
@@ -255,7 +257,7 @@ export function trainTour() {
     { target: '.controls > .ctl-group:nth-child(4)', block: true, title: 'Bild', text: [
       [ico('mirror'), ['Spiegelt das Video', key('M')]],
       [ico('image'), 'Helligkeit und Kontrast'],
-      [ico('marker'), ['Marker setzen: Start', key('S'), ', Ende', key('E'), ', Notiz', key('N'), ', Highlight', key('H')]]] },
+      [ico('marker'), ['Markierungen setzen: Start', key('S'), ', Ende', key('E'), ', Notiz', key('N'), ', Highlight', key('H')]]] },
     { target: '.controls > .ctl-group:nth-child(5)', block: true, title: 'Ansicht', text: [
       [ico('fitWidth'), 'Volle Breite'],
       [ico('fitAll'), 'Ganzes Bild'],
@@ -282,7 +284,7 @@ export function trainTour() {
     { target: sec('recs'), block: true, side: true, before: panelOpen, title: 'Aufnahmen', text: [
       ['Liste', 'Wechselt zu einer anderen Aufnahme der Choreo'],
       ['Name', 'Benennt die aktuelle Aufnahme um'],
-      ['+ Aufnahme', 'Fügt ein weiteres Video hinzu'],
+      ['Hinzufügen', 'Fügt ein weiteres Video hinzu'],
       ['Löschen', 'Löscht die aktuelle Aufnahme']] },
     { target: sec('keys'), block: true, side: true, before: panelOpen, when: () => !!document.querySelector(sec('keys')), title: 'Tasten', text: [
       ['Liste', 'Alle Tastenkürzel']] },
@@ -291,7 +293,7 @@ export function trainTour() {
     start: { title: 'TRAININGSANSICHT', text: [
       ['Teil 2', 'Video, Bedienleiste und Seitenpanel'],
       REPEAT] },
-    finish: { title: 'VIEL SPASS BEIM ÜBEN!', text: [tt(['Tastenkürzel', 'Seitenpanel › Tasten'], ['Song, Marker, Notizen, Status', 'Seitenpanel unter dem Video'])] },
+    finish: { title: 'VIEL SPASS BEIM ÜBEN!' }, // Tasten und Seitenpanel kamen schon in den Schritten
     onEnd: () => saveSettings({ tourTrainDone: true }),
   });
 }
