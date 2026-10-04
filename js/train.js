@@ -487,7 +487,7 @@ export async function renderTrain(root, recId) {
     h('div.btns', small('Zurücksetzen', () => { P.brightness = P.contrast = 100; update(); closePop(); })),
   ];
   const markPop = () => [
-    h('div.btns', Object.entries(MARKER_TYPES).map(([type, m]) => small(tt(`${m.label} (${m.key})`, m.label), () => { addMarker(type); closePop(); }))),
+    h('div.btns.btns-2', Object.entries(MARKER_TYPES).map(([type, m]) => small(tt(`${m.label} (${m.key})`, m.label), () => { addMarker(type); closePop(); }))),
     h('div.note', 'Setzt den Marker an der aktuellen Position. Start/Ende gibt es je einmal und begrenzen den Loop, solange kein In/Out gesetzt ist.'),
   ];
   const countPop = () => {
