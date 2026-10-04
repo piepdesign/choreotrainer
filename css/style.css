@@ -710,8 +710,9 @@ body.intro-open .tester-fab { display: none; }
 .tour-list dt { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .tour-list dd { margin: 0; }
 .tour-list { align-items: center; }
-.tour-ico, .tour-chip { display: inline-grid; place-items: center; min-width: 32px; height: 26px; border: 1px solid var(--rule); color: var(--fg); background: var(--surface); }
-.tour-chip { padding: 0 7px; font-size: 10.5px; letter-spacing: .06em; }
+.tour-ico, .tour-chip { display: inline-grid; place-items: center; box-sizing: border-box; width: 48px; height: 26px; border: 1px solid var(--rule); color: var(--fg); background: var(--surface); } /* alle gleich breit */
+.tour-chip { font-size: 10.5px; letter-spacing: .04em; white-space: nowrap; }
+.tour-kbd { white-space: nowrap; }
 .tour-ico svg { display: block; }
 .tour-list .tour-note { grid-column: 1 / -1; color: var(--muted); }
 .tour-hint { margin: 4px 0 0; }

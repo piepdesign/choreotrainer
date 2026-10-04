@@ -16,7 +16,7 @@ const ico = name => h('span.tour-ico', { html: icon(name) });
 const svgIco = svg => h('span.tour-ico', { html: svg || '' });
 const chip = text => h('span.tour-chip', text);
 const fill = (el, content) => el.replaceChildren(Array.isArray(content)
-  ? h('dl.tour-list', content.flatMap(([k, v]) => k == null ? [h('dd.tour-note', v)] : [h('dt', k), h('dd', v)])) // ohne Stichwort: Zusatz über die volle Breite
+  ? h('dl.tour-list', content.flatMap(([k, v]) => k == null ? [h('dd.tour-note', ...[v].flat())] : [h('dt', k), h('dd', ...[v].flat())])) // ohne Stichwort: Zusatz über die volle Breite
   : content);
 
 // Wartet, bis das Element des Schritts auf der Seite steht (z. B. nach einem Seitenwechsel), max. 8 s
@@ -144,19 +144,23 @@ const panelOpen = () => {
   if (t?.classList.contains('panel-closed')) document.querySelector('.panel-btn')?.click();
 };
 
+// Tastenkürzel nur am Rechner; geschütztes Leerzeichen + nowrap, damit es nicht mitten im Kürzel umbricht
+const key = k => tt(h('span.tour-kbd', ` (${k})`), '');
+const IO = 'In / Out';
+
 export function mainTour() {
   const tap = tt('Klick', 'Tippen');
   return runTour([
     { route: /^#\/?$/, target: '.dropzone', block: true, title: 'Neue Choreo', text: [
-      ['Video', tt('aus dem Kurs hier ablegen oder klicken', 'aus dem Kurs antippen und auswählen')],
-      ['Ergebnis', 'eine Choreo zum Üben']] },
+      ['Video', tt('Aus dem Kurs hier ablegen oder klicken', 'Aus dem Kurs antippen und auswählen')],
+      ['Ergebnis', 'Eine Choreo zum Üben']] },
     { route: /^#\/?$/, target: '.stats', block: true, title: 'Statistiken', text: [
       ['Kacheln', 'Kennzahlen zu deinem Üben'],
-      [tap, 'passende Auswertung im Profil']] },
+      [tap, 'Führt zur passenden Auswertung im Profil']] },
     { route: /^#\/?$/, target: '.stripes', block: true, when: () => !!document.querySelector('.stripes .stripe'), title: 'Classes', text: [
-      ['Farbe', 'eine je Class'],
-      [tap, 'Class mit allen Choreos'],
-      [tt('Ziehen', 'Halten + Ziehen'), 'Reihenfolge sortieren']] },
+      ['Farbe', 'Eine je Class'],
+      [tap, 'Öffnet die Class mit allen Choreos'],
+      [tt('Ziehen', 'Halten + Ziehen'), 'Sortiert die Reihenfolge']] },
     { target: '[data-nav="profile"]', title: 'Profil', text: [['Auswertungen', 'Übungszeit · Status · alle Choreos']] },
     { route: /^#\/profile/, target: '.p-nav', title: 'Reiter', text: [['Wechseln', 'Übersicht · Übungszeit · Status · Choreos']] },
     { target: '[data-nav="settings"]', title: 'Einstellungen', text: () => [[svgIco(document.querySelector('[data-nav="settings"] svg')?.outerHTML), 'Musikprovider · Hörprobe · Statistiken der Base · Classes verwalten · Konto']] },
@@ -165,10 +169,10 @@ export function mainTour() {
       [svgIco(themeIcon('dark')), 'Dunkel'],
       [svgIco(themeIcon('system')), 'System, folgt dem Gerät'],
       [null, 'Jederzeit umschaltbar.']] },
-    { target: '[data-nav="hub"]', title: 'Base', text: [['Start', 'für jede neue Choreo']] },
+    { target: '[data-nav="hub"]', title: 'Base', text: [['Start', 'Von hier startest du jede neue Choreo']] },
   ], {
     finish: { title: 'GESCHAFFT!', text: [
-      ['Teil 2', 'zeigt die Trainingsansicht, sobald du deine erste Choreo öffnest'],
+      ['Teil 2', 'Zeigt die Trainingsansicht, sobald du deine erste Choreo öffnest'],
       ['Wiederholen', 'Einstellungen › Konto']] },
     onEnd: () => saveSettings({ tourDone: true }),
   });
@@ -176,50 +180,49 @@ export function mainTour() {
 
 export function trainTour() {
   const tap = tt('Klick', 'Tippen');
-  const key = k => tt(` (${k})`, ''); // Tastenkürzel nur am Rechner
   return runTour([
     { target: '.stage', block: true, title: 'Video', text: [
-      [tap, 'Play/Pause'],
-      [tt('Doppelklick', 'doppelt Tippen'), 'Vollbild']] },
+      [tap, 'Play / Pause'],
+      [tt('Doppelklick', 'Doppelt tippen'), 'Vollbild']] },
     { target: '.timeline .tl-row:first-child .track', block: true, title: 'Zeitleiste', text: [
-      [`${tap} / Ziehen`, 'an eine Stelle springen'],
+      [`${tap} / Ziehen`, 'Springt an die Stelle'],
       ['Zeigt', 'Marker und Loop']] },
     { target: '.track.eights', block: true, title: '8er-Count', text: [
-      ['Feld', 'eine Acht'],
-      [tap, 'loopt diese Acht'],
-      ['Ziehen', 'loopt mehrere hintereinander']] },
+      ['Feld', 'Eine Acht'],
+      [tap, 'Loopt diese Acht'],
+      ['Ziehen', 'Loopt mehrere hintereinander']] },
     // Bedienleiste: je Gruppe ein Schritt, von links nach rechts
     { target: '.controls > .ctl-group:nth-child(1)', block: true, title: 'Wiedergabe', text: [
-      [ico('play'), `Play / Pause${key('Leertaste')}`],
-      [ico('tempo'), `Tempo, Tonhöhe bleibt gleich${key('↑ ↓')}`],
+      [ico('play'), ['Play / Pause', key('Leertaste')]],
+      [ico('tempo'), ['Tempo, die Tonhöhe bleibt gleich', key('↑ ↓')]],
       [ico('vol2'), 'Lautstärke'],
-      [ico('note'), `Ton von Video oder Songdatei${key('A')}, nur mit Songdatei`]] },
+      [ico('note'), ['Ton von Video oder Songdatei', key('A')]],
+      [null, 'Die Note erscheint, sobald unter Song eine Datei geladen ist.']] },
     { target: '.controls > .ctl-group:nth-child(2)', block: true, title: 'Loop', text: [
-      [chip('In'), `Anfang an der aktuellen Stelle${key('I')}`],
-      [chip('Out'), `Ende an der aktuellen Stelle${key('O')}`],
-      [chip('Loop'), `wiederholt den Abschnitt${key('L')}`],
-      [chip('×'), 'löscht In / Out'],
-      [null, 'Ohne In / Out loopt er zwischen Start- und Ende-Marker.']] },
+      [chip('In'), ['Setzt den Anfang an der aktuellen Stelle', key('I')]],
+      [chip('Out'), ['Setzt das Ende an der aktuellen Stelle', key('O')]],
+      [chip('Loop'), ['Wiederholt den Abschnitt', key('L')]],
+      [chip('×'), `Löscht ${IO}`],
+      [null, `Ohne ${IO} loopt er zwischen Start- und Ende-Marker. Beide gibt es je einmal, gesetzt über das Fähnchen.`]] },
     { target: '.controls > .ctl-group:nth-child(3)', block: true, title: 'Count', text: [
-      [chip('8er'), 'Zähler im Video ein / aus'],
+      [chip('8er'), 'Blendet den Zähler im Video ein oder aus'],
       [chip('BPM'), 'Takt-Menü: Tempo, Verschieben, Klick, Anzeige'],
-      [chip('1'), `zählt falsch? Bei der „1“ einer Acht pausieren und ${tt('drücken', 'antippen')}`],
-      [chip('Tap'), `oder ab einer „1“ mind. 4× im Takt tippen${key('T')}`]] },
+      [chip('1'), [`Zählt er falsch: Bei der „1“ einer Acht pausieren und ${tt('drücken', 'antippen')}`, key('1')]],
+      [chip('Tap'), ['Oder ab einer „1“ mindestens 4× im Takt tippen', key('T')]]] },
     { target: '.controls > .ctl-group:nth-child(4)', block: true, title: 'Bild', text: [
-      [ico('mirror'), `Spiegeln, tanzen wie vor dem Spiegel${key('M')}`],
-      [ico('image'), 'Helligkeit, Kontrast'],
-      [ico('marker'), 'Marker: Start, Ende, Gedanke, Highlight'],
-      [null, 'Start und Ende gibt es je einmal, sie begrenzen den Loop, solange kein In / Out gesetzt ist.']] },
+      [ico('mirror'), ['Spiegelt das Video, du tanzt wie vor dem Spiegel', key('M')]],
+      [ico('image'), 'Helligkeit und Kontrast'],
+      [ico('marker'), ['Marker setzen: Start, Ende, Gedanke, Highlight', key('S E N H')]]] },
     { target: '.controls > .ctl-group:nth-child(5)', block: true, title: 'Ansicht', text: [
-      [ico('fitWidth'), 'volle Breite, oben / unten beschnitten'],
-      [ico('fitAll'), 'ganzes Bild'],
-      [ico('full'), `Vollbild${key('F')}`]] },
+      [ico('fitWidth'), 'Volle Breite, oben und unten beschnitten'],
+      [ico('fitAll'), 'Ganzes Bild'],
+      [ico('full'), ['Vollbild', key('F')]]] },
     { target: '.panel-btn', block: true, title: 'Seitenpanel', text: [
-      [ico('panelOpen'), `ein- / ausblenden${key('P')}`],
-      ['Darin', `Song · Marker · Notizen · Status · Aufnahmen${tt(' · Tasten', '')}`]] },
+      [ico('panelOpen'), ['Ein- und ausblenden', key('P')]],
+      [null, `Darin: Song, Marker, Notizen, Status, Aufnahmen${tt(', Tasten', '')}.`]] },
     { target: '.panel-sec[data-k="status"]', block: true, before: panelOpen, title: 'Status', text: [
-      ['1 bis 5', 'wie gut du die Choreo schon kannst'],
-      ['Daraus', 'dein Verlauf im Profil']] },
+      ['1 bis 5', 'Wie gut du die Choreo schon kannst'],
+      ['Daraus', 'Entsteht dein Verlauf im Profil']] },
   ], {
     scope: /^#\/train\//,
     finish: { title: 'VIEL SPASS BEIM ÜBEN!', text: [tt(['Tastenkürzel', 'Seitenpanel › Tasten'], ['Song, Marker, Notizen, Status', 'Seitenpanel unter dem Video'])] },
