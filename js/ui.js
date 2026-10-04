@@ -104,6 +104,14 @@ const ICONS = {
   image: '<path d="M2.5 5.5h2.5M9 5.5h8.5M2.5 12.5h8.5M15 12.5h2.5"/><circle cx="7" cy="5.5" r="2"/><circle cx="13" cy="12.5" r="2"/>',
   // Marker setzen: Fähnchen mit Plus
   marker: '<path d="M4 16.5V2"/><path d="M4 2.5h9l-2.2 3 2.2 3H4"/><path d="M15.5 11.5v5M13 14h5"/>',
+  // Tempo: Stoppuhr
+  tempo: '<circle cx="10" cy="10.5" r="6"/><path d="M8.5 1.8h3M10 1.8v2.7M10 10.5V7.5M15.2 5.3l1.1-1.1"/>',
+  // Lautstärke: Lautsprecher mit 0–2 Wellen bzw. Kreuz (stumm)
+  vol0: '<path d="M2.5 7v4h3l4 3.3V3.7l-4 3.3z"/><path d="M13 6.5l4 5M17 6.5l-4 5"/>',
+  vol1: '<path d="M2.5 7v4h3l4 3.3V3.7l-4 3.3z"/><path d="M12.5 6.5a3.4 3.4 0 0 1 0 5"/>',
+  vol2: '<path d="M2.5 7v4h3l4 3.3V3.7l-4 3.3z"/><path d="M12.5 6.5a3.4 3.4 0 0 1 0 5M15 4a7 7 0 0 1 0 10"/>',
+  // Ton vom Song statt vom Video: Doppelnote
+  note: '<path d="M7.5 14V3.8l9-1.8v10"/><ellipse cx="5.5" cy="14" rx="2" ry="1.6" fill="currentColor"/><ellipse cx="14.5" cy="12" rx="2" ry="1.6" fill="currentColor"/>',
   grip: '<circle cx="7" cy="5" r="1.2"/><circle cx="13" cy="5" r="1.2"/><circle cx="7" cy="9" r="1.2"/><circle cx="13" cy="9" r="1.2"/><circle cx="7" cy="13" r="1.2"/><circle cx="13" cy="13" r="1.2"/>',
 };
 export function icon(name) {

@@ -301,8 +301,8 @@ export async function renderTrain(root, recId) {
   const fixed = (el, chars) => { el.classList.add('fixed'); el.style.width = `calc(${chars}ch + ${chars * 0.08}em + 20px)`; return el; };
   const bPlay = ctl('▶', { class: 'ctl play fixed', title: 'Play/Pause (Leertaste)', onclick: () => togglePlay() });
   const bMirror = h('button.ctl.icon-ctl', { type: 'button', title: tt('Spiegeln (M)', 'Spiegeln'), 'aria-label': 'Spiegeln', html: icon('mirror'), onclick: () => { P.mirror = !P.mirror; update(); } });
-  const bRate = fixed(ctl('', { title: 'Tempo (↑ / ↓)', onclick: e => popover(e.currentTarget, ratePop) }), 5);
-  const bVol = fixed(ctl('', { title: 'Lautstärke', onclick: e => popover(e.currentTarget, volPop) }), 7);
+  const bRate = h('button.ctl.icon-ctl', { type: 'button', title: 'Tempo', 'aria-label': 'Tempo', html: icon('tempo'), onclick: e => popover(e.currentTarget, ratePop) });
+  const bVol = h('button.ctl.icon-ctl', { type: 'button', title: 'Lautstärke', 'aria-label': 'Lautstärke', onclick: e => popover(e.currentTarget, volPop) });
   const bImg = h('button.ctl.icon-ctl', { type: 'button', title: 'Bild: Helligkeit/Kontrast', 'aria-label': 'Bild: Helligkeit/Kontrast', html: icon('image'), onclick: e => popover(e.currentTarget, imgPop) });
   const bIn = ctl('In', { title: 'Loop-Anfang setzen (I)', onclick: () => setIn() });
   const bOut = ctl('Out', { title: 'Loop-Ende setzen (O)', onclick: () => setOut() });
@@ -400,7 +400,7 @@ export async function renderTrain(root, recId) {
     update();
     syncSong(true);
   };
-  const bAudio = fixed(ctl('', { title: 'Ton: Video oder Song (A)', onclick: toggleAudio }), 10);
+  const bAudio = h('button.ctl.icon-ctl', { type: 'button', title: 'Ton: Video oder Song', 'aria-label': 'Ton: Video oder Song', html: icon('note'), onclick: toggleAudio });
   const timeView = h('span.timeview', '');
   // Bedienleiste in festen Gruppen, überall gleich: Wiedergabe · Loop · Count · Bild & Ansicht.
   // Breit: eine Zeile, Gruppen durch Linien getrennt. Schmaler: Gruppen untereinander bzw. nebeneinander,
@@ -419,9 +419,14 @@ export async function renderTrain(root, recId) {
   function update() {
     applyVideo();
     bMirror.classList.toggle('on', P.mirror);
-    bRate.textContent = `${P.rate.toFixed(2)}×`;
+    // Werte nur im Tooltip, die Leiste zeigt Icons; „on“ = vom Normalwert abweichend
+    bRate.title = `Tempo ${P.rate.toFixed(2)}×${tt(' (↑ / ↓)', '')}`;
     bRate.classList.toggle('on', P.rate !== 1);
-    bVol.textContent = P.muted ? 'Stumm' : `Vol ${Math.round(P.volume * 100)}`;
+    const vol = P.muted ? 0 : Math.round(P.volume * 100);
+    const volIcon = vol === 0 ? 'vol0' : vol < 50 ? 'vol1' : 'vol2';
+    if (bVol.dataset.icon !== volIcon) { bVol.innerHTML = icon(volIcon); bVol.dataset.icon = volIcon; }
+    bVol.title = P.muted ? 'Lautstärke: stumm' : `Lautstärke ${vol} %`;
+    bVol.classList.toggle('on', vol === 0);
     bImg.classList.toggle('on', P.brightness !== 100 || P.contrast !== 100);
     bIn.classList.toggle('on', P.loopIn != null);
     bOut.classList.toggle('on', P.loopOut != null);
@@ -430,7 +435,7 @@ export async function renderTrain(root, recId) {
     bCount.classList.toggle('on', P.countOn);
     bBpm.textContent = P.bpm ? `${Math.round(P.bpm * 10) / 10} BPM` : 'BPM ?';
     bAudio.hidden = !songBlob;
-    bAudio.textContent = songMode() ? '♪ Song' : '♪ Video'; // kurz, damit es in der Gruppe nicht abgeschnitten wird
+    bAudio.title = `Ton vom ${songMode() ? 'Song' : 'Video'} · umschalten${tt(' (A)', '')}`;
     bAudio.classList.toggle('on', songMode());
     renderStatic();
     persist();
