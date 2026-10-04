@@ -96,6 +96,8 @@ const ICONS = {
   fitWidth: '<rect x="1.5" y="3.5" width="17" height="11" rx="1.5"/><path d="M5 9h10M5 9l2.2-2.2M5 9l2.2 2.2M15 9l-2.2-2.2M15 9l-2.2 2.2"/>',
   // Komplett zeigen: Bild innerhalb des Rahmens
   fitAll: '<rect x="1.5" y="3.5" width="17" height="11" rx="1.5"/><rect x="6" y="5.5" width="8" height="7" rx="1"/>',
+  // Vollbild: vier Ecken nach außen
+  full: '<path d="M2 7V4.5A1.5 1.5 0 0 1 3.5 3H6M14 3h2.5A1.5 1.5 0 0 1 18 4.5V7M18 11v2.5a1.5 1.5 0 0 1-1.5 1.5H14M6 15H3.5A1.5 1.5 0 0 1 2 13.5V11"/>',
   grip: '<circle cx="7" cy="5" r="1.2"/><circle cx="13" cy="5" r="1.2"/><circle cx="7" cy="9" r="1.2"/><circle cx="13" cy="9" r="1.2"/><circle cx="7" cy="13" r="1.2"/><circle cx="13" cy="13" r="1.2"/>',
 };
 export function icon(name) {

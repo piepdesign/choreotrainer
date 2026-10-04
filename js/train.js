@@ -327,7 +327,7 @@ export async function renderTrain(root, recId) {
     // iPhone kennt Vollbild nur für das Video selbst (eigener Player, ohne 8er-Overlay)
     if (req) req.call(stage); else video.webkitEnterFullscreen?.();
   };
-  const bFull = ctl('Vollbild', { title: 'Vollbild (F)', onclick: toggleFull });
+  const bFull = h('button.ctl.icon-ctl', { type: 'button', title: tt('Vollbild (F)', 'Vollbild'), 'aria-label': 'Vollbild', html: icon('full'), onclick: toggleFull });
   // Video: Breite füllen (Bild wird oben/unten beschnitten) oder komplett zeigen
   let fit = settings().videoFit === 'width' ? 'width' : 'all';
   const bFitW = h('button.ctl.icon-ctl', { type: 'button', title: 'Breite füllen', 'aria-label': 'Breite füllen', html: icon('fitWidth') });

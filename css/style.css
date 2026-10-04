@@ -376,7 +376,7 @@ main:has(.train) { padding-bottom: 0; }
 .song-picked-text { min-width: 0; }
 .song-picked-text strong, .song-picked-text .label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .train-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.train-title .inline-edit { display: inline; }
+.train-title .inline-edit, .train-title .inline-edit > .editable { display: inline; } /* inline statt inline-block, sonst greift das „…“ nicht */
 .rating { display: flex; gap: 4px; }
 .rating button { flex: 1; padding: 8px 0; border: 1px solid var(--line); font-size: 12px; }
 .rating button.on { background: var(--fg); color: var(--bg); border-color: var(--fg); }
