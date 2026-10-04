@@ -705,6 +705,10 @@ body.intro-open .tester-fab { display: none; }
 .tour-top { display: flex; justify-content: space-between; align-items: center; }
 .tour-title { margin: 2px 0 0; }
 .tour-text { margin: 0; font-size: 13px; line-height: 1.5; }
+/* Stichwort links (Mono-Label), Erklärung rechts */
+.tour-list { display: grid; grid-template-columns: max-content 1fr; gap: 5px 12px; margin: 2px 0 0; }
+.tour-list dt { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding-top: 2px; }
+.tour-list dd { margin: 0; }
 .tour-hint { margin: 4px 0 0; }
 body.touring .tester-fab { display: none; }
 .tour-done { z-index: 95; }
