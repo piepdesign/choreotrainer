@@ -97,6 +97,12 @@ main { padding: 0 var(--gutter) 80px; }
 .stat { padding: 14px 16px 16px; background: var(--surface); }
 .stat .hint { display: block; margin-top: 4px; text-transform: none; letter-spacing: 0; }
 .stat b { display: block; font-family: var(--wide); font-stretch: 125%; font-weight: 800; font-size: clamp(20px, 1.8vw, 26px); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Handy: mindestens zwei Kacheln nebeneinander statt alle untereinander */
+@media (max-width: 600px) {
+  .stats > .stat { flex: 1 1 calc(50% - var(--tile-gap)); }
+  .stat { padding: 12px 12px 14px; }
+  .stat b { font-size: 18px; }
+}
 
 .section-head { display: flex; justify-content: space-between; align-items: baseline; margin: clamp(36px, 5vw, 64px) 0 14px; }
 .section-head h2 { font-size: clamp(20px, 2.4vw, 28px); margin: 0; }
