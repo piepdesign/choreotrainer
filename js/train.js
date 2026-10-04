@@ -402,7 +402,7 @@ export async function renderTrain(root, recId) {
   };
   const bAudio = fixed(ctl('', { title: 'Ton: Video oder Song (A)', onclick: toggleAudio }), 10);
   const timeView = h('span.timeview', '');
-  // Bedienleiste in festen Gruppen, überall gleich: Wiedergabe · Loop · Count · Bild · Ansicht.
+  // Bedienleiste in festen Gruppen, überall gleich: Wiedergabe · Loop · Count · Bild & Ansicht.
   // Breit: eine Zeile, Gruppen durch Linien getrennt. Schmaler: Gruppen untereinander bzw. nebeneinander,
   // Linien zwischen allen Zeilen und Spalten (CSS-Container-Abfrage). Knöpfe einer Gruppe sind gleich breit;
   // erscheinen × oder Ton, wird ihre Gruppe nur enger.
@@ -411,8 +411,7 @@ export async function renderTrain(root, recId) {
     group(bPlay, bRate, bVol, bAudio),
     group(bIn, bOut, bLoop, bClear),
     group(bCount, bBpm, bOne, bTap),
-    group(bMirror, bImg, bMark),
-    group(bFitW, bFitA, bFull));
+    group(bMirror, bImg, bMark, bFitW, bFitA, bFull));
   // Zeitangabe als kleine eigene Zeile direkt unter den Zeitleisten
   timeline.append(h('div.tl-time', timeView));
 
@@ -1037,7 +1036,9 @@ export async function renderTrain(root, recId) {
     h('span.label', classMeta(cls)),
     h('span.label', titleEdit(), ` · ${recIndex + 1}/${recs.length} · ${sameDay ? fmtDate(rec.recordedAt) : fmtRecDate(rec.recordedAt)}`),
     panelBtn,
-    h('h1.wide', inlineEdit((choreo.title || song?.title || 'Ohne Song').toUpperCase(), async v => { choreo.title = v; await db.put('choreos', choreo); }), song?.artist ? h('span.muted', { style: { fontWeight: 600 } }, ` — ${song.artist.toUpperCase()}`) : ''));
+    // Titel und Interpret einzeilig (zu lang → „…“, ganz im Tooltip), damit das Video mehr Höhe bekommt
+    h('h1.wide.train-title', { title: [choreo.title || song?.title || 'Ohne Song', song?.artist].filter(Boolean).join(' — ') },
+      inlineEdit((choreo.title || song?.title || 'Ohne Song').toUpperCase(), async v => { choreo.title = v; await db.put('choreos', choreo); }), song?.artist ? h('span.muted', { style: { fontWeight: 600 } }, ` — ${song.artist.toUpperCase()}`) : ''));
   const mainCol = h('div.train-main', crumbs, stage, timeline, controls);
   const trainEl = h(`div.train${panelState.open ? '' : '.panel-closed'}`, { style: { '--cc': `#${color}`, '--cc-text': textOn(color) } }, mainCol, side);
   const setPanel = open => {

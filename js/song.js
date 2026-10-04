@@ -64,7 +64,7 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
     picked.replaceChildren(current && !editing
       ? h('div.song-picked',
         current.cover ? songLink(h('img', { src: current.cover, alt: '' }), current) : h('div.nocover'),
-        h('div', songLink(h('strong', current.title), current),
+        h('div.song-picked-text', { title: [current.title, current.artist].filter(Boolean).join(' — ') }, songLink(h('strong', current.title), current),
           h('div.label', [current.artist, current.duration && fmt(current.duration), current.bpm && `${Math.round(current.bpm)} BPM`].filter(Boolean).join(' · '))),
         h('button.linkbtn', { type: 'button', onclick: () => { editing = true; render(); input.focus(); } }, 'Ändern'))
       : current ? h('button.linkbtn', { type: 'button', onclick: () => { editing = false; render(); } }, 'Abbrechen') : '');
