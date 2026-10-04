@@ -122,8 +122,10 @@ function corr(V, S, L, minOverlap) {
   return sum / ((b - a) * V.length);
 }
 
-// → { offset, confidence, songDuration } · offset in Sekunden (negativ: Video beginnt vor dem Song)
-// prior: grober Startpunkt (z. B. von Shazam). Dann wird nur in ±3 s darum gesucht und verfeinert.
+// → { offset, confidence, peak, songDuration } · offset in Sekunden in der Songdatei (negativ: Video beginnt vor dem Song)
+// Gesucht wird immer über die ganze Datei (nicht nur um den Shazam-Wert): Nur so fällt auf, wenn die Datei nicht
+// passt (anderer Song) oder anders geschnitten ist (z. B. Musikvideo mit Intro). confidence = bester Wert gegen den
+// besten Wert anderswo (> 1 s entfernt); bei einer falschen Datei liegen beide nah beieinander.
 export async function alignToSong(videoBlob, songBlob, { prior = null, onProgress = () => {} } = {}) {
   onProgress('Lese Tonspuren …');
   const [v, s] = await Promise.all([features(videoBlob, 'video'), features(songBlob, 'song')]);
@@ -132,11 +134,7 @@ export async function alignToSong(videoBlob, songBlob, { prior = null, onProgres
   const lenV = Vc[0].length, lenS = Sc[0].length;
   const minOverlap = Math.min(lenV, lenS) * 0.5;
 
-  let from = -Math.floor(lenV / 2), to = lenS - Math.floor(minOverlap);
-  if (prior != null) {
-    const p = Math.round((prior * FPS) / COARSE), w = Math.round((3 * FPS) / COARSE);
-    from = Math.max(from, p - w); to = Math.min(to, p + w);
-  }
+  const from = -Math.floor(lenV / 2), to = lenS - Math.floor(minOverlap);
   const coarse = [];
   for (let L = from; L < to; L++) coarse.push([L, corr(Vc, Sc, L, minOverlap)]);
   coarse.sort((a, b) => b[1] - a[1]);
@@ -164,6 +162,7 @@ export async function alignToSong(videoBlob, songBlob, { prior = null, onProgres
   return {
     offset: (best.L + frac) / FPS,
     confidence: second > 0 ? coarse[0][1] / second : 10,
+    peak: coarse[0][1],
     songDuration: s.duration,
   };
 }

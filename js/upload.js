@@ -1,7 +1,8 @@
 // Upload: Video + Class + Song + Recording-Datum + Notizen → Class › Choreo › Aufnahme
 import { db, uid } from './db.js';
 import { h, fmt, parseTime, isoDate, classTitle, classMeta, PALETTE, textOn, WEEKDAYS, byClassOrder, CLASS_TITLES, CLASS_LEVELS } from './util.js';
-import { songPicker, songKeyOf } from './song.js';
+import { songPicker, songKeyOf, sameSong } from './song.js';
+import { identifyAudio } from './recognize.js';
 import { alignToSong, checkAudio } from './align.js';
 import { classPickers } from './ui.js';
 import { dropzone } from './hub.js';
@@ -41,12 +42,15 @@ export async function renderUpload(root, kind, refId) {
   // ── Song ──
   const offsetIn = h('input.offset-in', { type: 'text', placeholder: '0:00' });
   let songFile = null; // optionale Songdatei (wird mit der Choreo gespeichert, wie in der Trainingsansicht)
+  let fileOffset; // Position des Videos in der Songdatei aus dem Abgleich (undefined = wie Startpunkt)
+  offsetIn.addEventListener('input', () => { fileOffset = undefined; }); // von Hand: gilt für Song und Datei
   const picker = songPicker({
     song: preChoreo?.song || null,
     getBlob: () => file,
     onChange: (s, offset) => { if (offset != null) offsetIn.value = fmt(offset, true); songStep.hidden = false; },
-    onOffset: offset => { offsetIn.value = fmt(offset, true); },
-    align: prior => (songFile && file ? alignToSong(file, songFile, { prior }) : null),
+    // file: Position in der Songdatei (kann bei Musikvideo-Fassungen abweichen), null = Datei passt nicht
+    onOffset: (offset, { file: pos } = {}) => { offsetIn.value = fmt(offset, true); fileOffset = pos; },
+    align: () => (songFile && file ? alignToSong(file, songFile) : null),
     startField: offsetIn,
   });
   // Schritt 3: Songdatei (optional) – gleicher Aufbau wie im Panel der Trainingsansicht
@@ -69,7 +73,19 @@ export async function renderUpload(root, kind, refId) {
     renderSongStep('Prüfe Songdatei …');
     const problem = await checkAudio(f);
     if (problem) { toast(problem, 8000); renderSongStep(); return; }
+    // Ist es wirklich der gewählte Song? (kurz bei Shazam nachfragen; scheitert das, ohne Prüfung weiter)
+    const chosen = picker.get();
+    if (chosen?.title) {
+      renderSongStep('Prüfe, welcher Song in der Datei ist …');
+      const found = await identifyAudio(f).catch(() => null);
+      if (found && !sameSong(found, chosen)
+        && !confirm(`Die Datei klingt nach „${[found.artist, found.title].filter(Boolean).join(' — ')}“, gewählt ist aber „${chosen.title}“. Trotzdem verwenden?`)) {
+        renderSongStep();
+        return;
+      }
+    }
     songFile = f;
+    fileOffset = undefined;
     renderSongStep();
     if (file && picker.get()) picker.detectStart(); // Startpunkt direkt per Abgleich
   });
@@ -164,6 +180,7 @@ export async function renderUpload(root, kind, refId) {
         duration: meta.duration,
         thumb: meta.thumb,
         songOffset: parseTime(offsetIn.value),
+        ...(fileOffset !== undefined ? { fileOffset } : {}),
         markers: [],
         player: {},
       };

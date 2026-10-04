@@ -10,7 +10,9 @@ export const songKeyOf = s => (s.source === 'deezer' ? `dz:${s.id}` : `m:${norm(
 
 // Grober Titelvergleich, um zu prüfen, ob Shazam denselben Song erkannt hat
 const simple = s => norm(s).replace(/\(.*?\)|\[.*?\]|feat\..*$/g, '').replace(/[^a-z0-9äöüß]+/g, ' ').trim();
-const sameSong = (a, b) => {
+// Schwellen für „Songdatei passt zum Video“ (siehe detectStart)
+const FILE_MIN_CONF = 1.25, FILE_MIN_PEAK = 0.12;
+export const sameSong = (a, b) => {
   const x = simple(a?.title), y = simple(b?.title);
   return !!x && !!y && (x.startsWith(y) || y.startsWith(x));
 };
@@ -160,19 +162,28 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
       }
       // align() liefert null, solange keine Songdatei geladen ist
       if (align) startStatus.textContent = 'Gleiche mit Songdatei ab …';
-      const r = align ? await align(shazam) : null;
+      const r = align ? await align() : null;
       hasFile = r !== null;
       if (scanError && !hasFile) throw scanError; // ohne Songdatei gibt es keinen anderen Weg
-      if (r) {
-        if (shazam != null || r.confidence >= 1.15) {
-          onOffset(r.offset);
-          startStatus.textContent = `Video beginnt bei ${fmt(r.offset, true)} im Song (Abgleich mit Songdatei)`;
-          return;
-        }
+      // Abgleich nur übernehmen, wenn die Datei eindeutig passt (gemessen: passende Datei ≥ 2,9 / Spitzenwert ≥ 0,7,
+      // falsche Datei 1,02 / 0,08). Vorher galt jeder Abgleich, sobald Shazam etwas gefunden hatte → falscher Song lief mit.
+      const fileOk = r && r.confidence >= FILE_MIN_CONF && r.peak >= FILE_MIN_PEAK;
+      if (fileOk) {
+        // Position in der Datei (fürs Mitspielen) und im Original (Song-Zeitleiste) getrennt: bei Musikvideo-Fassungen
+        // mit Intro oder anderer Länge weichen sie voneinander ab
+        const songPos = shazam != null ? Math.max(0, shazam) : r.offset;
+        onOffset(songPos, { file: r.offset });
+        const diff = shazam != null ? r.offset - shazam : 0;
+        startStatus.textContent = Math.abs(diff) > 1.5
+          ? `Video beginnt bei ${fmt(songPos, true)} im Song, in deiner Songdatei bei ${fmt(r.offset, true)} (Datei ist anders geschnitten, z. B. Musikvideo-Fassung; zum Mitspielen gilt die Datei)`
+          : `Video beginnt bei ${fmt(r.offset, true)} im Song (Abgleich mit Songdatei)`;
+        return;
       }
       if (shazam != null) {
-        onOffset(Math.max(0, shazam));
-        startStatus.textContent = `Video beginnt bei ${fmt(Math.max(0, shazam), true)} im Song (${hits}/${segments} Abschnitte)`;
+        onOffset(Math.max(0, shazam), { file: hasFile ? null : undefined });
+        startStatus.textContent = hasFile
+          ? `Video beginnt bei ${fmt(Math.max(0, shazam), true)} im Song (${hits}/${segments} Abschnitte). Die Songdatei passt aber nicht zum Video (anderer Song oder andere Aufnahme), Mitspielen mit der Datei ist deshalb aus. Bitte unten die richtige Datei laden.`
+          : `Video beginnt bei ${fmt(Math.max(0, shazam), true)} im Song (${hits}/${segments} Abschnitte)`;
       } else {
         const heard = others[0] ? ` Gehört wurde: ${[others[0].track.subtitle, others[0].track.title].filter(Boolean).join(' — ')}.` : '';
         const hint = align && !hasFile ? 'Lade unten die Songdatei, dann klappt es per Abgleich. Oder trag den ' : hasFile ? 'Auch der Abgleich mit der Songdatei war unsicher (anderer Song oder verlangsamt?). Trag den ' : 'Trag den ';

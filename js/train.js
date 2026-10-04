@@ -2,7 +2,8 @@
 import { db, uid, deleteRecording, deleteChoreo } from './db.js';
 import { h, holdGate, isTouch, tt, fmt, fmtDate, WEEKDAYS, fmtRecDate, fmtDuration, relDate, parseTime, debounce, inlineEdit, fitInput, classTitle, classMeta, PALETTE, textOn } from './util.js';
 import { analyzeBeat } from './beat.js';
-import { songPicker, songKeyOf } from './song.js';
+import { songPicker, songKeyOf, sameSong } from './song.js';
+import { identifyAudio } from './recognize.js';
 import { alignToSong, checkAudio } from './align.js';
 import { recTitle } from './hub.js';
 import { go, toast } from './app.js';
@@ -98,24 +99,35 @@ export async function renderTrain(root, recId) {
       renderStatic();
     }
   });
-  const songMode = () => P.audio === 'song' && !!songBlob && rec.songOffset != null;
+  // Position des Videos in der Songdatei: eigener Wert aus dem Abgleich (Datei kann anders geschnitten sein als das
+  // Original, z. B. Musikvideo), sonst der Startpunkt im Song. null = Datei passt nicht zum Video.
+  const filePos = () => (rec.fileOffset !== undefined ? rec.fileOffset : rec.songOffset);
+  const songMode = () => P.audio === 'song' && !!songBlob && filePos() != null;
+  let lastSeek = 0, lastSync = 0;
   function syncSong(force = false) {
     if (!songMode()) { if (!songAudio.paused) songAudio.pause(); return; }
     songAudio.volume = P.volume;
     songAudio.muted = P.muted;
-    const target = rec.songOffset + video.currentTime;
+    const target = filePos() + video.currentTime;
     const outside = target < 0 || (isFinite(songAudio.duration) && target >= songAudio.duration);
     if (outside || video.paused) { if (!songAudio.paused) songAudio.pause(); if (!outside && force) songAudio.currentTime = target; return; }
     // Kleine Abweichungen weich ausgleichen: Song minimal schneller/langsamer (max. ±6 %, Tonhöhe
     // bleibt). Springen nur bei großen Abständen, denn nach jedem Sprung hängt Audio ~50 ms hinterher.
+    // Handy: Die Wiedergabe meldet ihre Position dort nur grob und verträgt keine ständigen Tempo-Wechsel.
+    // Darum dort kein Nachregeln, nur seltene Sprünge (ab 0,5 s, höchstens alle 3 s). Vorher sprang der Song
+    // fast in jedem Bild neu → nach 1–2 s nur noch abgehackte Fetzen.
     const err = target - songAudio.currentTime; // > 0: Song hinkt hinterher
-    if (force || Math.abs(err) > 0.25) {
+    const now = performance.now();
+    const touchMode = isTouch();
+    if (force || (touchMode ? Math.abs(err) > 0.5 && now - lastSeek > 3000 : Math.abs(err) > 0.25)) {
       songAudio.currentTime = target;
-      songAudio.playbackRate = P.rate;
-    } else {
+      lastSeek = now;
+      if (songAudio.playbackRate !== P.rate) songAudio.playbackRate = P.rate;
+    } else if (!touchMode) {
       const nudge = Math.abs(err) < 0.008 ? 0 : Math.max(-0.06, Math.min(0.06, err * 0.8));
-      songAudio.playbackRate = P.rate * (1 + nudge);
-    }
+      const r = P.rate * (1 + nudge);
+      if (Math.abs(songAudio.playbackRate - r) > 0.002) songAudio.playbackRate = r;
+    } else if (songAudio.playbackRate !== P.rate) songAudio.playbackRate = P.rate;
     if (songAudio.paused) songAudio.play().catch(() => {});
   }
   for (const ev of ['play', 'seeked', 'ratechange']) video.addEventListener(ev, () => syncSong(true));
@@ -382,7 +394,8 @@ export async function renderTrain(root, recId) {
   const bMark = ctl('+ Marker', { title: 'Marker setzen', onclick: e => popover(e.currentTarget, markPop) });
   const toggleAudio = () => {
     if (!songBlob) { toast('Erst unter SONG eine Songdatei laden'); return; }
-    if (P.audio !== 'song' && rec.songOffset == null) { toast('Erst den Startpunkt im Song setzen (Startpunkt erkennen)'); return; }
+    if (P.audio !== 'song' && rec.fileOffset === null) { toast('Die Songdatei passt nicht zum Video. Bitte die richtige Datei laden oder den Startpunkt von Hand eintragen.', 5000); return; }
+    if (P.audio !== 'song' && filePos() == null) { toast('Erst den Startpunkt im Song setzen (Startpunkt erkennen)'); return; }
     P.audio = P.audio === 'song' ? 'video' : 'song';
     update();
     syncSong(true);
@@ -659,7 +672,8 @@ export async function renderTrain(root, recId) {
     const songPos = song?.duration && rec.songOffset != null ? ` · Song ${fmt(rec.songOffset + t)}` : '';
     setText(timeView, `${fmt(t, true)} / ${fmt(d, true)}${songPos}`);
     setText(bPlay, video.paused ? '▶' : '❚❚');
-    if (songMode() && !video.paused) syncSong();
+    // im Bildtakt abgleichen, auf dem Handy nur alle 0,4 s
+    if (songMode() && !video.paused && (!isTouch() || performance.now() - lastSync > 400)) { lastSync = performance.now(); syncSong(); }
     if (song?.duration && rec.songOffset != null) {
       const st = rec.songOffset + t;
       sPh.style.left = `${(st / song.duration) * 100}%`;
@@ -796,7 +810,8 @@ export async function renderTrain(root, recId) {
   notesIn.addEventListener('input', () => { rec.notes = notesIn.value; saveRec(); });
 
   const offsetIn = h('input.offset-in', { type: 'text', placeholder: '0:00', value: rec.songOffset != null ? fmt(rec.songOffset, true) : '' });
-  offsetIn.addEventListener('change', () => { rec.songOffset = parseTime(offsetIn.value); update(); });
+  // von Hand: gilt für Song und Datei
+  offsetIn.addEventListener('change', () => { rec.songOffset = parseTime(offsetIn.value); delete rec.fileOffset; update(); });
   const picker = songPicker({
     song,
     getBlob: () => blob,
@@ -811,13 +826,16 @@ export async function renderTrain(root, recId) {
       await db.put('recordings', rec);
       go(location.hash); // neu aufbauen, damit Titel und Song-Zeitleiste stimmen
     },
-    onOffset: offset => {
+    // offset = Position im Song (Original). file = Position in der Songdatei (fürs Mitspielen), null = Datei passt nicht
+    onOffset: (offset, { file } = {}) => {
       rec.songOffset = offset;
+      if (file !== undefined) rec.fileOffset = file;
+      if (rec.fileOffset === null && P.audio === 'song') { P.audio = 'video'; }
       offsetIn.value = fmt(offset, true);
       update();
       syncSong(true);
     },
-    align: prior => (songBlob ? alignToSong(blob, songBlob, { prior }) : null),
+    align: () => (songBlob ? alignToSong(blob, songBlob) : null),
     startField: offsetIn,
   });
 
@@ -831,7 +849,19 @@ export async function renderTrain(root, recId) {
     songFileRow.querySelector('.label')?.replaceChildren('Prüfe Songdatei …');
     const problem = await checkAudio(file);
     if (problem) { toast(problem, 8000); renderSongFile(); return; }
+    // Ist es wirklich dieser Song? (Kurz bei Shazam nachfragen; scheitert das, geht es ohne Prüfung weiter)
+    if (song?.title) {
+      songFileRow.querySelector('.label')?.replaceChildren('Prüfe, welcher Song in der Datei ist …');
+      const found = await identifyAudio(file).catch(() => null);
+      if (found && !sameSong(found, song)
+        && !confirm(`Die Datei klingt nach „${[found.artist, found.title].filter(Boolean).join(' — ')}“, die Choreo ist aber „${song.title}“. Trotzdem verwenden?`)) {
+        renderSongFile();
+        return;
+      }
+    }
     await db.put('videos', file, songKey);
+    delete rec.fileOffset; // neue Datei: Position darin bestimmt gleich der Abgleich
+    if (P.audio === 'song') P.audio = 'video'; // erst nach bestandener Prüfung wieder mit der Datei abspielen
     songBlob = file;
     loadSongAudio();
     renderSongFile();
@@ -850,6 +880,7 @@ export async function renderTrain(root, recId) {
             if (!confirm('Songdatei aus dieser Choreo entfernen?')) return;
             await db.del('videos', songKey);
             songBlob = null;
+            delete rec.fileOffset;
             P.audio = 'video';
             loadSongAudio();
             renderSongFile();

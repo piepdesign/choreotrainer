@@ -182,3 +182,30 @@ export async function enrich(track) {
     return fallback;
   }
 }
+
+// Welcher Song steckt in einer Songdatei? Drei kurze Stellen (25/50/75 %) an Shazam, Mehrheit gewinnt.
+// → { title, artist, hits, asked } oder null (nichts erkannt / nicht erreichbar)
+export async function identifyAudio(blob, onProgress = () => {}) {
+  await loadVibra();
+  const audio = await decodeAudio(blob, SR, onProgress);
+  const pcm = audio.getChannelData(0), dur = audio.duration;
+  const votes = new Map();
+  let asked = 0;
+  for (const f of [0.25, 0.5, 0.75]) {
+    const start = Math.max(0, Math.min(dur - SNIPPET, dur * f));
+    try {
+      const data = await ask(signature(pcm.subarray(Math.floor(start * SR), Math.floor(Math.min(dur, start + SNIPPET) * SR))));
+      asked++;
+      const t = data.track;
+      if (t?.title) {
+        const key = String(t.key || `${t.subtitle}|${t.title}`);
+        const v = votes.get(key) || { title: t.title, artist: t.subtitle || '', hits: 0 };
+        v.hits++;
+        votes.set(key, v);
+      }
+    } catch { /* Stelle auslassen */ }
+    await wait(700);
+  }
+  const best = [...votes.values()].sort((a, b) => b.hits - a.hits)[0];
+  return best ? { ...best, asked } : null;
+}
