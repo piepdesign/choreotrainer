@@ -1,5 +1,5 @@
 // Upload: Video + Class + Song + Recording-Datum + Notizen → Class › Choreo › Aufnahme
-import { db, uid } from './db.js';
+import { db, uid, requestPersist } from './db.js';
 import { h, fmt, parseTime, isoDate, classTitle, classMeta, PALETTE, textOn, WEEKDAYS, byClassOrder, CLASS_TITLES, CLASS_LEVELS } from './util.js';
 import { songPicker, songKeyOf, sameSong } from './song.js';
 import { identifyAudio } from './recognize.js';
@@ -187,6 +187,7 @@ export async function renderUpload(root, kind, refId) {
       await db.put('videos', file, rec.id);
       if (songFile) await db.put('videos', songFile, `song:${choreo.id}`);
       await db.put('recordings', rec);
+      requestPersist(); // spätestens jetzt liegen Daten vor: Browser bitten, sie nicht selbst zu räumen
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       go(`#/train/${rec.id}`, { replace: true });
     } catch (e) {

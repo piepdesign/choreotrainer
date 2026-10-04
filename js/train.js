@@ -1,5 +1,5 @@
 // Trainingsansicht: Player mit Spiegeln, Tempo, Lautstärke, Bild, Loop, 8er-Count, Markern, Song-Zeitleiste
-import { db, uid, deleteRecording, deleteChoreo } from './db.js';
+import { db, uid, deleteRecording, deleteChoreo, untracked } from './db.js';
 import { h, holdGate, isTouch, tt, fmt, fmtDate, WEEKDAYS, fmtRecDate, fmtDuration, relDate, parseTime, debounce, inlineEdit, fitInput, classTitle, classMeta, PALETTE, textOn } from './util.js';
 import { analyzeBeat } from './beat.js';
 import { songPicker, songKeyOf, sameSong } from './song.js';
@@ -37,7 +37,21 @@ export async function renderTrain(root, recId) {
   const recs = (await db.byIndex('recordings', 'choreoId', choreo.id)).sort((a, b) => a.recordedAt - b.recordedAt);
   const sessions = await db.byIndex('sessions', 'choreoId', choreo.id);
   const blob = await db.get('videos', recId);
-  if (!blob) { root.append(h('p.empty', 'Das Video zu dieser Aufnahme fehlt im Speicher dieses Browsers.')); return; }
+  if (!blob) {
+    // z. B. nach dem Wiederherstellen einer Sicherung: Video neu wählen, alles andere (Marker, Notizen …) ist da
+    const input = h('input', { type: 'file', accept: 'video/*', hidden: true });
+    input.addEventListener('change', async () => {
+      const f = input.files[0];
+      if (!f) return;
+      await untracked(() => db.put('videos', f, recId));
+      go(`#/train/${recId}`, { replace: true });
+    });
+    root.append(h('div.empty',
+      h('p', 'Das Video zu dieser Aufnahme fehlt in diesem Browser.'),
+      h('p.label', [rec.fileName, rec.duration && fmt(rec.duration)].filter(Boolean).join(' · ')),
+      h('div.actions', h('button.btn.small', { type: 'button', onclick: () => input.click() }, 'Video wählen')), input));
+    return;
+  }
   const songKey = `song:${choreo.id}`; // Songdatei gehört zur Choreo, gilt für alle Aufnahmen
   let songBlob = (await db.get('videos', songKey)) || null;
 

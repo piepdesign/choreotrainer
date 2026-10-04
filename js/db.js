@@ -98,6 +98,7 @@ export const db = {
     return raw.del(name, id);
   },
   async byIndex(name, index, value) { return wrap((await store(name)).index(index).getAll(value)); },
+  async keys(name) { return wrap((await store(name)).getAllKeys()); },
 };
 
 // Während fn läuft, wird nichts gemerkt (z. B. Ansicht speichert beim Verlassen ihren Stand)

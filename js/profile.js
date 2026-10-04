@@ -10,6 +10,7 @@ import { settings, saveSettings, applyTheme, resetSettings, BASE_STATS } from '.
 import { classManager } from './classform.js';
 import { go, toast, replaceHash } from './app.js';
 import { preferences } from './ui.js';
+import { storageState, askPersist, isInstalled, isIOS, canPromptInstall, promptInstall, exportBackup, readBackup, restoreBackup, missingVideos, relinkVideos } from './backup.js';
 
 const DAY = 86400000;
 const NS = 'http://www.w3.org/2000/svg';
@@ -465,6 +466,83 @@ export async function renderProfile(root, section) {
           },
         }, 'Alles löschen'))));
 
+  // ── Daten: Speicher, Sicherung, Wiederherstellen, Videos zuordnen, App ──
+  const dataBox = h('div.acc');
+  const mb = b => (b >= 1e9 ? `${(b / 1e9).toFixed(1).replace('.', ',')} GB` : `${Math.max(1, Math.round(b / 1e6))} MB`);
+  const pick = (accept, multiple, onFiles) => {
+    const input = h('input', { type: 'file', accept, multiple, hidden: true });
+    input.addEventListener('change', () => { if (input.files.length) onFiles([...input.files]); input.remove(); });
+    document.body.append(input);
+    input.click();
+  };
+  async function renderData() {
+    const [st, missing] = await Promise.all([storageState(), missingVideos()]);
+    const last = settings().lastBackup;
+    const installed = isInstalled();
+    const cards = [
+      accRow('Speicher', [
+        h('p.acc-lead', st.persisted ? 'Dauerhaft: Der Browser räumt die Daten nicht von sich aus.' : 'Nicht dauerhaft: Der Browser darf die Daten bei Platzmangel oder längerer Pause räumen.'),
+        st.usage != null ? h('p.acc-note', `Belegt: ${mb(st.usage)}${st.quota ? ` von ${mb(st.quota)}` : ''}`) : null,
+        h('p.acc-note', 'Bewusstes Löschen der Websitedaten verhindert das nicht, dafür gibt es die Sicherung.')],
+        st.persisted || !st.supported ? null : h('button.btn.small', {
+          type: 'button',
+          onclick: async () => { toast((await askPersist()) ? 'Speicher ist jetzt dauerhaft' : 'Der Browser lehnt ab. Als App installiert klappt es meist.', 4000); renderData(); },
+        }, 'Dauerhaft anfordern')),
+      accRow('Sicherung', [h('p.acc-lead', 'Speichert als Datei:'),
+          h('ul.acc-list', h('li', 'Classes, Choreos, Aufnahmen'), h('li', 'Marker, Notizen, Status'), h('li', 'Einheiten, Profil, Präferenzen')),
+          h('p.acc-note', `Ohne Videos und Songdateien. ${last ? `Letzte Sicherung: ${relDate(last)}.` : 'Noch keine Sicherung.'}`)],
+        h('button.btn.small', {
+          type: 'button',
+          onclick: async () => {
+            try {
+              const r = await exportBackup();
+              await saveSettings({ lastBackup: Date.now() });
+              toast(`Gesichert: ${plural(r.counts.choreos, 'Choreo', 'Choreos')}, ${plural(r.counts.recordings, 'Aufnahme', 'Aufnahmen')}`, 3500);
+              renderData();
+            } catch (e) { console.error(e); toast(`Sichern fehlgeschlagen: ${e.message}`, 5000); }
+          },
+        }, 'Sichern')),
+      accRow('Wiederherstellen', [h('p.acc-lead', 'Spielt eine Sicherung ein:'),
+          h('ul.acc-list', h('li', 'Gleiche Einträge werden ersetzt'), h('li', 'Alles andere bleibt')),
+          h('p.acc-note', 'Videos danach unter „Videos zuordnen“ neu wählen.')],
+        h('button.btn.small', {
+          type: 'button',
+          onclick: () => pick('.json,application/json', false, async ([file]) => {
+            try {
+              const b = await readBackup(file);
+              const n = b.data.choreos?.length || 0, r = b.data.recordings?.length || 0;
+              if (!confirm(`Sicherung vom ${new Date(b.exportedAt).toLocaleDateString('de-DE')} einspielen (${n} Choreos, ${r} Aufnahmen)? Gleiche Einträge werden ersetzt.`)) return;
+              await restoreBackup(b);
+              toast('Wiederhergestellt', 2500);
+              setTimeout(() => location.reload(), 600); // Einstellungen und Ansichten frisch laden
+            } catch (e) { toast(e.message, 5000); }
+          }),
+        }, 'Datei wählen')),
+    ];
+    if (missing.length) cards.push(accRow('Videos zuordnen', [
+        h('p.acc-lead', `${plural(missing.length, 'Aufnahme', 'Aufnahmen')} ohne Video:`),
+        h('ul.acc-list', missing.slice(0, 4).map(r => h('li', r.fileName || r.title || 'Aufnahme')), missing.length > 4 ? h('li', `… und ${missing.length - 4} weitere`) : null),
+        h('p.acc-note', 'Wähle die Videos, sie werden über Dateiname, Größe und Länge zugeordnet.')],
+      h('button.btn.small', {
+        type: 'button',
+        onclick: () => pick('video/*', true, async files => {
+          toast('Ordne zu …', 1500);
+          const r = await relinkVideos(files, missing);
+          toast(`${plural(r.matched, 'Video', 'Videos')} zugeordnet${r.unmatched.length ? `, nicht erkannt: ${r.unmatched.join(', ')}` : ''}`, 6000);
+          renderData();
+        }),
+      }, 'Videos wählen')));
+    cards.push(accRow('App', [
+        h('p.acc-lead', installed ? 'Läuft als App.' : 'Als App installieren:'),
+        h('ul.acc-list', h('li', 'Startet vom Home-Bildschirm'), h('li', 'Daten bleiben dauerhaft'), h('li', 'Startet auch ohne Internet')),
+        !installed && isIOS() ? h('p.acc-note', 'iPhone: in Safari Teilen › Zum Home-Bildschirm. Die App hat dort einen eigenen Speicher: vorher hier sichern, in der App wiederherstellen.') : null,
+        !installed && !isIOS() && !canPromptInstall() ? h('p.acc-note', 'Im Browser-Menü „App installieren“ bzw. „Zum Startbildschirm“ wählen.') : null],
+      !installed && canPromptInstall() ? h('button.btn.small', { type: 'button', onclick: async () => { await promptInstall(); renderData(); } }, 'Installieren') : null));
+    dataBox.replaceChildren(...cards);
+  }
+  if (settingsPage) { renderData(); addEventListener('ct-install', renderData); }
+  const dataSec = sect('data', 'Daten', dataBox);
+
   const panes = {
     overview: h('div.p-tab', overview, classSec),
     time: h('div.p-tab', time, sessionSec),
@@ -472,8 +550,8 @@ export async function renderProfile(root, section) {
     choreos: h('div.p-tab', choreoSec),
   };
   if (settingsPage) {
-    root.append(h('section.p-head', h('h1.wide.p-name', 'EINSTELLUNGEN')), h('div.p-tab.p-settings', prefs, manageSec, account));
-    return () => { urls.forEach(u => URL.revokeObjectURL(u)); };
+    root.append(h('section.p-head', h('h1.wide.p-name', 'EINSTELLUNGEN')), h('div.p-tab.p-settings', prefs, manageSec, dataSec, account));
+    return () => { urls.forEach(u => URL.revokeObjectURL(u)); removeEventListener('ct-install', renderData); };
   }
   function showTab(id, user = false) {
     current = id;
