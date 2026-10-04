@@ -446,10 +446,10 @@ export async function renderTrain(root, recId) {
   function closePop() { pop?.remove(); pop = null; }
   const refreshPop = () => pop?.rebuild();
   function popover(btn, build) {
-    if (pop && pop.dataset.for === btn.textContent) { closePop(); return; }
+    if (pop && pop.btn === btn) { closePop(); return; } // gleicher Knopf: zu (nicht per Text, die Icon-Knöpfe haben keinen)
     closePop();
     pop = h('div.pop', build());
-    pop.dataset.for = btn.textContent;
+    pop.btn = btn;
     pop.rebuild = () => pop.replaceChildren(...build().flat());
     controls.append(pop);
     pop.style.bottom = `${controls.clientHeight - btn.offsetTop + 6}px`;

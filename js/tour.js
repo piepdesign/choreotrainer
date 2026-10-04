@@ -28,6 +28,9 @@ async function find(step) {
 export function runTour(steps, { finish, onEnd, scope = null } = {}) {
   if (active) return Promise.resolve();
   active = true;
+  // offene Menüs (Leiste, Ansicht, Helfer*in) schließen: alle gehen bei Klick daneben zu. Später fängt die Sperre
+  // unten solche Klicks ab, ein offenes Menü könnte sonst die markierte Stelle verdecken.
+  document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
   const spot = h('div.tour-spot');
   const num = h('span.label.tour-num');
   const title = h('h3.p-sub.tour-title');
