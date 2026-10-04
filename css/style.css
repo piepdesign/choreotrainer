@@ -719,3 +719,28 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 /* Intro: seitlich nicht verschiebbar (die Pfeile ragen bewusst in den Rand) */
 .intro { overflow-x: hidden; overscroll-behavior: contain; touch-action: pan-y; }
 @media (max-width: 600px) { .intro-nav .intro-arrow:first-child { margin-left: -12px; } .intro-nav .intro-arrow:last-child { margin-right: -12px; } }
+
+/* Knöpfe nur für Touch („1“, „Tap“ in der Leiste) */
+.touch-only { display: none; }
+.touch .touch-only { display: inline-block; }
+
+/* Menüs (Tempo, BPM, Lautstärke …): feste Breite, Knöpfe einer Zeile gleich breit */
+.pop { width: 300px; max-width: calc(100vw - 32px); }
+.pop .btns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; }
+.pop .btns .btn { justify-content: center; text-align: center; white-space: nowrap; padding-left: 4px; padding-right: 4px; }
+
+@media (max-width: 600px) {
+  /* Bedienleiste: Knöpfe füllen jede Zeile, sauber untereinander; Zeitangabe eigene Zeile */
+  .controls { gap: 4px; padding: 6px; }
+  .controls .ctl-sep { display: none; }
+  /* je vier pro Zeile, gleich breit; was in der letzten Zeile übrig bleibt, füllt sie */
+  .controls > .ctl { flex: 1 0 calc(25% - 4px); width: auto !important; text-align: center; justify-content: center; white-space: nowrap; padding-left: 2px; padding-right: 2px; font-size: 10px; min-height: 34px; }
+  .controls > .ctl.icon-ctl { display: grid; place-items: center; }
+  .controls .timeview { flex: 1 1 100%; text-align: right; padding: 2px 4px; }
+  .controls .pop { left: 0 !important; right: 0; margin: 0 auto; }
+}
+/* sehr schmale Handys: „BASE“ ausblenden, die Wortmarke führt ohnehin zur Base */
+@media (max-width: 400px) { .topbar nav a[data-nav="hub"] { display: none; } }
+@media (max-width: 340px) { .wordmark { font-size: 11px; } .topbar nav { gap: 10px; } }
+/* Fallback für ältere iOS-Versionen ohne overflow: clip */
+@supports not (overflow: clip) { html, body { overflow-x: hidden; } }

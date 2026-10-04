@@ -8,6 +8,7 @@ import { recTitle } from './hub.js';
 import { go, toast } from './app.js';
 import { settings, saveSettings, PANEL_SECTIONS } from './settings.js';
 import { icon } from './ui.js';
+import { prime, needsCapture } from './audio.js';
 
 const MARKER_TYPES = {
   start: { label: 'START', color: 'var(--fg)', key: 'S' },
@@ -295,7 +296,18 @@ export async function renderTrain(root, recId) {
   const bOut = ctl('Out', { title: 'Loop-Ende setzen (O)', onclick: () => setOut() });
   const bLoop = ctl('Loop', { title: 'Loop an/aus (L) · ohne In/Out zwischen Start und Ende', onclick: () => toggleLoop() });
   const bClear = ctl('×', { title: 'In/Out löschen', onclick: () => { P.loopIn = P.loopOut = null; P.loopOn = false; update(); } });
-  const bCount = ctl('8er', { title: '8er-Count an/aus (C)', onclick: () => { P.countOn = !P.countOn; update(); } });
+  // Ohne Tempo zählt nichts: dann beim Einschalten den Takt ermitteln (auf dem Handy muss das im Antippen starten)
+  const bCount = ctl('8er', {
+    title: '8er-Count an/aus (C)',
+    onclick: () => {
+      P.countOn = !P.countOn;
+      if (P.countOn && !P.bpm) { prime(blob); runAnalysis(true); }
+      update();
+    },
+  });
+  // „1“ und „Tap“ direkt in der Leiste (ohne Tastatur sonst nur im Menü erreichbar, das dann das Video verdeckt)
+  const bOne = ctl('1', { class: 'ctl touch-only', title: 'Anfangscount: hier ist die 1', onclick: () => setOne() });
+  const bTap = ctl('Tap', { class: 'ctl touch-only', title: 'Im Takt tippen (ab einer „1“ mindestens viermal)', onclick: () => tap() });
   const bBpm = fixed(ctl('', { title: 'Takt einstellen', onclick: e => popover(e.currentTarget, countPop) }), 9);
   const toggleFull = () => {
     if (document.fullscreenElement) { document.exitFullscreen(); return; }
@@ -379,7 +391,7 @@ export async function renderTrain(root, recId) {
   const timeView = h('span.timeview', '');
   const controls = h('div.controls', { style: { position: 'relative' } },
     bPlay, h('span.ctl-sep'), bMirror, bRate, bVol, bImg, h('span.ctl-sep'), bIn, bOut, bLoop, bClear,
-    h('span.ctl-sep'), bCount, bBpm, h('span.ctl-sep'), bAudio, bMark, h('span.ctl-sep'), bFitW, bFitA, bFull, timeView);
+    h('span.ctl-sep'), bCount, bBpm, bOne, bTap, h('span.ctl-sep'), bAudio, bMark, h('span.ctl-sep'), bFitW, bFitA, bFull, timeView);
 
   function update() {
     applyVideo();
@@ -453,14 +465,20 @@ export async function renderTrain(root, recId) {
       h('div.btns',
         small('÷2', () => { if (P.bpm) { P.bpm /= 2; P.manualBeat = true; update(); bpmIn.value = Math.round(P.bpm * 10) / 10; } }),
         small('×2', () => { if (P.bpm) { P.bpm *= 2; P.manualBeat = true; update(); bpmIn.value = Math.round(P.bpm * 10) / 10; } }),
-        small('−10 ms', () => { P.anchor -= 0.01; P.manualBeat = true; update(); }),
-        small('+10 ms', () => { P.anchor += 0.01; P.manualBeat = true; update(); })),
+      ),
+      h('div.btns',
+        // ±10 ms war nicht wahrnehmbar: ganze Zählzeit verschieben (welcher Schlag die „1“ ist) und fein ±25 ms
+        small('« 1 Schlag', () => shiftAnchor(-1, 'beat')),
+        small('1 Schlag »', () => shiftAnchor(1, 'beat'))),
+      h('div.btns',
+        small('−25 ms', () => shiftAnchor(-0.025)),
+        small('+25 ms', () => shiftAnchor(0.025))),
       h('div.btns',
         small(tt('Anfangscount (1)', 'Anfangscount'), () => setOne()),
         small(tt('Tap (T)', 'Tap'), () => tap())),
       h('div.btns',
         small(P.click ? 'Klick an' : 'Klick aus', () => { P.click = !P.click; update(); refreshPop(); }, P.click),
-        small('Neu analysieren', () => { closePop(); P.manualBeat = false; runAnalysis(true); })),
+        small('Neu analysieren', () => { prime(blob); closePop(); P.manualBeat = false; runAnalysis(true); })),
       h('div.prow', h('span', 'Anzeige')),
       h('div.btns', [['s', 'S'], ['m', 'M'], ['l', 'L'], ['xl', 'XL']].map(([k, l]) =>
         small(l, () => { C.size = k; saveCountView(C); update(); refreshPop(); }, C.size === k))),
@@ -491,6 +509,17 @@ export async function renderTrain(root, recId) {
     video.currentTime = loopRange().a;
     update();
   }
+  // Zählung verschieben: ganze Schläge oder Sekunden; kurz anzeigen, damit man die Wirkung sieht
+  function shiftAnchor(n, unit) {
+    if (!P.bpm) { toast('Erst Tempo setzen (Tap oder BPM)'); return; }
+    P.anchor += unit === 'beat' ? n * (60 / P.bpm) : n;
+    P.manualBeat = true;
+    update();
+    status.textContent = unit === 'beat' ? `„1“ ${n > 0 ? 'EINEN SCHLAG SPÄTER' : 'EINEN SCHLAG FRÜHER'}` : `ZÄHLUNG ${n > 0 ? '+' : '−'}25 MS`;
+    clearTimeout(shiftAnchor.t);
+    shiftAnchor.t = setTimeout(() => { status.textContent = ''; }, 1600);
+  }
+
   function setOne() {
     if (!P.bpm) { toast('Erst Tempo setzen (Tap oder BPM)'); return; }
     const beat = 60 / P.bpm;
@@ -782,7 +811,7 @@ export async function renderTrain(root, recId) {
   });
 
   // Songdatei laden / entfernen
-  const songFileIn = h('input', { type: 'file', accept: 'audio/*,.mp3,.m4a,.aac,.wav,.flac,.aiff', hidden: true });
+  const songFileIn = h('input', { type: 'file', accept: 'audio/*,audio/flac,audio/x-flac,.mp3,.m4a,.aac,.wav,.flac,.aiff', hidden: true });
   const songFileRow = h('div.song-step');
   async function setSongFile(file) {
     if (!file) return;
@@ -819,7 +848,7 @@ export async function renderTrain(root, recId) {
       : h('div',
         h('span.label.step-label', 'Songdatei (optional)'),
         h('div.actions', h('button.btn.small', { type: 'button', onclick: () => songFileIn.click() }, 'Songdatei laden')),
-        h('div.label', { style: { marginTop: '6px' } }, 'mp3, m4a, wav · zum Trainieren auf den Song.')));
+        h('div.label', { style: { marginTop: '6px' } }, 'Zum Trainieren auf den Song.')));
   }
   songFileIn.addEventListener('change', () => setSongFile(songFileIn.files[0]));
   renderSongFile();
@@ -1018,7 +1047,14 @@ export async function renderTrain(root, recId) {
   renderRating();
   renderMarkers();
   raf = requestAnimationFrame(loop);
-  if (!P.bpm && !rec.beatTried) setTimeout(() => runAnalysis(false), 300);
+  // Takt automatisch schätzen; auf dem Handy nicht, wenn dafür mitgehört werden muss (geht nur nach Antippen)
+  if (!P.bpm && !rec.beatTried) {
+    if (needsCapture(blob)) {
+      if (song?.bpm) { P.bpm = song.bpm; P.anchor = 0; } // vorläufig Deezer-Tempo, „1“ dann per Knopf setzen
+      status.textContent = '8ER ANTIPPEN, DANN WIRD DER TAKT ERMITTELT';
+    }
+    else setTimeout(() => runAnalysis(false), 300);
+  }
 
   return async () => {
     cancelAnimationFrame(raf);

@@ -51,10 +51,19 @@ async function askRemote(sig) {
   return res.json();
 }
 
+const wait = ms => new Promise(r => setTimeout(r, ms));
+// Läuft lokal server.py? (sonst gehen Anfragen über den öffentlichen Durchreicher)
+let localOk = null;
+async function localAvailable() {
+  if (localOk != null) return localOk;
+  try { const r = await fetch('api/shazam', { method: 'POST', body: '{}' }); localOk = r.status !== 404 && r.status !== 501 && r.status !== 405; } catch { localOk = false; }
+  return localOk;
+}
+
 async function ask(sig) {
   let data = null;
   try {
-    if (IS_LOCAL) data = await askLocal(sig);
+    if (IS_LOCAL && !window.ctForceRemote) data = await askLocal(sig);
     data ??= await askRemote(sig);
   } catch {
     throw new Error('Erkennungsdienst nicht erreichbar');
@@ -98,15 +107,29 @@ export async function scanTrack(blob, onProgress = () => {}) {
     if (typeof m === 'number') entry.offsets.push(m - start);
     byKey.set(key, entry);
   };
-  // drei Anfragen gleichzeitig, um den Durchreicher nicht zu überlasten
-  for (let k = 0; k < starts.length; k += 3) await Promise.all(starts.slice(k, k + 3).map(one));
-  // Abgelehnte Abschnitte (Shazam bremst bei vielen Anfragen kurz hintereinander) einmal nachholen,
-  // nach kurzer Pause und einzeln. Sonst zählen sie als „nicht erkannt“ und verzerren die Mehrheit.
-  if (failed.length) {
+  // Lokal (server.py): drei Anfragen gleichzeitig. Online über den öffentlichen Durchreicher: einzeln mit Pause,
+  // der bremst sonst sofort („Shazam bremst“). Steht ein Song klar vorn, wird früher aufgehört.
+  const remote = window.ctForceRemote || !IS_LOCAL || !(await localAvailable()); // ctForceRemote: zum Testen
+  const clearWinner = () => {
+    const hits = [...byKey.values()].map(e => e.hits).sort((a, b) => b - a);
+    return (hits[0] || 0) >= 4 && hits[0] - (hits[1] || 0) >= 3;
+  };
+  if (remote) {
+    for (const start of starts) {
+      await one(start);
+      if (clearWinner() && byKey.size) break;
+      await wait(700);
+    }
+  } else {
+    for (let k = 0; k < starts.length; k += 3) await Promise.all(starts.slice(k, k + 3).map(one));
+  }
+  // Abgelehnte Abschnitte (Shazam bremst bei vielen Anfragen kurz hintereinander) nachholen: einzeln,
+  // mit wachsender Pause (2 s, 4 s, 8 s). Sonst zählen sie als „nicht erkannt“ und verzerren die Mehrheit.
+  for (let round = 0; failed.length && round < 3 && !clearWinner(); round++) {
     const retry = failed.splice(0);
-    onProgress('Shazam bremst kurz, frage erneut …');
-    await new Promise(r => setTimeout(r, 1500));
-    for (const start of retry) await one(start);
+    onProgress(`Shazam bremst kurz, frage erneut … (${round + 1}/3)`);
+    await wait(2000 * 2 ** round);
+    for (const start of retry) { await one(start); if (remote) await wait(900); }
   }
   if (!answered && lastError) throw lastError;
 

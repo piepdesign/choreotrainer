@@ -3,6 +3,7 @@ import { h, fmt, debounce } from './util.js';
 import { searchSongs, songDetails } from './deezer.js';
 import { recognizeSong, scanTrack, median, enrich } from './recognize.js';
 import { songLink } from './providers.js';
+import { prime } from './audio.js';
 
 const norm = s => String(s || '').trim().toLowerCase();
 export const songKeyOf = s => (s.source === 'deezer' ? `dz:${s.id}` : `m:${norm(s.artist)}|${norm(s.title)}`);
@@ -26,8 +27,9 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
   const suggest = h('div.suggest', { hidden: true });
   const search = h('div.song-search', input, suggest);
   const picked = h('div');
-  const recBtn = h('button.btn.small', { type: 'button', onclick: () => recognize(false) }, 'Aus Video erkennen');
-  const startBtn = h('button.btn.small', { type: 'button', onclick: () => detectStart() }, 'Startpunkt erkennen');
+  // prime(): auf dem Handy muss das Mithören direkt im Antippen starten (iOS)
+  const recBtn = h('button.btn.small', { type: 'button', onclick: () => { prime(getBlob()); recognize(false); } }, 'Aus Video erkennen');
+  const startBtn = h('button.btn.small', { type: 'button', onclick: () => { prime(getBlob()); detectStart(); } }, 'Startpunkt erkennen');
   const recStatus = h('div.label.song-status');
   const startStatus = h('div.label.song-status');
   const altBox = h('div.actions', { style: { marginTop: '6px' } });

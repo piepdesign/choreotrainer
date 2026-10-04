@@ -50,7 +50,7 @@ export async function renderUpload(root, kind, refId) {
     startField: offsetIn,
   });
   // Schritt 3: Songdatei (optional) – gleicher Aufbau wie im Panel der Trainingsansicht
-  const songFileIn = h('input', { type: 'file', accept: 'audio/*,.mp3,.m4a,.aac,.wav,.flac,.aiff', hidden: true });
+  const songFileIn = h('input', { type: 'file', accept: 'audio/*,audio/flac,audio/x-flac,.mp3,.m4a,.aac,.wav,.flac,.aiff', hidden: true });
   const songStep = h('div.song-step', { hidden: !preChoreo?.song });
   function renderSongStep(msg = '') {
     songStep.replaceChildren(songFileIn, h('span.label.step-label', 'Songdatei (optional)'), songFile
@@ -59,7 +59,7 @@ export async function renderUpload(root, kind, refId) {
         h('button.linkbtn', { type: 'button', onclick: () => songFileIn.click() }, 'Ersetzen'),
         h('button.linkbtn', { type: 'button', onclick: () => { songFile = null; renderSongStep(); } }, 'Entfernen'))
       : h('div.actions', h('button.btn.small', { type: 'button', onclick: () => songFileIn.click() }, 'Songdatei laden')),
-    h('div.label', { style: { marginTop: '6px' } }, msg || 'mp3, m4a, wav · zum Trainieren auf den Song.'));
+    h('div.label', { style: { marginTop: '6px' } }, msg || 'Zum Trainieren auf den Song.'));
   }
   songFileIn.addEventListener('change', async () => {
     const f = songFileIn.files[0];

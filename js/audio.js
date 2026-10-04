@@ -9,6 +9,42 @@ const RATE = 2; // Abspielgeschwindigkeit beim Mitschneiden
 
 const touch = () => matchMedia('(hover: none) and (pointer: coarse)').matches;
 
+// Muss das Handy mithören (Weg 2)? Dann braucht iOS ein Antippen, bevor Ton laufen darf.
+export const needsCapture = blob => touch() && (blob.size > MOBILE_LIMIT || /\.mov$/i.test(blob.name || '') || blob.type === 'video/quicktime');
+
+// iOS gibt Ton nur frei, wenn Wiedergabe direkt im Antippen startet. prime(blob) deshalb synchron im
+// Klick-Handler aufrufen (vor jedem await): legt Video und Audio-Kontext an und startet sie kurz.
+let primed = null;
+export function prime(blob) {
+  if (!blob || !touch()) return;
+  if (primed?.blob === blob) return;
+  dropPrimed();
+  const url = URL.createObjectURL(blob);
+  const v = makeVideo(url);
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  ctx.resume().catch(() => {});
+  // Ton gleich in den (stummen) Audio-Graphen leiten, dann kurz mit Ton anspielen: schaltet das Video für iOS frei
+  const src = ctx.createMediaElementSource(v);
+  v.muted = false;
+  v.play().then(() => v.pause()).catch(() => {});
+  primed = { blob, url, v, ctx, src };
+}
+function dropPrimed() {
+  if (!primed) return;
+  primed.v.remove(); URL.revokeObjectURL(primed.url); primed.ctx.close().catch(() => {});
+  primed = null;
+}
+function makeVideo(url) {
+  const v = document.createElement('video');
+  Object.assign(v.style, { position: 'fixed', left: '-10px', top: '-10px', width: '1px', height: '1px', opacity: '0', pointerEvents: 'none' });
+  v.playsInline = true;
+  v.setAttribute('playsinline', '');
+  v.preload = 'auto';
+  v.src = url;
+  document.body.append(v);
+  return v;
+}
+
 // gibt ein Objekt wie AudioBuffer zurück: { duration, sampleRate, numberOfChannels, getChannelData(c) }
 export async function decodeAudio(blob, sampleRate, onProgress = () => {}) {
   if (!window.ctForceCapture && !(touch() && blob.size > MOBILE_LIMIT)) { // ctForceCapture: zum Testen des Ersatzwegs
@@ -22,25 +58,23 @@ export async function decodeAudio(blob, sampleRate, onProgress = () => {}) {
 }
 
 export async function capture(blob, sampleRate, onProgress = () => {}) {
-  const url = URL.createObjectURL(blob);
-  const v = document.createElement('video');
-  Object.assign(v.style, { position: 'fixed', left: '-10px', top: '-10px', width: '1px', height: '1px', opacity: '0', pointerEvents: 'none' });
-  v.playsInline = true;
-  v.setAttribute('playsinline', '');
-  v.preload = 'auto';
-  v.src = url;
-  document.body.append(v);
-  let ctx = null;
+  // vorbereitetes Video/Kontext aus dem Antippen übernehmen (iOS), sonst neu anlegen
+  const own = primed?.blob === blob ? primed : null;
+  primed = null;
+  const url = own?.url || URL.createObjectURL(blob);
+  const v = own?.v || makeVideo(url);
+  let ctx = own?.ctx || null;
   try {
-    await new Promise((resolve, reject) => {
+    if (!(v.readyState >= 1)) await new Promise((resolve, reject) => {
       v.onloadedmetadata = resolve;
       v.onerror = () => reject(new Error('Die Tonspur des Videos lässt sich nicht lesen.'));
     });
+    v.currentTime = 0;
     const dur = v.duration;
-    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    ctx ||= new (window.AudioContext || window.webkitAudioContext)();
     await ctx.resume();
-    if (ctx.state !== 'running') throw new Error('Ton blockiert: bitte auf „Aus Video erkennen“ tippen, dann startet das Mithören.');
-    const src = ctx.createMediaElementSource(v);
+    if (ctx.state !== 'running') throw new Error('Ton blockiert: bitte auf den Knopf tippen, dann startet das Mithören.');
+    const src = own?.src || ctx.createMediaElementSource(v);
     const proc = ctx.createScriptProcessor(4096, 1, 1);
     const chunks = [];
     let n = 0;
@@ -58,11 +92,18 @@ export async function capture(blob, sampleRate, onProgress = () => {}) {
     v.volume = 1;
     const tick = setInterval(() => onProgress(`Höre Tonspur ab … ${Math.round((v.currentTime / dur) * 100)} %`), 500);
     try {
-      await v.play();
+      try { await v.play(); } catch { throw new Error('Ton blockiert: bitte auf den Knopf tippen, dann startet das Mithören.'); }
       await new Promise((resolve, reject) => {
         v.onended = resolve;
         v.onerror = () => reject(new Error('Wiedergabe abgebrochen'));
         setTimeout(() => reject(new Error('Mithören dauert zu lange')), (dur / RATE + 30) * 1000);
+        // hängt die Wiedergabe (z. B. vom Handy angehalten), nicht ewig warten
+        let last = -1, still = 0;
+        const watch = setInterval(() => {
+          if (v.ended) { clearInterval(watch); return; }
+          if (v.currentTime === last) { if (++still >= 8) { clearInterval(watch); reject(new Error('Mithören hängt. Bitte erneut auf den Knopf tippen.')); } } else { still = 0; last = v.currentTime; }
+        }, 500);
+        v.addEventListener('ended', () => clearInterval(watch), { once: true });
       });
     } finally {
       clearInterval(tick);
