@@ -1,7 +1,7 @@
 // Service Worker: macht die App installierbar und offline startbar.
 // Netz zuerst (neue Versionen kommen sofort an), ohne Netz die zuletzt geladene Fassung aus dem Zwischenspeicher.
 // Gemerkt werden nur eigene Dateien und die Schriften, keine Anfragen an Deezer, Shazam usw.
-const CACHE = 'ct-v1';
+const CACHE = 'ct-v2';
 const keep = url => url.origin === location.origin || url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com';
 
 self.addEventListener('install', () => self.skipWaiting());
@@ -24,7 +24,10 @@ self.addEventListener('fetch', e => {
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);
     try {
-      const res = await fetch(req);
+      // eigene Dateien immer beim Server nachfragen (sonst liefert der Browser-Cache bis zu 10 min die alte Fassung,
+      // GitHub Pages schickt max-age=600); unverändert kommt nur ein kurzes „304“ zurück
+      const fresh = req.mode === 'navigate' ? new Request(req.url, { cache: 'no-cache' }) : new Request(req, { cache: 'no-cache' }); // Seitenaufruf lässt sich nicht mit Optionen kopieren
+      const res = await fetch(url.origin === location.origin ? fresh : req);
       if (res.ok || res.type === 'opaque') cache.put(req, res.clone()).catch(() => {});
       return res;
     } catch (err) {

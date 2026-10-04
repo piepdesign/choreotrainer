@@ -5,6 +5,7 @@ import { h, isTouch, onHold } from './util.js';
 import { brandIcon } from './brand-icons.js';
 import { searchSongs, songDetails } from './deezer.js';
 import { settings, saveSettings } from './settings.js';
+import { toast } from './app.js';
 
 export const PROVIDERS = [
   ['spotify', 'Spotify'],
@@ -163,10 +164,16 @@ export function songLink(el, song) {
 // Die Adressen sind signiert und laufen ab, daher frisch holen und nur kurz merken.
 const previewCache = new Map();
 const norm = s => clean(s).toLowerCase().replace(/[^a-z0-9äöüß]+/g, ' ').trim();
-async function previewUrl(song) {
-  const key = song.source === 'deezer' && song.id ? `dz:${song.id}` : `q:${norm(song.artist)}|${norm(song.title)}`;
+const inflight = new Map(); // gleiche Suche nicht doppelt starten (Vorladen und Überfahren gleichzeitig)
+const previewKey = song => (song.source === 'deezer' && song.id ? `dz:${song.id}` : `q:${norm(song.artist)}|${norm(song.title)}`);
+function previewUrl(song) {
+  const key = previewKey(song);
   const hit = previewCache.get(key);
-  if (hit && Date.now() - hit.t < 10 * 60 * 1000) return hit.url;
+  if (hit && Date.now() - hit.t < 10 * 60 * 1000) return Promise.resolve(hit.url);
+  if (!inflight.has(key)) inflight.set(key, lookupPreview(song, key).finally(() => inflight.delete(key)));
+  return inflight.get(key);
+}
+async function lookupPreview(song, key) {
   let url = '';
   try {
     if (song.source === 'deezer' && song.id) url = (await songDetails(song.id))?.preview || '';
@@ -176,7 +183,8 @@ async function previewUrl(song) {
       url = (list.find(x => x.preview && norm(x.title).startsWith(t)) || list.find(x => x.preview))?.preview || '';
     }
   } catch { /* keine Hörprobe */ }
-  previewCache.set(key, { url, t: Date.now() });
+  // Treffer 10 min merken, Fehlschlag (z. B. Deezer kurz nicht erreichbar) nur 30 s, damit es bald wieder versucht wird
+  previewCache.set(key, { url, t: url ? Date.now() : Date.now() - 9.5 * 60 * 1000 });
   return url;
 }
 
@@ -192,7 +200,7 @@ addEventListener('touchend', () => {
   player.src = SILENT;
   player.play().then(() => player.pause()).catch(() => {});
 }, { once: true, capture: true });
-let owner = null, fadeTimer = null;
+let owner = null, fadeTimer = null, hinted = false;
 function fadeTo(target, ms, done) {
   clearInterval(fadeTimer);
   const start = player.volume, t0 = performance.now();
@@ -216,8 +224,9 @@ function previewOnHover(el, song) {
     if (!level) return; // in den Einstellungen abgeschaltet
     wanted = true;
     timer = setTimeout(async () => {
+      el.classList.add('preview-wait'); // Rahmen schon zeigen, solange die Hörprobe noch gesucht/geladen wird
       const url = await previewUrl(song);
-      if (!url || !wanted) return;
+      if (!url || !wanted) { el.classList.remove('preview-wait'); return; }
       stopPreview();
       owner = el;
       if (player.src !== url) player.src = url;
@@ -225,15 +234,52 @@ function previewOnHover(el, song) {
       player.volume = 0;
       try {
         await player.play();
+        el.classList.remove('preview-wait');
         if (owner !== el) return;
         el.classList.add('previewing');
         fadeTo(level, 300);
-      } catch { owner = null; } // ohne vorherigen Klick auf der Seite blockt der Browser den Ton
+      } catch (e) {
+        owner = null;
+        el.classList.remove('preview-wait');
+        // Browser spielen Ton erst, nachdem einmal auf die Seite geklickt/getippt wurde (Überfahren zählt nicht).
+        // Darum blieb das erste Cover nach dem Laden stumm, und nach einem Klick ging es überall. Einmal darauf hinweisen.
+        if (e?.name === 'NotAllowedError' && !hinted) { hinted = true; toast('Hörprobe: Einmal irgendwo auf die Seite klicken, dann spielt sie beim Darüberfahren.', 4500); }
+      }
     }, delay);
   };
-  const stop = () => { wanted = false; clearTimeout(timer); if (owner === el) stopPreview(); };
+  const stop = () => { wanted = false; clearTimeout(timer); el.classList.remove('preview-wait'); if (owner === el) stopPreview(); };
   el.addEventListener('mouseenter', () => { if (!isTouch()) start(250); }); // kurz warten: Überfahren spielt nichts
   el.addEventListener('mouseleave', () => { if (!isTouch()) stop(); });
   onHold(el, () => start(0), stop);
+  watchCover(el, song);
+}
+
+// Hörproben der sichtbaren Cover vorab suchen (nacheinander, mit Pause), damit beim Überfahren sofort Ton kommt.
+// Vorher dauerte die erste Suche nach dem Laden teils Sekunden, das erste Cover blieb scheinbar stumm.
+const prefetchQueue = [];
+let prefetching = false;
+async function pumpPrefetch() {
+  if (prefetching) return;
+  prefetching = true;
+  while (prefetchQueue.length) {
+    const song = prefetchQueue.shift();
+    if (PREVIEW_VOLUME[settings().hoverPreview] ?? PREVIEW_VOLUME.mid) await previewUrl(song).catch(() => {});
+    await new Promise(r => setTimeout(r, 250));
+  }
+  prefetching = false;
+}
+const coverSongs = new WeakMap();
+const coverObserver = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
+  for (const e of entries) {
+    if (!e.isIntersecting) continue;
+    coverObserver.unobserve(e.target);
+    const song = coverSongs.get(e.target);
+    if (song && !prefetchQueue.some(s => previewKey(s) === previewKey(song))) { prefetchQueue.push(song); pumpPrefetch(); }
+  }
+}, { rootMargin: '800px' }) : null; // auch knapp außerhalb des Bildschirms schon vorladen
+function watchCover(el, song) {
+  if (!coverObserver) return;
+  coverSongs.set(el, song);
+  coverObserver.observe(el);
 }
 player.addEventListener('ended', () => { owner?.classList.remove('previewing'); owner = null; });

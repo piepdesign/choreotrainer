@@ -2,7 +2,7 @@
 // Die Sicherung enthält alle Eingaben (Classes, Choreos, Aufnahmen samt Markern/Notizen/Status, Einheiten, Profil)
 // und wahlweise die Videos und Songdateien. Ohne Videos werden sie nach dem Wiederherstellen über Dateiname, Größe
 // und Länge wieder ihren Aufnahmen zugeordnet.
-import { db, untracked } from './db.js';
+import { db, untracked, deleteChoreo } from './db.js';
 
 const STORES = ['classes', 'choreos', 'recordings', 'sessions'];
 const FORMAT = 'choreotrainer-sicherung';
@@ -46,7 +46,7 @@ export function registerServiceWorker() {
 }
 
 // ── Sicherung ──
-// Ohne Videos: JSON-Datei. Mit Videos: eine Datei „.ctbackup“: 8 Zeichen Kennung „CTBACKUP“, 8 Byte Länge des
+// Eine Datei „.ctbackup“ (mit oder ohne Videos): 8 Zeichen Kennung „CTBACKUP“, 8 Byte Länge des
 // Kopfes (JSON, UTF-8), Kopf, danach die Videos und Songdateien unverändert hintereinander. Der Kopf nennt je Datei
 // Schlüssel, Name, Typ, Größe und Position. Die Videos werden nicht in den Arbeitsspeicher geladen, sondern direkt
 // aus der Datenbank in die Datei geschrieben (und beim Wiederherstellen direkt aus der Datei gelesen).
@@ -79,12 +79,7 @@ export async function exportBackup({ videos = true } = {}) {
   const data = await collect();
   const date = new Date().toISOString().slice(0, 10);
   const counts = Object.fromEntries(STORES.map(s => [s, data[s].length]));
-  if (!videos) {
-    const backup = { format: FORMAT, version: 1, exportedAt: Date.now(), data };
-    download(new Blob([JSON.stringify(backup)], { type: 'application/json' }), `choreotrainer-sicherung-${date}.json`);
-    return { counts, videos: 0, bytes: 0 };
-  }
-  const blobs = await videoBlobs();
+  const blobs = videos ? await videoBlobs() : []; // „Ohne Videos“: gleiche Datei, nur ohne angehängte Dateien
   let offset = 0;
   const files = blobs.map(([key, b]) => { const f = { key, name: b.name || '', type: b.type || '', size: b.size, offset }; offset += b.size; return f; });
   const head = new TextEncoder().encode(JSON.stringify({ format: FORMAT, version: 2, exportedAt: Date.now(), data, files }));
@@ -94,23 +89,30 @@ export async function exportBackup({ videos = true } = {}) {
   return { counts, videos: files.length, bytes: offset };
 }
 
-// liest beide Formate; bei .ctbackup bleiben die Videos Ausschnitte der gewählten Datei (nichts wird kopiert)
+// Nur .ctbackup. Die Videos bleiben Ausschnitte der gewählten Datei (nichts wird in den Arbeitsspeicher kopiert).
 export async function readBackup(file) {
-  const fail = () => { throw new Error('Die Datei ist keine ChoreoTrainer-Sicherung.'); };
-  const start = new TextDecoder().decode(await file.slice(0, 8).arrayBuffer());
-  let backup, base = 0;
-  if (start === MAGIC) {
-    const len = Number(new DataView(await file.slice(8, 16).arrayBuffer()).getBigUint64(0, true));
-    if (!(len > 0 && 16 + len <= file.size)) fail();
-    try { backup = JSON.parse(new TextDecoder().decode(await file.slice(16, 16 + len).arrayBuffer())); } catch { fail(); }
-    base = 16 + len;
-  } else {
-    try { backup = JSON.parse(await file.text()); } catch { fail(); }
-  }
+  const fail = () => { throw new Error('Bitte eine ChoreoTrainer-Sicherung (.ctbackup) wählen.'); };
+  if (!/\.ctbackup$/i.test(file.name || '')) fail();
+  if (new TextDecoder().decode(await file.slice(0, 8).arrayBuffer()) !== MAGIC) fail();
+  const len = Number(new DataView(await file.slice(8, 16).arrayBuffer()).getBigUint64(0, true));
+  if (!(len > 0 && 16 + len <= file.size)) fail();
+  let backup;
+  try { backup = JSON.parse(new TextDecoder().decode(await file.slice(16, 16 + len).arrayBuffer())); } catch { fail(); }
   if (backup?.format !== FORMAT || !backup.data) fail();
+  const base = 16 + len;
   backup.videos = (backup.files || []).filter(f => base + f.offset + f.size <= file.size)
     .map(f => [f.key, new File([file.slice(base + f.offset, base + f.offset + f.size)], f.name || f.key, { type: f.type })]);
   return backup;
+}
+
+// Speicher freigeben: alle Choreos mit Aufnahmen, Videos, Songdateien und Einheiten löschen.
+// Classes, Profil und Präferenzen bleiben. Nicht im Rückgängig-Verlauf (sonst hielte der Verlauf die Videos fest).
+export async function deleteRecordings() {
+  await untracked(async () => {
+    for (const c of await db.all('choreos')) await deleteChoreo(c.id);
+    for (const key of await db.keys('videos')) await db.del('videos', key); // übrig gebliebene Dateien ohne Choreo
+    for (const s of await db.all('sessions')) await db.del('sessions', s.id);
+  });
 }
 
 // Einträge mit gleicher ID werden überschrieben, alles andere bleibt. Nicht im Rückgängig-Verlauf.

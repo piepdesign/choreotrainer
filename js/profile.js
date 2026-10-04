@@ -2,7 +2,7 @@
 // und Präferenzen. Diagramme als schlankes SVG: Mengen in Graustufen (eine Skala), Identität über
 // Class-Farben, Werte immer in Textfarbe, Tooltip auf jedem Datenpunkt.
 import { db, deleteAllData } from './db.js';
-import { h, tt, fmt, fmtDuration, relDate, fmtRecDate, classTitle, stripe, byClassOrder, WEEKDAYS, textOn, plural } from './util.js';
+import { h, tt, isTouch, fmt, fmtDuration, relDate, fmtRecDate, classTitle, stripe, byClassOrder, WEEKDAYS, textOn, plural } from './util.js';
 import { loadAll, dots, choreoCard, recTitle, nextClass } from './hub.js';
 import { songLink } from './providers.js';
 import { baseStats, latestRating, choreoLength, weekStart, dayKey } from './stats.js';
@@ -10,7 +10,7 @@ import { settings, saveSettings, applyTheme, resetSettings, BASE_STATS } from '.
 import { classManager } from './classform.js';
 import { go, toast, replaceHash } from './app.js';
 import { preferences } from './ui.js';
-import { storageState, askPersist, isInstalled, isIOS, canPromptInstall, promptInstall, exportBackup, readBackup, restoreBackup, missingVideos, relinkVideos, videoBytes } from './backup.js';
+import { storageState, askPersist, isInstalled, isIOS, canPromptInstall, promptInstall, exportBackup, readBackup, restoreBackup, missingVideos, relinkVideos, videoBytes, deleteRecordings } from './backup.js';
 
 const DAY = 86400000;
 const NS = 'http://www.w3.org/2000/svg';
@@ -486,7 +486,8 @@ export async function renderProfile(root, section) {
     const cards = [
       accRow('Speicher', [
         h('p.acc-lead', st.persisted ? 'Dauerhaft: Der Browser räumt die Daten nicht von sich aus.' : 'Nicht dauerhaft: Der Browser darf die Daten bei Platzmangel oder längerer Pause räumen.'),
-        st.usage != null ? h('p.acc-note', `Belegt: ${mb(st.usage)}${st.quota ? ` von ${mb(st.quota)}` : ''}`) : null,
+        // quota ist nur der Rahmen, den der Browser dieser Seite gerade zugesteht (Schätzwert, am iPhone klein und teils unter der Belegung)
+        st.usage != null ? h('p.acc-note', `Belegt: ${mb(st.usage)}${st.quota > st.usage ? ` · Rahmen laut Browser: ${mb(st.quota)}` : ''}`) : null,
         h('p.acc-note', 'Bewusstes Löschen der Websitedaten verhindert das nicht, dafür gibt es die Sicherung.')],
         st.persisted || !st.supported ? null : h('button.btn.small', {
           type: 'button',
@@ -513,8 +514,8 @@ export async function renderProfile(root, section) {
           h('p.acc-note', 'Sicherung ohne Videos: Videos danach unter „Videos zuordnen“ wählen.')],
         h('button.btn.small', {
           type: 'button',
-          // ohne Dateityp-Filter: iPhone graut unbekannte Endungen (.ctbackup) sonst aus; geprüft wird nach dem Wählen
-          onclick: () => pick('', false, async ([file]) => {
+          // nur .ctbackup; am Handy ohne Filter (iPhone graut unbekannte Endungen sonst aus), geprüft wird nach dem Wählen
+          onclick: () => pick(isTouch() ? '' : '.ctbackup', false, async ([file]) => {
             try {
               const b = await readBackup(file);
               const n = b.data.choreos?.length || 0, r = b.data.recordings?.length || 0, v = b.videos.length;
@@ -539,6 +540,20 @@ export async function renderProfile(root, section) {
           renderData();
         }),
       }, 'Videos wählen')));
+    cards.push(accRow('Aufnahmen löschen', [h('p.acc-lead', 'Gibt Speicher frei, löscht:'),
+        h('ul.acc-list', h('li', 'Choreos und Aufnahmen'), h('li', 'Videos und Songdateien'), h('li', 'Einheiten')),
+        h('p.acc-note', `Bleibt: Classes, Profil, Präferenzen. Vorher sichern, wenn du sie behalten willst. Belegt durch Videos: ${mb(vBytes)}.`)],
+      h('button.btn.small.danger', {
+        type: 'button',
+        onclick: async () => {
+          if (!confirm('Alle Choreos, Aufnahmen, Videos, Songdateien und Einheiten löschen? Classes, Profil und Präferenzen bleiben. Lässt sich nicht rückgängig machen.')) return;
+          const before = (await storageState()).usage;
+          await deleteRecordings();
+          const after = (await storageState()).usage;
+          toast(before != null && after != null && before > after ? `Gelöscht, ${mb(before - after)} frei` : 'Gelöscht. Der Browser gibt den Speicher teils erst nach einem Neustart frei.', 5000);
+          renderData();
+        },
+      }, 'Aufnahmen löschen')));
     cards.push(accRow('App', [
         h('p.acc-lead', installed ? 'Läuft als App.' : 'Als App installieren:'),
         h('ul.acc-list', h('li', 'Startet vom Home-Bildschirm'), h('li', 'Daten bleiben dauerhaft'), h('li', 'Startet auch ohne Internet')),

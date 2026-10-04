@@ -80,7 +80,13 @@ async function track(name, key, after) {
   group ||= [];
   const known = group.find(e => e.name === name && e.key === key);
   if (known) known.after = snap(after);
-  else group.push({ name, key, before: snap(before), after: snap(after) });
+  else {
+    const entry = { name, key, before: snap(before), after: snap(after) };
+    group.push(entry);
+    // Videos nur 1 Minute rückgängig machbar: Solange der Verlauf ein gelöschtes Video festhält, gibt der Browser
+    // dessen Speicher nicht frei. Danach stellt Rückgängig die Aufnahme ohne Video wieder her (Video neu wählbar).
+    if (name === 'videos') setTimeout(() => { if (isBlob(entry.before)) entry.before = undefined; if (isBlob(entry.after)) entry.after = undefined; }, 60000);
+  }
   redoStack.length = 0;
   clearTimeout(groupTimer);
   groupTimer = setTimeout(closeGroup, 700);

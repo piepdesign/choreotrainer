@@ -667,8 +667,9 @@ a.stat-link:hover { background: var(--surface-2); }
 .cover-wrap { position: relative; display: block; flex: none; width: fit-content; height: fit-content; align-self: start; justify-self: start; line-height: 0; }
 .cover-wrap::after { content: ''; position: absolute; inset: 0; border: 3px solid #fff; mix-blend-mode: difference; opacity: 0; pointer-events: none; transition: opacity .15s; }
 .cover-wrap.previewing::after { opacity: 1; animation: preview-pulse 1.2s ease-in-out infinite; }
+.cover-wrap.preview-wait::after { opacity: .45; animation: preview-pulse 1.2s ease-in-out infinite; } /* Hörprobe lädt */
 @keyframes preview-pulse { 50% { opacity: .35; } }
-@media (prefers-reduced-motion: reduce) { .cover-wrap.previewing::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .cover-wrap.previewing::after, .cover-wrap.preview-wait::after { animation: none; } }
 
 /* Choreo-Kachel: Cover klein auf dem Video, Textzeilen einzeilig (gleich hohe, ruhige Kacheln) */
 .card .thumb .cover-wrap { position: absolute; left: 8px; bottom: 14px; z-index: 2; }
