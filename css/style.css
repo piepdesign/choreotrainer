@@ -709,7 +709,8 @@ body.intro-open .tester-fab { display: none; }
 .tour-list { display: grid; grid-template-columns: max-content 1fr; gap: 5px 12px; margin: 2px 0 0; }
 .tour-list dt { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .tour-list dd { margin: 0; }
-.tour-list { align-items: center; }
+.tour-list { align-items: baseline; } /* Wort-Stichwort auf Höhe der ersten Zeile */
+.tour-list dt:has(.tour-ico, .tour-chip) { align-self: center; }
 .tour-ico, .tour-chip { display: inline-grid; place-items: center; box-sizing: border-box; width: 48px; height: 26px; border: 1px solid var(--rule); color: var(--fg); background: var(--surface); } /* alle gleich breit */
 .tour-chip { font-size: 10.5px; letter-spacing: .04em; white-space: nowrap; }
 .tour-kbd { white-space: nowrap; }

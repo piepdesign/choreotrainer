@@ -14,7 +14,7 @@ import { prime, needsCapture } from './audio.js';
 const MARKER_TYPES = {
   start: { label: 'START', color: 'var(--fg)', key: 'S' },
   end: { label: 'ENDE', color: 'var(--fg)', key: 'E' },
-  memo: { label: 'GEDANKE', color: 'var(--c4)', key: 'N' },
+  memo: { label: 'NOTIZ', color: 'var(--c4)', key: 'N' }, // Typ-Schlüssel bleibt „memo“ (gespeicherte Daten)
   highlight: { label: 'HIGHLIGHT', color: 'var(--c1)', key: 'H' },
 };
 
@@ -800,7 +800,7 @@ export async function renderTrain(root, recId) {
           small('Hierhin', () => { video.currentTime = m.t; menuFor = null; renderMarkers(); }),
           small('Auf jetzt setzen', () => { m.t = video.currentTime; rec.markers.sort((a, b) => a.t - b.t); menuFor = null; update(); renderMarkers(); }),
           small('Löschen', () => { rec.markers = rec.markers.filter(x => x !== m); menuFor = null; update(); renderMarkers(); }),
-          // Art wechseln, z. B. einen als Gedanke angelegten „Ende“-Marker zum echten Ende machen (zählt dann für den Loop)
+          // Art wechseln, z. B. einen als Notiz angelegten „Ende“-Marker zum echten Ende machen (zählt dann für den Loop)
           h('span.label.menu-sep', 'Art:'),
           ...Object.entries(MARKER_TYPES).filter(([t]) => t !== m.type).map(([t, def]) => small(def.label.charAt(0) + def.label.slice(1).toLowerCase(), () => {
             if (t === 'start' || t === 'end') rec.markers = rec.markers.filter(x => x === m || x.type !== t); // Start/Ende gibt es je einmal
@@ -948,7 +948,7 @@ export async function renderTrain(root, recId) {
   const KEYS = [
     ['␣', 'Play/Pause'], ['← →', '±2 s (⇧ ±0,2)'], ['M', 'Spiegeln'], ['↑ ↓', 'Tempo'],
     ['I / O', 'Loop In/Out'], ['L', 'Loop'], ['C', '8er-Count'], ['T', 'Tap-Tempo'],
-    ['1', 'Anfangscount'], ['S / E', 'Start/Ende'], ['N', 'Gedanke'], ['H', 'Highlight'], ['F', 'Vollbild'], ['A', 'Ton Video/Song'], ['P', 'Seitenpanel'], ['⌘Z', 'Rückgängig'], ['⌘⇧Z', 'Wiederherstellen'],
+    ['1', 'Anfangscount'], ['S / E', 'Start/Ende'], ['N', 'Notiz'], ['H', 'Highlight'], ['F', 'Vollbild'], ['A', 'Ton Video/Song'], ['P', 'Seitenpanel'], ['⌘Z', 'Rückgängig'], ['⌘⇧Z', 'Wiederherstellen'],
   ];
   const keysBody = [h('div.keys', { style: { '--rows': Math.ceil(KEYS.length / 2) } }, KEYS.map(([k, d]) => h('div', h('kbd', k), ' ', d)))];
   const SECTIONS = {
