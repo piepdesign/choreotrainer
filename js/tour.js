@@ -257,7 +257,7 @@ export function trainTour() {
     { target: '.controls > .ctl-group:nth-child(4)', block: true, title: 'Bild', text: [
       [ico('mirror'), ['Spiegelt das Video', key('M')]],
       [ico('image'), 'Helligkeit und Kontrast'],
-      [ico('marker'), ['Markierungen setzen: Start', key('S'), ', Ende', key('E'), ', Notiz', key('N'), ', Highlight', key('H')]]] },
+      [ico('marker'), 'Markierungen setzen']] },
     { target: '.controls > .ctl-group:nth-child(5)', block: true, title: 'Ansicht', text: [
       [ico('fitWidth'), 'Volle Breite'],
       [ico('fitAll'), 'Ganzes Bild'],
@@ -279,8 +279,7 @@ export function trainTour() {
     { target: sec('notes'), block: true, side: true, before: panelOpen, title: 'Notizen', text: [
       ['Feld', 'Eigene Notizen zur Aufnahme, speichert automatisch']] },
     { target: sec('status'), block: true, side: true, before: panelOpen, title: 'Status', text: [
-      ['1 bis 5', 'Bewertet, wie gut du die Choreo kannst'],
-      ['Darunter', 'Übungszeit und wann zuletzt geübt']] },
+      ['1 bis 5', 'Bewertet, wie gut du die Choreo kannst']] },
     { target: sec('recs'), block: true, side: true, before: panelOpen, title: 'Aufnahmen', text: [
       ['Liste', 'Wechselt zu einer anderen Aufnahme der Choreo'],
       ['Name', 'Benennt die aktuelle Aufnahme um'],
