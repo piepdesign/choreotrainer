@@ -301,7 +301,7 @@ export async function renderTrain(root, recId) {
   const fixed = (el, chars) => { el.classList.add('fixed'); el.style.width = `calc(${chars}ch + ${chars * 0.08}em + 20px)`; return el; };
   const bPlay = h('button.ctl.icon-ctl', { type: 'button', title: tt('Play/Pause (Leertaste)', 'Play/Pause'), 'aria-label': 'Play/Pause', html: icon('play'), onclick: () => togglePlay() });
   const bMirror = h('button.ctl.icon-ctl', { type: 'button', title: tt('Spiegeln (M)', 'Spiegeln'), 'aria-label': 'Spiegeln', html: icon('mirror'), onclick: () => { P.mirror = !P.mirror; update(); } });
-  const bRate = h('button.ctl.icon-ctl', { type: 'button', title: 'Tempo', 'aria-label': 'Tempo', html: icon('tempo'), onclick: e => popover(e.currentTarget, ratePop) });
+  const bRate = h('button.ctl.icon-ctl.rate', { type: 'button', title: 'Tempo', 'aria-label': 'Tempo', html: icon('tempo'), onclick: e => popover(e.currentTarget, ratePop) });
   const bVol = h('button.ctl.icon-ctl', { type: 'button', title: 'Lautstärke', 'aria-label': 'Lautstärke', onclick: e => popover(e.currentTarget, volPop) });
   const bImg = h('button.ctl.icon-ctl', { type: 'button', title: 'Bild: Helligkeit/Kontrast', 'aria-label': 'Bild: Helligkeit/Kontrast', html: icon('image'), onclick: e => popover(e.currentTarget, imgPop) });
   const bIn = ctl('In', { title: 'Loop-Anfang setzen (I)', onclick: () => setIn() });
