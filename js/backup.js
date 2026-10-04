@@ -1,7 +1,7 @@
 // Datensicherung: dauerhafter Speicher, App-Installation, Sicherung als Datei.
-// Die Sicherung enthält alle Eingaben (Classes, Choreos, Aufnahmen samt Markern/Notizen/Status, Einheiten, Profil),
-// aber keine Videos und Songdateien: die sind groß und liegen ohnehin noch auf dem Gerät. Nach dem Wiederherstellen
-// werden die Videos über Dateiname, Größe und Länge wieder ihren Aufnahmen zugeordnet.
+// Die Sicherung enthält alle Eingaben (Classes, Choreos, Aufnahmen samt Markern/Notizen/Status, Einheiten, Profil)
+// und wahlweise die Videos und Songdateien. Ohne Videos werden sie nach dem Wiederherstellen über Dateiname, Größe
+// und Länge wieder ihren Aufnahmen zugeordnet.
 import { db, untracked } from './db.js';
 
 const STORES = ['classes', 'choreos', 'recordings', 'sessions'];
@@ -46,38 +46,83 @@ export function registerServiceWorker() {
 }
 
 // ── Sicherung ──
-export async function exportBackup() {
+// Ohne Videos: JSON-Datei. Mit Videos: eine Datei „.ctbackup“: 8 Zeichen Kennung „CTBACKUP“, 8 Byte Länge des
+// Kopfes (JSON, UTF-8), Kopf, danach die Videos und Songdateien unverändert hintereinander. Der Kopf nennt je Datei
+// Schlüssel, Name, Typ, Größe und Position. Die Videos werden nicht in den Arbeitsspeicher geladen, sondern direkt
+// aus der Datenbank in die Datei geschrieben (und beim Wiederherstellen direkt aus der Datei gelesen).
+const MAGIC = 'CTBACKUP';
+
+async function collect() {
   const data = {};
   for (const s of STORES) data[s] = await db.all(s);
   data.settings = (await db.get('settings', 'profile')) || {};
-  const backup = { format: FORMAT, version: 1, exportedAt: Date.now(), data };
-  const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
-  const name = `choreotrainer-sicherung-${new Date().toISOString().slice(0, 10)}.json`;
+  return data;
+}
+async function videoBlobs() {
+  const out = [];
+  for (const key of await db.keys('videos')) { const b = await db.get('videos', key); if (b) out.push([key, b]); }
+  return out;
+}
+export async function videoBytes() { return (await videoBlobs()).reduce((a, [, b]) => a + b.size, 0); }
+
+function download(blob, name) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
   document.body.append(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-  return { name, counts: Object.fromEntries(STORES.map(s => [s, data[s].length])) };
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
 }
 
+export async function exportBackup({ videos = true } = {}) {
+  const data = await collect();
+  const date = new Date().toISOString().slice(0, 10);
+  const counts = Object.fromEntries(STORES.map(s => [s, data[s].length]));
+  if (!videos) {
+    const backup = { format: FORMAT, version: 1, exportedAt: Date.now(), data };
+    download(new Blob([JSON.stringify(backup)], { type: 'application/json' }), `choreotrainer-sicherung-${date}.json`);
+    return { counts, videos: 0, bytes: 0 };
+  }
+  const blobs = await videoBlobs();
+  let offset = 0;
+  const files = blobs.map(([key, b]) => { const f = { key, name: b.name || '', type: b.type || '', size: b.size, offset }; offset += b.size; return f; });
+  const head = new TextEncoder().encode(JSON.stringify({ format: FORMAT, version: 2, exportedAt: Date.now(), data, files }));
+  const len = new Uint8Array(8);
+  new DataView(len.buffer).setBigUint64(0, BigInt(head.length), true);
+  download(new Blob([MAGIC, len, head, ...blobs.map(([, b]) => b)], { type: 'application/octet-stream' }), `choreotrainer-sicherung-${date}.ctbackup`);
+  return { counts, videos: files.length, bytes: offset };
+}
+
+// liest beide Formate; bei .ctbackup bleiben die Videos Ausschnitte der gewählten Datei (nichts wird kopiert)
 export async function readBackup(file) {
-  let backup;
-  try { backup = JSON.parse(await file.text()); } catch { throw new Error('Die Datei ist keine ChoreoTrainer-Sicherung.'); }
-  if (backup?.format !== FORMAT || !backup.data) throw new Error('Die Datei ist keine ChoreoTrainer-Sicherung.');
+  const fail = () => { throw new Error('Die Datei ist keine ChoreoTrainer-Sicherung.'); };
+  const start = new TextDecoder().decode(await file.slice(0, 8).arrayBuffer());
+  let backup, base = 0;
+  if (start === MAGIC) {
+    const len = Number(new DataView(await file.slice(8, 16).arrayBuffer()).getBigUint64(0, true));
+    if (!(len > 0 && 16 + len <= file.size)) fail();
+    try { backup = JSON.parse(new TextDecoder().decode(await file.slice(16, 16 + len).arrayBuffer())); } catch { fail(); }
+    base = 16 + len;
+  } else {
+    try { backup = JSON.parse(await file.text()); } catch { fail(); }
+  }
+  if (backup?.format !== FORMAT || !backup.data) fail();
+  backup.videos = (backup.files || []).filter(f => base + f.offset + f.size <= file.size)
+    .map(f => [f.key, new File([file.slice(base + f.offset, base + f.offset + f.size)], f.name || f.key, { type: f.type })]);
   return backup;
 }
 
 // Einträge mit gleicher ID werden überschrieben, alles andere bleibt. Nicht im Rückgängig-Verlauf.
-export async function restoreBackup(backup) {
+export async function restoreBackup(backup, onProgress = () => {}) {
   await untracked(async () => {
     for (const s of STORES) for (const v of backup.data[s] || []) if (v?.id) await db.put(s, v);
     if (backup.data.settings && typeof backup.data.settings === 'object') {
       const cur = (await db.get('settings', 'profile')) || {};
       await db.put('settings', { ...cur, ...backup.data.settings }, 'profile');
     }
+    let i = 0;
+    for (const [key, f] of backup.videos || []) { onProgress(++i, backup.videos.length); await db.put('videos', f, key); }
   });
 }
 

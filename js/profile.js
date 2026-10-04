@@ -10,7 +10,7 @@ import { settings, saveSettings, applyTheme, resetSettings, BASE_STATS } from '.
 import { classManager } from './classform.js';
 import { go, toast, replaceHash } from './app.js';
 import { preferences } from './ui.js';
-import { storageState, askPersist, isInstalled, isIOS, canPromptInstall, promptInstall, exportBackup, readBackup, restoreBackup, missingVideos, relinkVideos } from './backup.js';
+import { storageState, askPersist, isInstalled, isIOS, canPromptInstall, promptInstall, exportBackup, readBackup, restoreBackup, missingVideos, relinkVideos, videoBytes } from './backup.js';
 
 const DAY = 86400000;
 const NS = 'http://www.w3.org/2000/svg';
@@ -475,8 +475,12 @@ export async function renderProfile(root, section) {
     document.body.append(input);
     input.click();
   };
+  let withVideos = true; // Sicherung mit Videos (Standard) oder nur die Eingaben
+  const videoSeg = () => h('div.seg', [[true, 'Mit'], [false, 'Ohne']].map(([v, l]) => h(`button.ctl${withVideos === v ? '.on' : ''}`, {
+    type: 'button', onclick: () => { withVideos = v; renderData(); },
+  }, l)));
   async function renderData() {
-    const [st, missing] = await Promise.all([storageState(), missingVideos()]);
+    const [st, missing, vBytes] = await Promise.all([storageState(), missingVideos(), videoBytes()]);
     const last = settings().lastBackup;
     const installed = isInstalled();
     const cards = [
@@ -489,33 +493,36 @@ export async function renderProfile(root, section) {
           onclick: async () => { toast((await askPersist()) ? 'Speicher ist jetzt dauerhaft' : 'Der Browser lehnt ab. Als App installiert klappt es meist.', 4000); renderData(); },
         }, 'Dauerhaft anfordern')),
       accRow('Sicherung', [h('p.acc-lead', 'Speichert als Datei:'),
-          h('ul.acc-list', h('li', 'Classes, Choreos, Aufnahmen'), h('li', 'Marker, Notizen, Status'), h('li', 'Einheiten, Profil, Präferenzen')),
-          h('p.acc-note', `Ohne Videos und Songdateien. ${last ? `Letzte Sicherung: ${relDate(last)}.` : 'Noch keine Sicherung.'}`)],
+          h('ul.acc-list', h('li', 'Classes, Choreos, Aufnahmen'), h('li', 'Marker, Notizen, Status'), h('li', 'Einheiten, Profil, Präferenzen'),
+            withVideos ? h('li', `Videos und Songdateien (${mb(vBytes)})`) : null),
+          h('div.field.acc-tester', h('span', 'Videos'), videoSeg()),
+          h('p.acc-note', last ? `Letzte Sicherung: ${relDate(last)}.` : 'Noch keine Sicherung.')],
         h('button.btn.small', {
           type: 'button',
           onclick: async () => {
             try {
-              const r = await exportBackup();
+              const r = await exportBackup({ videos: withVideos });
               await saveSettings({ lastBackup: Date.now() });
-              toast(`Gesichert: ${plural(r.counts.choreos, 'Choreo', 'Choreos')}, ${plural(r.counts.recordings, 'Aufnahme', 'Aufnahmen')}`, 3500);
+              toast(`Gesichert: ${plural(r.counts.choreos, 'Choreo', 'Choreos')}, ${plural(r.counts.recordings, 'Aufnahme', 'Aufnahmen')}${r.videos ? `, ${plural(r.videos, 'Datei', 'Dateien')} (${mb(r.bytes)})` : ''}`, 4000);
               renderData();
             } catch (e) { console.error(e); toast(`Sichern fehlgeschlagen: ${e.message}`, 5000); }
           },
         }, 'Sichern')),
       accRow('Wiederherstellen', [h('p.acc-lead', 'Spielt eine Sicherung ein:'),
-          h('ul.acc-list', h('li', 'Gleiche Einträge werden ersetzt'), h('li', 'Alles andere bleibt')),
-          h('p.acc-note', 'Videos danach unter „Videos zuordnen“ neu wählen.')],
+          h('ul.acc-list', h('li', 'Gleiche Einträge werden ersetzt'), h('li', 'Alles andere bleibt'), h('li', 'Enthaltene Videos kommen mit')),
+          h('p.acc-note', 'Sicherung ohne Videos: Videos danach unter „Videos zuordnen“ wählen.')],
         h('button.btn.small', {
           type: 'button',
-          onclick: () => pick('.json,application/json', false, async ([file]) => {
+          // ohne Dateityp-Filter: iPhone graut unbekannte Endungen (.ctbackup) sonst aus; geprüft wird nach dem Wählen
+          onclick: () => pick('', false, async ([file]) => {
             try {
               const b = await readBackup(file);
-              const n = b.data.choreos?.length || 0, r = b.data.recordings?.length || 0;
-              if (!confirm(`Sicherung vom ${new Date(b.exportedAt).toLocaleDateString('de-DE')} einspielen (${n} Choreos, ${r} Aufnahmen)? Gleiche Einträge werden ersetzt.`)) return;
-              await restoreBackup(b);
+              const n = b.data.choreos?.length || 0, r = b.data.recordings?.length || 0, v = b.videos.length;
+              if (!confirm(`Sicherung vom ${new Date(b.exportedAt).toLocaleDateString('de-DE')} einspielen (${n} Choreos, ${r} Aufnahmen${v ? `, ${v} Videos/Songdateien` : ', ohne Videos'})? Gleiche Einträge werden ersetzt.`)) return;
+              await restoreBackup(b, (i, all) => toast(`Stelle Videos wieder her … ${i} / ${all}`, 60000));
               toast('Wiederhergestellt', 2500);
               setTimeout(() => location.reload(), 600); // Einstellungen und Ansichten frisch laden
-            } catch (e) { toast(e.message, 5000); }
+            } catch (e) { console.error(e); toast(e.message, 5000); }
           }),
         }, 'Datei wählen')),
     ];
