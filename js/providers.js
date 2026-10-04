@@ -19,28 +19,62 @@ export const providerName = id => PROVIDERS.find(p => p[0] === id)?.[1] || '';
 const clean = s => String(s || '').replace(/\(.*?\)|\[.*?\]|feat\..*$/gi, '').replace(/\s+/g, ' ').trim();
 const simple = s => clean(s).toLowerCase().replace(/[^a-z0-9äöüß]+/g, ' ').trim();
 
-async function appleUrl(song, q) {
-  try {
-    const res = await fetch(`https://itunes.apple.com/search?entity=song&limit=25&country=de&term=${encodeURIComponent(q)}`);
-    const { results = [] } = await res.json();
-    const t = simple(song.title), a = simple(song.artist).split(' ')[0];
-    // Original bevorzugen: Versionen nur, wenn der eingetragene Titel sie selbst nennt
-    const VERSION = /instrumental|karaoke|acapella|a cappella|remix|sped up|slowed|live|cover|tribute|re ?record/i;
-    const wanted = VERSION.test(song.title);
-    const ok = r => simple(r.trackName).startsWith(t) && (wanted || !VERSION.test(r.trackName + ' ' + (r.collectionName || '')));
-    const hit = results.find(r => ok(r) && (!a || simple(r.artistName).includes(a))) || results.find(ok)
-      || results.find(r => simple(r.trackName).startsWith(t));
-    if (hit?.trackViewUrl) return hit.trackViewUrl;
-  } catch { /* dann Suche */ }
+// Suchbegriff: Titel zuerst, dann Interpret; ohne Klammern/feat., Kommas und Sonderzeichen als Leerzeichen
+// (sonst zerlegen manche Suchen den Begriff, z. B. „Tyler, The Creator“)
+const query = song => [clean(song.title), clean(song.artist)].filter(Boolean).join(' ').replace(/[,&/+]/g, ' ').replace(/\s+/g, ' ').trim();
+// Original bevorzugen: Versionen nur, wenn der eingetragene Titel sie selbst nennt
+const VERSION = /instrumental|karaoke|acapella|a cappella|remix|sped up|slowed|live|cover|tribute|re ?record/i;
+// passt ein Treffer (Titel + Interpret) zum eingetragenen Song?
+function matches(song, title, artist, extra = '') {
+  const t = simple(song.title), a = simple(song.artist).split(' ').filter(w => w.length > 2)[0] || simple(song.artist);
+  return simple(title).startsWith(t) && (!a || simple(artist).includes(a))
+    && (VERSION.test(song.title) || !VERSION.test(`${title} ${extra}`));
+}
+
+// Apple Music: exakter Titel über die freie iTunes-Suche. Die Suche im deutschen Katalog sortiert teils schlecht,
+// daher drei Anläufe: freie Suche, Suche nach Interpret (Titel gefiltert), US-Katalog (nur wenn der Titel auch in DE
+// existiert). Kein passender Interpret → Suchseite statt eines falschen gleichnamigen Songs.
+const itunes = async params => {
+  const res = await fetch(`https://itunes.apple.com/search?entity=song&limit=200&${params}`);
+  return (await res.json()).results || [];
+};
+async function appleUrl(song) {
+  const q = query(song);
+  const tries = [
+    () => itunes(`country=de&term=${encodeURIComponent(q)}`),
+    () => itunes(`country=de&attribute=artistTerm&term=${encodeURIComponent(clean(song.artist).replace(/[,&]/g, ' '))}`),
+    async () => {
+      const us = (await itunes(`country=us&term=${encodeURIComponent(q)}`)).find(r => matches(song, r.trackName, r.artistName, r.collectionName || ''));
+      if (!us) return [];
+      const de = await (await fetch(`https://itunes.apple.com/lookup?id=${us.trackId}&country=de`)).json();
+      return de.results || [];
+    },
+  ];
+  for (const run of tries) {
+    try {
+      const hit = (await run()).find(r => matches(song, r.trackName, r.artistName, r.collectionName || ''));
+      if (hit?.trackId) return `https://music.apple.com/de/song/${hit.trackId}`;
+    } catch { /* nächster Anlauf */ }
+  }
   return `https://music.apple.com/de/search?term=${encodeURIComponent(q)}`;
 }
 
+// Deezer: eigene Track-ID oder per freier Deezer-Suche (Titel + Interpret) den exakten Titel
+async function deezerUrl(song) {
+  if (song.source === 'deezer' && song.id) return `https://www.deezer.com/track/${song.id}`;
+  try {
+    const hit = (await searchSongs(query(song))).find(x => matches(song, x.title, x.artist));
+    if (hit?.id) return `https://www.deezer.com/track/${hit.id}`;
+  } catch { /* dann Suche */ }
+  return `https://www.deezer.com/search/${encodeURIComponent(query(song))}`;
+}
+
 export async function providerUrl(provider, song) {
-  const q = [clean(song.artist), clean(song.title)].filter(Boolean).join(' ');
-  const e = encodeURIComponent(q);
+  const e = encodeURIComponent(query(song));
   switch (provider) {
-    case 'deezer': return song.source === 'deezer' && song.id ? `https://www.deezer.com/track/${song.id}` : `https://www.deezer.com/search/${e}`;
-    case 'apple': return appleUrl(song, q);
+    case 'deezer': return deezerUrl(song);
+    case 'apple': return appleUrl(song);
+    // ohne Schlüssel keine exakten Titel-Links: Suche mit Titel + Interpret, Treffer steht oben
     case 'spotify': return `https://open.spotify.com/search/${e}`;
     case 'tidal': return `https://listen.tidal.com/search?q=${e}`;
     case 'ytmusic': return `https://music.youtube.com/search?q=${e}`;
@@ -50,13 +84,15 @@ export async function providerUrl(provider, song) {
 }
 
 // App-Link zur Web-Adresse, damit sich das installierte Programm öffnet (null = keine Mac-App)
-// Tidal: geprüft im Programmcode der App, alles nach tidal:// wird als Seitenpfad angesteuert.
+// Tidal: geprüft im Programmcode der App. Alles nach tidal:// wird als Seitenpfad angesteuert und dabei von der
+// App selbst noch einmal kodiert (encodeURI). Deshalb Wörter mit „+“ verbinden (bleibt erhalten, wird zu Leerzeichen)
+// und nur einfache Buchstaben verwenden, sonst kommt nur ein Bruchstück an (z. B. „tyler“).
 export function appUrl(provider, webUrl, song) {
-  const q = encodeURIComponent([clean(song.artist), clean(song.title)].filter(Boolean).join(' '));
+  const q = query(song);
   switch (provider) {
-    case 'spotify': return `spotify:search:${q}`;
+    case 'spotify': return `spotify:search:${encodeURIComponent(q)}`;
     case 'apple': return webUrl.replace(/^https:/, 'music:');
-    case 'tidal': return `tidal://search?q=${q}`;
+    case 'tidal': return `tidal://search?q=${q.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9 ]+/g, ' ').trim().split(/\s+/).join('+')}`;
     case 'deezer': return webUrl.replace(/^https:\/\//, 'deezer://');
     default: return null; // YouTube Music, Amazon Music: im Browser
   }
