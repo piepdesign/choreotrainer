@@ -678,6 +678,20 @@ a.stat-link:hover { background: var(--surface-2); }
 
 /* Cover spielt gerade die Hörprobe */
 /* Hörprobe: Rahmen innen auf dem Cover als Negativ des Bildes (Differenz), sichtbar auf hellen und dunklen Covern */
+.toggle { display: inline-flex; align-items: center; gap: 10px; background: none; border: 0; padding: 4px 0; margin: 0; color: var(--fg); font: inherit; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+.toggle-track { position: relative; flex: none; width: 38px; height: 20px; border: 1px solid var(--fg); box-sizing: border-box; transition: background .15s; }
+.toggle-track i { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: var(--fg); transition: transform .15s, background .15s; }
+.toggle[aria-checked="true"] .toggle-track { background: var(--fg); }
+.toggle[aria-checked="true"] .toggle-track i { transform: translateX(18px); background: var(--bg); }
+.toggle:focus-visible { outline: 1px dotted var(--fg); outline-offset: 3px; }
+/* „Neue Choreo/Class“ + kleines „importieren“ */
+.add-row { align-items: baseline; margin-top: 18px; }
+.small-link { font-size: 11px; }
+.dropzone .dz-import { margin-top: 10px; position: relative; z-index: 1; }
+.class-card { max-width: 760px; }
+.pop .toggle, .share-card .toggle { justify-self: start; }
+.acc-text .toggle { display: flex; margin-top: 10px; }
+.confirm-card p { margin: 0; font-size: 13px; line-height: 1.55; }
 .section-tools { display: flex; gap: 14px; align-items: baseline; } /* Überschrift rechts: Knopf + Hinweis */
 .pack-info { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin-top: 6px; } /* Upload: Verkleinern */
 .cover-wrap { position: relative; display: block; flex: none; width: fit-content; height: fit-content; align-self: start; justify-self: start; line-height: 0; }

@@ -8,7 +8,7 @@ import { alignToSong, checkAudio } from './align.js';
 import { recTitle } from './hub.js';
 import { go, toast } from './app.js';
 import { settings, saveSettings, PANEL_SECTIONS } from './settings.js';
-import { icon } from './ui.js';
+import { icon, toggle } from './ui.js';
 import { exportChoreoDialog } from './share.js';
 import { prime, needsCapture } from './audio.js';
 
@@ -502,7 +502,7 @@ export async function renderTrain(root, recId) {
   ];
   const volPop = () => [
     ...slider('Lautstärke', 0, 1, 0.05, () => P.volume, v => { P.volume = v; P.muted = false; }, v => `${Math.round(v * 100)}`),
-    h('div.btns', small(P.muted ? 'Ton an' : 'Stumm', () => { P.muted = !P.muted; update(); closePop(); })),
+    toggle('Stumm', P.muted, v => { P.muted = v; update(); }),
   ];
   const imgPop = () => [
     ...slider('Helligkeit', 50, 200, 5, () => P.brightness, v => { P.brightness = v; }, v => `${v}%`),
@@ -533,16 +533,15 @@ export async function renderTrain(root, recId) {
         small(tt('Anfangscount (1)', 'Anfangscount'), () => setOne()),
         small(tt('Tap (T)', 'Tap'), () => tap())),
       h('div.btns',
-        small(P.click ? 'Klick an' : 'Klick aus', () => { P.click = !P.click; update(); refreshPop(); }, P.click),
         small('Neu analysieren', () => { prime(blob); closePop(); P.manualBeat = false; runAnalysis(true); })),
+      toggle('Klick im Takt', P.click, v => { P.click = v; update(); }),
       h('div.prow', h('span', 'Anzeige')),
       h('div.btns', [['s', 'S'], ['m', 'M'], ['l', 'L'], ['xl', 'XL']].map(([k, l]) =>
         small(l, () => { C.size = k; saveCountView(C); update(); refreshPop(); }, C.size === k))),
       h('div.btns', [['tl', '↖'], ['tr', '↗'], ['c', '·'], ['bl', '↙'], ['br', '↘']].map(([k, l]) =>
         small(l, () => { C.pos = k; saveCountView(C); update(); refreshPop(); }, C.pos === k))),
-      h('div.btns',
-        small(C.plus ? 'Halbe „+“ an' : 'Halbe „+“ aus', () => { C.plus = !C.plus; saveCountView(C); update(); refreshPop(); }, C.plus),
-        small(C.show ? 'Zähler sichtbar' : 'Zähler ausgeblendet', () => { C.show = !C.show; saveCountView(C); update(); refreshPop(); }, C.show)),
+      toggle('Halbe „+“', C.plus, v => { C.plus = v; saveCountView(C); update(); }),
+      toggle('Zähler sichtbar', C.show, v => { C.show = v; saveCountView(C); update(); }),
     ];
   };
 

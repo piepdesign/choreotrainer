@@ -125,6 +125,36 @@ export function icon(name) {
 // Präferenzen (Intro und Profil gleich): Ansicht als Umschalter, Musikprovider als Kacheln mit Logo,
 // Statistiken als Kacheln wie in der Base. values: { theme, provider, baseStats } · onChange(patch)
 // statValues: { id: { value } } bzw. Promise darauf, für echte Werte in den Kacheln
+// Schalter für Ja/Nein bzw. Mit/Ohne: eckige Spur mit Quadrat, an = gefüllt. el.set(v) setzt ihn von außen.
+export function toggle(label, on, onChange) {
+  const el = h('button.toggle', { type: 'button', role: 'switch', 'aria-checked': String(!!on) },
+    h('span.toggle-track', h('i')), label ? h('span.toggle-label', label) : null);
+  el.addEventListener('click', () => { const v = el.getAttribute('aria-checked') !== 'true'; el.set(v); onChange(v); });
+  el.set = v => el.setAttribute('aria-checked', String(!!v));
+  return el;
+}
+
+// Bestätigung vor Zurücksetzen/Löschen: erklärt kurz, was passiert. typeToConfirm: Wort, das eingetippt werden muss.
+export function confirmDialog({ title, text, ok = 'Bestätigen', danger = true, typeToConfirm = null, cancel = true }) {
+  return new Promise(resolve => {
+    const close = v => { box.remove(); removeEventListener('keydown', onKey, true); resolve(v); };
+    const okBtn = h(`button.btn.small${danger ? '.danger' : '.primary'}`, { type: 'button', onclick: () => close(true) }, ok);
+    const input = typeToConfirm ? h('input', { type: 'text', placeholder: typeToConfirm, autocomplete: 'off' }) : null;
+    if (input) {
+      okBtn.disabled = true;
+      input.addEventListener('input', () => { okBtn.disabled = input.value.trim().toLowerCase() !== typeToConfirm.toLowerCase(); });
+    }
+    const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(false); } };
+    const box = h('div.modal', { onclick: e => { if (e.target === box) close(false); } },
+      h('div.modal-card.confirm-card', h('h2.wide', title), h('p', text),
+        input ? h('label.field', h('span', `Zur Bestätigung „${typeToConfirm}“ eintippen`), input) : null,
+        h('div.actions', okBtn, cancel ? h('button.linkbtn', { type: 'button', onclick: () => close(false) }, 'Abbrechen') : null)));
+    addEventListener('keydown', onKey, true);
+    document.body.append(box);
+    (input || okBtn).focus();
+  });
+}
+
 export function preferences(values, onChange, statValues = null, { baseLabel = true, tester = false, hints = false } = {}) {
   // hints: im Intro ein Satz unter jedem Titel, was die Einstellung bewirkt
   const HINTS = {
@@ -155,8 +185,7 @@ export function preferences(values, onChange, statValues = null, { baseLabel = t
     block('Song-Cover Hörprobe', single('hoverPreview', [['off', 'Aus'], ['low', 'Leise'], ['mid', 'Mittel'], ['high', 'Laut']],
       values.hoverPreview === 'on' || !values.hoverPreview ? 'mid' : values.hoverPreview,
       ([id, label]) => [h('i.brand', { html: svg26(SOUND_PATHS[id]) }), h('span', label)])),
-    tester ? block('Helfer*in', single('tester', [[false, 'Nein'], [true, 'Ja']], !!values.tester,
-      ([id, label]) => [h('i.brand', { html: svg26(id ? TOOL_PATHS.clipboard : TOOL_PATHS.none) }), h('span', label)])) : null,
+    tester ? block('Helfer*in', toggle('Knopf für Bugs und Ideen', !!values.tester, v => onChange({ tester: v }))) : null,
     block('Statistiken', chips),
     block('Ansicht', single('theme', [['light', 'Hell'], ['dark', 'Dunkel'], ['system', 'System']], values.theme,
       ([id, label]) => [h('i.brand', { html: THEME_ICONS[id] }), h('span', label)])));

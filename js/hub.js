@@ -5,7 +5,8 @@ import { state, go, toast } from './app.js';
 import { baseStats } from './stats.js';
 import { settings, BASE_STATS } from './settings.js';
 import { songLink } from './providers.js';
-import { classPickers, icon } from './ui.js';
+import { classPickers, icon, confirmDialog } from './ui.js';
+import { classForm } from './classform.js';
 import { exportClassDialog, exportChoreoDialog, chooseFile, importExport, importSummary } from './share.js';
 
 export async function loadAll() {
@@ -29,7 +30,9 @@ export function dropzone(onFile) {
   const zone = h('label.dropzone',
     input,
     h('strong', 'NEUE CHOREO'),
-    h('span.label', tt('(Video ablegen oder klicken zum Auswählen)', '(Tippen, um ein Video auszuwählen)')));
+    h('span.label', tt('(Video ablegen oder klicken zum Auswählen)', '(Tippen, um ein Video auszuwählen)')),
+    // eigener Knopf im Feld: öffnet nicht die Videoauswahl, sondern den Import (Class/Choreo aus einem Export)
+    h('button.linkbtn.small-link.dz-import', { type: 'button', onclick: e => { e.preventDefault(); e.stopPropagation(); importInto(); } }, 'importieren'));
   const take = f => {
     if (!f) return;
     if (/\.ctbackup$/i.test(f.name)) { importInto(undefined, f); return; } // Export einer Class/Choreo abgelegt
@@ -215,12 +218,11 @@ export async function renderHub(root) {
       h('div.col-songs',
         h('div.section-head', h('h2.wide', 'LETZTE SONGS')),
         songs.length ? songList : h('p.empty', 'Noch keine Songs.'))),
-    h('div.section-head', h('h2.wide', 'CLASSES'), h('span.section-tools',
-      h('button.linkbtn', { type: 'button', onclick: () => importInto() }, 'Importieren'),
-      classes.length ? h('span.label', '# Choreos') : null)),
+    h('div.section-head', h('h2.wide', 'CLASSES'), classes.length ? h('span.label', '# Choreos') : null),
     classes.length
       ? sortableStripes(classes.sort(byClassOrder), c => stripe(c, String(choreos.filter(x => x.classId === c.id).length)))
-      : h('p.empty', 'Lege Classes in den Einstellungen an, beim ersten Upload oder importiere eine.'),
+      : h('p.empty', 'Noch keine Class.'),
+    addRow(h('button.btn.small', { type: 'button', onclick: newClassDialog }, 'Neue Class'), () => importInto()),
   );
 
   // Songliste an die Höhe der Choreo-Zeile koppeln
@@ -364,30 +366,46 @@ export async function renderClass(root, id) {
   const header = stripe(cls, '', () => {});
   root.append(
     h('div.stripes', { style: { marginTop: '8px' } }, header),
+    // direkt unter der Leiste nur die Class selbst: Bearbeiten, Exportieren, Löschen
     h('div.actions', { style: { margin: '14px 0 28px' } },
       h('button.linkbtn', { onclick: () => { if (editBox.hidden) { editBox.replaceChildren(classEditor(cls, header, () => { editBox.hidden = true; }, classes)); editBox.hidden = false; } else editBox.hidden = true; } }, 'Bearbeiten'),
-      h('a.linkbtn', { href: `#/upload?class=${id}`, onclick: () => { state.pendingFile = null; } }, 'Neue Aufnahme'),
-      h('button.linkbtn', { type: 'button', onclick: () => importInto(id) }, 'Choreo importieren'),
       h('button.linkbtn', {
         type: 'button',
         onclick: async () => {
           try { const r = await exportClassDialog(cls); if (r) toast(`Exportiert: ${r.choreos} Choreo${r.choreos === 1 ? '' : 's'}${r.files ? `, ${r.files} Dateien (${Math.round(r.bytes / 1e6)} MB)` : ''}`, 3500); }
           catch (e) { console.error(e); toast(`Export fehlgeschlagen: ${e.message}`, 5000); }
         },
-      }, 'Exportieren')),
-    editBox,
-    ...(mine.length ? mine.map(c => choreoBlock(c, recsByChoreo[c.id] || [], sessions, urls)) : [h('p.empty', 'Keine Choreos in dieser Class.')]),
-    h('div.actions', { style: { marginTop: '40px' } },
-      h('button.btn.small.danger', {
+      }, 'Exportieren'),
+      h('button.linkbtn', {
+        type: 'button',
         onclick: async () => {
-          if (!confirm(`Class „${classTitle(cls)}“ mit allen Choreos und Videos löschen?`)) return;
+          if (!(await confirmDialog({ title: 'CLASS LÖSCHEN', text: `Löscht „${classTitle(cls)}“ mit ${mine.length === 1 ? 'einer Choreo' : `${mine.length} Choreos`} samt Videos.`, ok: 'Löschen' }))) return;
           await deleteClass(id);
           toast('Class gelöscht');
           go('#/');
         },
-      }, 'Class löschen')),
+      }, 'Löschen')),
+    editBox,
+    ...(mine.length ? mine.map(c => choreoBlock(c, recsByChoreo[c.id] || [], sessions, urls)) : [h('p.empty', 'Keine Choreos in dieser Class.')]),
+    // unter der letzten Choreo: neue Choreo (Video hochladen), daneben kleiner: aus einem Export übernehmen
+    addRow(h('a.btn.small', { href: `#/upload?class=${id}`, onclick: () => { state.pendingFile = null; } }, 'Neue Choreo'), () => importInto(id)),
   );
   return () => urls.forEach(u => URL.revokeObjectURL(u));
+}
+
+// Neue Class aus der Base: Class-Formular im Fenster, danach Base neu aufbauen
+function newClassDialog() {
+  const close = () => box.remove();
+  const form = classForm(() => { close(); go('#/', { replace: true }); }, { heading: false, withImport: false });
+  const box = h('div.modal', { onclick: e => { if (e.target === box) close(); } },
+    h('div.modal-card.class-card', h('h2.wide', 'NEUE CLASS'), form, h('button.linkbtn', { type: 'button', onclick: close, style: { justifySelf: 'start' } }, 'Abbrechen')));
+  document.body.append(box);
+  form.querySelector('input, select')?.focus();
+}
+
+// „Neu …“ als Knopf, daneben klein „importieren“ (unter der letzten Choreo bzw. Class)
+function addRow(main, onImport) {
+  return h('div.actions.add-row', main, h('button.linkbtn.small-link', { type: 'button', onclick: onImport }, 'importieren'));
 }
 
 // Import aus Class-Übersicht, Class-Formular und Einstellungen: Datei wählen, einspielen, zur Class springen
@@ -471,7 +489,7 @@ function choreoBlock(c, recs, sessions, urls) {
         h('button.linkbtn', { onclick: () => title.startEdit() }, 'Umbenennen'),
         h('button.linkbtn', {
           onclick: async () => {
-            if (!confirm('Diese Aufnahme samt Video löschen?')) return;
+            if (!(await confirmDialog({ title: 'AUFNAHME LÖSCHEN', text: 'Löscht diese Aufnahme samt Video.', ok: 'Löschen' }))) return;
             await deleteRecording(r.id);
             if (recs.length === 1) await deleteChoreo(c.id);
             go(location.hash);
@@ -490,7 +508,7 @@ function choreoBlock(c, recs, sessions, urls) {
         h('button.linkbtn', {
           onclick: async () => {
             const name = c.title || c.song?.title || 'Ohne Song';
-            if (!confirm(`Choreo „${name}“ mit ${recs.length} Aufnahme${recs.length === 1 ? '' : 'n'} samt Videos löschen?`)) return;
+            if (!(await confirmDialog({ title: 'CHOREO LÖSCHEN', text: `Löscht „${name}“ mit ${recs.length} Aufnahme${recs.length === 1 ? '' : 'n'} samt Videos.`, ok: 'Löschen' }))) return;
             await deleteChoreo(c.id);
             toast('Choreo gelöscht');
             go(location.hash);

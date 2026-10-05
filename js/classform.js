@@ -43,7 +43,7 @@ export function classManager(onChange) {
 }
 
 // Formular. onSaved(cls) nach Anlegen/Speichern. el.edit(cls) lädt eine Class zum Bearbeiten.
-export function classForm(onSaved) {
+export function classForm(onSaved, { heading = true, withImport = true } = {}) {
   const f = {
     ...classPickers([], { styles: CLASS_TITLES, levels: CLASS_LEVELS }),
     weekday: h('select', h('option', { value: '' }, '—'), WEEKDAYS.map(d => h('option', d))),
@@ -113,10 +113,10 @@ export function classForm(onSaved) {
   }, 'Class importieren');
 
   const el = h('div.classform',
-    title,
+    heading ? title : null,
     h('div.row', field('Style', f.category), field('Level', f.level), field('Wochentag', f.weekday), field('Uhrzeit', f.time), field('Coach', f.coach)),
     h('div', { style: { marginTop: '14px' } }, h('span.label.color-label', 'Farbe'), swatches),
-    h('div.actions', saveBtn, cancelBtn, importBtn, msg));
+    h('div.actions', saveBtn, cancelBtn, withImport ? importBtn : null, msg));
   el.edit = cls => {
     editing = cls;
     for (const k of KEYS) f[k].value = cls[k] || '';

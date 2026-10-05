@@ -9,7 +9,7 @@ import { baseStats, latestRating, choreoLength, weekStart, dayKey } from './stat
 import { settings, saveSettings, applyTheme, resetSettings, BASE_STATS } from './settings.js';
 import { classManager } from './classform.js';
 import { go, toast, replaceHash } from './app.js';
-import { preferences } from './ui.js';
+import { preferences, toggle, confirmDialog } from './ui.js';
 import { storageState, askPersist, isInstalled, isIOS, canPromptInstall, promptInstall, exportBackup, readBackup, restoreBackup, missingVideos, relinkVideos, videoBytes, deleteRecordings, freeStorage } from './backup.js';
 
 const DAY = 86400000;
@@ -384,10 +384,10 @@ export async function renderProfile(root, section) {
         { label: 'Zuletzt', value: c => c.lastPracticed || 0, cell: c => h('span.label', relDate(c.lastPracticed)), dir: -1 },
       ], choreos, { sort: 5, cls: '.wide6', key: 'ct-sort-choreos', href: c => ((recsByChoreo[c.id] || []).length ? `#/train/${recsByChoreo[c.id].at(-1).id}` : null) }));
     }
-    toggle.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === view));
+    viewSeg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === view));
   }
-  const toggle = h('div.seg', [['gallery', 'Galerie'], ['list', 'Liste']].map(([v, l]) => h('button.ctl', { type: 'button', 'data-v': v, onclick: () => { view = v; try { localStorage.setItem('ct-choreo-view', v); } catch { /* egal */ } renderChoreos(); } }, l)));
-  const choreoSec = sect('choreos', null, h('div.actions.p-tools', toggle, sortWrap, h('span.label', `${choreos.length} insgesamt`)), choreoBox);
+  const viewSeg = h('div.seg', [['gallery', 'Galerie'], ['list', 'Liste']].map(([v, l]) => h('button.ctl', { type: 'button', 'data-v': v, onclick: () => { view = v; try { localStorage.setItem('ct-choreo-view', v); } catch { /* egal */ } renderChoreos(); } }, l)));
+  const choreoSec = sect('choreos', null, h('div.actions.p-tools', viewSeg, sortWrap, h('span.label', `${choreos.length} insgesamt`)), choreoBox);
   renderChoreos();
 
   // ── Classes ──
@@ -420,45 +420,35 @@ export async function renderProfile(root, section) {
   const nameIn = h('input.caps', { type: 'text', value: (s.name || '').toUpperCase(), placeholder: 'DEIN NAME' });
   const saveName = async () => { if (!nameIn.value.trim()) return; await saveSettings({ name: nameIn.value.trim().toUpperCase() }); toast('Name gespeichert'); go('#/settings', { keep: true }); };
   nameIn.addEventListener('keydown', e => { if (e.key === 'Enter') saveName(); });
-  // Je Zeile: Feld bzw. Erklärung, der Knopf direkt daneben (alle Knöpfe gleich breit untereinander)
-  // Konto als Kacheln wie die übrigen Einstellungen: oben Feld bzw. Erklärung, unten der Knopf
-  const testerSeg = () => {
-    const box = h('div.seg');
-    const render = () => box.replaceChildren(...[[false, 'Nein'], [true, 'Ja']].map(([v, l]) => h(`button.ctl${!!settings().tester === v ? '.on' : ''}`, {
-      type: 'button', onclick: async () => { await saveSettings({ tester: v }); render(); },
-    }, l)));
-    render();
-    return box;
-  };
-  // Jede Kachel: Überschrift (wie Feldbeschriftungen), Inhalt, Knopf. Überschrift benennt das Thema, der Knopf die Aktion.
-  const accRow = (title, body, button) => h('div.acc-card', h('span.acc-title', title), h('div.acc-text', body), button);
-  const note = text => h('p.acc-lead', text);
+  // Kacheln: Überschrift, Bedienelemente, Knopf. Keine Erklärtexte; was Zurücksetzen/Löschen bewirkt, sagt das Bestätigungsfenster.
+  const accRow = (title, body, button) => h('div.acc-card', h('span.acc-title', title), body?.length ? h('div.acc-text', body) : null, button);
+  const stateLine = text => h('p.acc-lead', text); // Zustand (keine Erklärung), z. B. Belegung
   // Konto: Profil, Tutorial, Neustart, ganz zuletzt das endgültige Löschen
   const account = sect('account', 'Konto',
     h('div.acc',
       // Name + Helfer*in in einer Kachel; Helfer*in wirkt sofort (Knopf unten rechts für Bug-Meldungen und Ideen)
       accRow('Profil', [
         h('label.field', h('span', 'Name'), nameIn),
-        h('div.field.acc-tester', h('span', 'Helfer*in'), testerSeg()),
+        toggle('Helfer*in', !!s.tester, v => saveSettings({ tester: v })),
       ], h('button.btn.small', { type: 'button', onclick: saveName }, 'Speichern')),
-      accRow('Tutorial', [note('Beide Teile noch einmal zeigen.')],
+      accRow('Tutorial', [],
         h('button.btn.small', {
           type: 'button',
           onclick: async () => { await saveSettings({ tourDone: false, tourTrainDone: false }); go('#/'); },
         }, 'Starten')),
-      accRow('Neustart', [note('Name, Präferenzen und Intro zurücksetzen. Daten bleiben.')],
+      accRow('Neustart', [],
         h('button.btn.small', {
           type: 'button',
-          onclick: async () => { if (!confirm('Einstellungen zurücksetzen? Deine Daten bleiben erhalten.')) return; await resetSettings(); location.hash = '#/'; location.reload(); },
+          onclick: async () => {
+            if (!(await confirmDialog({ title: 'NEUSTART', text: 'Setzt Name, Präferenzen und Panel-Anordnung zurück, das Intro startet neu. Classes, Choreos, Videos und Statistiken bleiben.', ok: 'Zurücksetzen', danger: false }))) return;
+            await resetSettings(); location.hash = '#/'; location.reload();
+          },
         }, 'Zurücksetzen')),
-      accRow('Werkseinstellungen', [note('Löscht alles in diesem Browser.')],
+      accRow('Werkseinstellungen', [],
         h('button.btn.small.danger', {
           type: 'button',
           onclick: async () => {
-            if (!confirm('Wirklich ALLES löschen? Videos und Statistik sind danach weg.')) return;
-            const name = settings().name || 'LÖSCHEN';
-            const typed = prompt(`Zur Bestätigung „${name}“ eintippen:`);
-            if (typed == null || typed.trim().toLowerCase() !== name.toLowerCase()) { toast('Nicht gelöscht'); return; }
+            if (!(await confirmDialog({ title: 'ALLES LÖSCHEN', text: 'Löscht in diesem Browser alle Classes, Choreos, Videos, Songdateien, Einheiten und das Profil. Lässt sich nicht rückgängig machen.', ok: 'Alles löschen', typeToConfirm: settings().name || 'LÖSCHEN' }))) return;
             await deleteAllData();
             location.hash = '#/';
             location.reload();
@@ -475,9 +465,6 @@ export async function renderProfile(root, section) {
     input.click();
   };
   let withVideos = true; // Sicherung mit Videos (Standard) oder nur die Eingaben
-  const videoSeg = () => h('div.seg', [[true, 'Mit'], [false, 'Ohne']].map(([v, l]) => h(`button.ctl${withVideos === v ? '.on' : ''}`, {
-    type: 'button', onclick: () => { withVideos = v; renderData(); },
-  }, l)));
   async function renderData() {
     const [st, missing, vBytes] = await Promise.all([storageState(), missingVideos(), videoBytes()]);
     const last = settings().lastBackup;
@@ -485,8 +472,8 @@ export async function renderProfile(root, section) {
     // Gelöschte Videos gibt der Browser erst frei, wenn die Seite neu geladen wurde (vorher halten Verweise sie fest)
     const pending = (st.idb ?? st.usage ?? 0) - vBytes;
     const cards = [
-      accRow('Sicherung', [note(`Alles als Datei${last ? `, zuletzt ${relDate(last)}` : ''}.`),
-          h('div.field.acc-tester', h('span', `Videos${vBytes ? ` (${mb(vBytes)})` : ''}`), videoSeg())],
+      accRow('Sicherung', [toggle(`Mit Videos${vBytes ? ` (${mb(vBytes)})` : ''}`, withVideos, v => { withVideos = v; }),
+          last ? h('p.acc-note', `Zuletzt ${relDate(last)}`) : null],
         h('button.btn.small', {
           type: 'button',
           onclick: async () => {
@@ -498,7 +485,7 @@ export async function renderProfile(root, section) {
             } catch (e) { console.error(e); toast(`Sichern fehlgeschlagen: ${e.message}`, 5000); }
           },
         }, 'Sichern')),
-      accRow('Wiederherstellen', [note('Sicherung einspielen. Gleiches wird ersetzt.')],
+      accRow('Wiederherstellen', [],
         h('button.btn.small', {
           type: 'button',
           // nur .ctbackup; am Handy ohne Filter (iPhone graut unbekannte Endungen sonst aus), geprüft wird nach dem Wählen
@@ -506,17 +493,17 @@ export async function renderProfile(root, section) {
             try {
               const b = await readBackup(file);
               const n = b.data.choreos?.length || 0, r = b.data.recordings?.length || 0, v = b.videos.length;
-              if (!confirm(`Sicherung vom ${new Date(b.exportedAt).toLocaleDateString('de-DE')} einspielen (${n} Choreos, ${r} Aufnahmen${v ? `, ${v} Videos/Songdateien` : ', ohne Videos'})? Gleiche Einträge werden ersetzt.`)) return;
+              if (!(await confirmDialog({ title: 'WIEDERHERSTELLEN', text: `Spielt die Sicherung vom ${new Date(b.exportedAt).toLocaleDateString('de-DE')} ein: ${plural(n, 'Choreo', 'Choreos')}, ${plural(r, 'Aufnahme', 'Aufnahmen')}, ${v ? plural(v, 'Video/Songdatei', 'Videos/Songdateien') : 'ohne Videos'}. Gleiche Einträge werden ersetzt, alles andere bleibt.`, ok: 'Einspielen', danger: false }))) return;
               await restoreBackup(b, (i, all) => toast(`Stelle Videos wieder her … ${i} / ${all}`, 60000));
               toast('Wiederhergestellt', 2500);
               setTimeout(() => location.reload(), 600); // Einstellungen und Ansichten frisch laden
             } catch (e) { console.error(e); toast(e.message, 5000); }
           }),
         }, 'Datei wählen')),
-      accRow('Importieren', [note('Class oder Choreo aus einem Export.')],
+      accRow('Importieren', [],
         h('button.btn.small', { type: 'button', onclick: () => importInto() }, 'Datei wählen')),
     ];
-    if (missing.length) cards.push(accRow('Videos zuordnen', [note(`${plural(missing.length, 'Aufnahme', 'Aufnahmen')} ohne Video.`)],
+    if (missing.length) cards.push(accRow(`${plural(missing.length, 'Video', 'Videos')} fehlen`, [],
       h('button.btn.small', {
         type: 'button',
         onclick: () => pick('video/*', true, async files => {
@@ -525,24 +512,29 @@ export async function renderProfile(root, section) {
           toast(`${plural(r.matched, 'Video', 'Videos')} zugeordnet${r.unmatched.length ? `, nicht erkannt: ${r.unmatched.join(', ')}` : ''}`, 6000);
           renderData();
         }),
-      }, 'Videos wählen')));
+      }, 'Zuordnen')));
     cards.push(accRow('Speicher', [
-        note(st.usage != null ? `Belegt: ${mb(st.usage)}, ${st.persisted ? 'dauerhaft' : 'nicht dauerhaft'}.` : (st.persisted ? 'Dauerhaft.' : 'Nicht dauerhaft.')),
-        pending > 20e6 ? h('p.acc-note', `${mb(pending)} gelöscht, noch nicht freigegeben.`) : null],
+        stateLine(st.usage != null ? `${mb(st.usage)} belegt · ${st.persisted ? 'dauerhaft' : 'nicht dauerhaft'}` : (st.persisted ? 'dauerhaft' : 'nicht dauerhaft')),
+        pending > 20e6 ? h('p.acc-note', `${mb(pending)} noch nicht freigegeben`) : null],
       pending > 20e6 ? h('button.btn.small', { type: 'button', onclick: freeStorage }, 'Freigeben')
         : !st.persisted && st.supported ? h('button.btn.small', {
           type: 'button',
           onclick: async () => { toast((await askPersist()) ? 'Speicher ist jetzt dauerhaft' : 'Der Browser lehnt ab. Als App installiert klappt es meist.', 4000); renderData(); },
         }, 'Dauerhaft anfordern') : null));
-    cards.push(accRow('App', [note(installed ? 'Installiert.'
-        : isIOS() ? 'Safari › Teilen › Zum Home-Bildschirm. Danach dort die Sicherung einspielen.'
-          : canPromptInstall() ? 'Vom Home-Bildschirm starten, auch offline.' : 'Im Browser-Menü „App installieren“ wählen.')],
-      !installed && canPromptInstall() ? h('button.btn.small', { type: 'button', onclick: async () => { await promptInstall(); renderData(); } }, 'Installieren') : null));
-    cards.push(accRow('Aufnahmen löschen', [note('Choreos, Videos und Einheiten. Classes und Profil bleiben.')],
+    cards.push(accRow('App', installed ? [stateLine('installiert')] : [],
+      installed ? null : h('button.btn.small', {
+        type: 'button',
+        onclick: async () => {
+          if (canPromptInstall()) { await promptInstall(); renderData(); return; }
+          // ohne Installations-Angebot des Browsers: kurz zeigen, wie es geht
+          await confirmDialog({ title: 'INSTALLIEREN', text: isIOS() ? 'In Safari: Teilen › Zum Home-Bildschirm. Die App hat dort einen eigenen Speicher, danach die Sicherung einspielen.' : 'Im Browser-Menü „App installieren“ bzw. „Zum Startbildschirm hinzufügen“ wählen.', ok: 'OK', danger: false, cancel: false });
+        },
+      }, 'Installieren')));
+    cards.push(accRow('Aufnahmen löschen', [],
       h('button.btn.small.danger', {
         type: 'button',
         onclick: async () => {
-          if (!confirm('Alle Choreos, Aufnahmen, Videos, Songdateien und Einheiten löschen? Classes, Profil und Präferenzen bleiben. Lässt sich nicht rückgängig machen.')) return;
+          if (!(await confirmDialog({ title: 'AUFNAHMEN LÖSCHEN', text: `Löscht alle Choreos mit Aufnahmen, Videos und Songdateien (${mb(vBytes)}) sowie die Einheiten und gibt den Speicher frei. Classes, Profil und Präferenzen bleiben. Lässt sich nicht rückgängig machen.`, ok: 'Löschen' }))) return;
           await deleteRecordings();
           freeStorage();
         },

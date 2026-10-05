@@ -8,6 +8,7 @@
 import { db, uid, untracked } from './db.js';
 import { packFile, unpackFile } from './backup.js';
 import { h, isTouch, classTitle, classMeta, byClassOrder, PALETTE } from './util.js';
+import { toggle } from './ui.js';
 
 const FORMAT = 'choreotrainer-export';
 const KEYS = ['category', 'level', 'weekday', 'time', 'coach'];
@@ -71,7 +72,7 @@ export async function exportClassDialog(cls) {
   const go = await dialog('CLASS EXPORTIEREN', [
     h('p.label', label(cls)),
     h('div.field', h('span', 'Choreos'), modeSeg), list,
-    h('div.field', h('span', 'Videos und Songdateien'), seg([[true, 'Mit'], [false, 'Ohne']], () => videos, v => { videos = v; })),
+    toggle('Mit Videos und Songdateien', videos, v => { videos = v; }),
   ], [['Exportieren', true, '.primary'], ['Abbrechen', null]]);
   if (!go) return null;
   const ids = mode === 'all' ? choreos.map(c => c.id) : mode === 'pick' ? checks.filter(x => x.checked).map(x => x.value) : [];
@@ -81,7 +82,7 @@ export async function exportChoreoDialog(choreo) {
   let videos = true;
   const go = await dialog('CHOREO EXPORTIEREN', [
     h('p.label', choreoName(choreo)),
-    h('div.field', h('span', 'Videos und Songdateien'), seg([[true, 'Mit'], [false, 'Ohne']], () => videos, v => { videos = v; })),
+    toggle('Mit Videos und Songdateien', videos, v => { videos = v; }),
   ], [['Exportieren', true, '.primary'], ['Abbrechen', null]]);
   return go ? exportChoreo(choreo, { videos }) : null;
 }
