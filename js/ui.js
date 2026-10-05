@@ -209,7 +209,15 @@ export function preferences(values, onChange, statValues = null, { baseLabel = t
     block('Song-Cover Hörprobe', single('hoverPreview', [['off', 'Aus'], ['low', 'Leise'], ['mid', 'Mittel'], ['high', 'Laut']],
       values.hoverPreview === 'on' || !values.hoverPreview ? 'mid' : values.hoverPreview,
       ([id, label]) => [h('i.brand', { html: svg26(SOUND_PATHS[id]) }), h('span', label)])),
-    tester ? block('Helfer*in', toggle('Knopf für Bugs und Ideen', !!values.tester, v => onChange({ tester: v }))) : null,
+    // Helfer*in wie in den Einstellungen: ein Knopf, Beschriftung zeigt den Zustand, aktiviert = gefüllt
+    tester ? block('Helfer*in', (() => {
+      let on = !!values.tester;
+      const b = h('button.btn.small', { type: 'button' });
+      const show = () => { b.textContent = on ? 'Aktiviert' : 'Deaktiviert'; b.classList.toggle('primary', on); };
+      b.addEventListener('click', () => { on = !on; show(); onChange({ tester: on }); });
+      show();
+      return h('div.pref-onoff', b); // Erklärung steht schon unter der Überschrift
+    })()) : null,
     block('Statistiken', chips),
     block('Ansicht', single('theme', [['light', 'Hell'], ['dark', 'Dunkel'], ['system', 'System']], values.theme,
       ([id, label]) => [h('i.brand', { html: THEME_ICONS[id] }), h('span', label)])));

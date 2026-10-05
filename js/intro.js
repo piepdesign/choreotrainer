@@ -100,10 +100,10 @@ export async function runIntro() {
     // Als App installieren? Nur, solange sie im Browser läuft. „Im Browser“ schaltet den Hinweis in der Base ab.
     ...(isInstalled() ? [] : [{
       render() {
-        // Symbole im Stil der Präferenz-Kacheln: Home-Bildschirm mit Pfeil bzw. Browserfenster
+        // Symbole im Stil der Präferenz-Kacheln, geräteneutral: Herunterladen bzw. Weltkugel (Web)
         const ICON = {
-          install: '<rect x="8" y="2.5" width="10" height="21" rx="1.5"/><path d="M13 7v8M9.8 12l3.2 3.2 3.2-3.2M11 20.5h4"/>',
-          browser: '<rect x="2.5" y="4.5" width="21" height="17" rx="1.5"/><path d="M2.5 9h21M5.5 6.8h.01M8 6.8h.01"/>',
+          install: '<path d="M13 3.5v12.5M8.5 11.5 13 16l4.5-4.5"/><path d="M4.5 15.5v5A1.5 1.5 0 0 0 6 22h14a1.5 1.5 0 0 0 1.5-1.5v-5"/>',
+          browser: '<circle cx="13" cy="13" r="9.5"/><path d="M3.5 13h19M13 3.5c3.2 3 3.2 16 0 19M13 3.5c-3.2 3-3.2 16 0 19"/>',
         };
         const svg = id => `<svg viewBox="0 0 26 26" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true">${ICON[id]}</svg>`;
         const choice = (id, label, onPick) => h(`button${state.appChoice === id ? '.on' : ''}`, {
@@ -120,7 +120,7 @@ export async function runIntro() {
           choice('browser', 'Im Browser nutzen', () => { state.appHint = false; }));
         return h('div.intro-step',
           h('h1.wide', 'ALS APP NUTZEN?'),
-          h('p.intro-lead', 'Installiert startet ChoreoTrainer vom Home-Bildschirm, auch ohne Internet, und der Browser räumt deine Daten nicht von sich aus.'),
+          h('p.intro-lead', 'Installiert startet ChoreoTrainer wie eine eigene App, auch ohne Internet, und der Browser räumt deine Daten nicht von sich aus.'),
           tiles,
           isIOS() ? h('p.intro-lead', 'Am iPhone hat die installierte App einen eigenen Speicher. Am besten jetzt installieren und dort weitermachen.') : null,
           h('p.intro-lead', '(Jederzeit unter Einstellungen › App)'));

@@ -552,7 +552,7 @@ export async function renderProfile(root, section) {
   function renderApp() {
     const installed = isInstalled();
     appBox.replaceChildren(
-      accRow('Installieren', [stateLine(installed ? 'Als App installiert.' : 'Startet vom Home-Bildschirm, auch offline.')],
+      accRow('Installieren', [stateLine(installed ? 'Als App installiert.' : 'Startet wie eine eigene App, auch offline.')],
         installed ? null : h('button.btn.small', { type: 'button', onclick: async () => { await installApp(); renderApp(); } }, 'Installieren')),
       accRow('Empfehlen', [stateLine('Link zu ChoreoTrainer weitergeben.')],
         h('button.btn.small', {

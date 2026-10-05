@@ -399,7 +399,7 @@ export async function renderClass(root, id) {
 function appHint() {
   if (isInstalled() || !settings().appHint) return null;
   const bar = h('div.app-hint',
-    h('span', 'Als App installieren: startet vom Home-Bildschirm, auch offline.'),
+    h('span', 'Als App installieren: startet wie eine eigene App, auch offline.'),
     h('span.app-hint-actions',
       h('button.btn.small', { type: 'button', onclick: async () => { if (await installApp()) go('#/', { replace: true }); } }, 'Installieren'),
       h('button.linkbtn.small-link', {

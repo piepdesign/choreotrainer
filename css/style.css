@@ -712,6 +712,8 @@ a.stat-link:hover { background: var(--surface-2); }
 .guide-ico { display: grid; place-items: center; width: 52px; height: 52px; background: var(--surface); }
 .guide-text { font-size: 13px; }
 .guide-note { margin: 0; padding: 10px 12px; border-left: 2px solid var(--fg); font-size: 12px; color: var(--muted); }
+.pref-onoff { display: flex; }
+.pref-onoff .btn { min-width: 128px; justify-content: center; }
 .confirm-card p { margin: 0; font-size: 13px; line-height: 1.55; }
 .app-hint { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; margin-top: var(--tile-gap); padding: 12px 16px; background: var(--surface); font-size: 12px; }
 .app-hint-actions { display: flex; align-items: baseline; gap: 14px; }
