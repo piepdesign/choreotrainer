@@ -428,10 +428,9 @@ export async function renderProfile(root, section) {
   const account = sect('account', 'Konto',
     h('div.acc',
       // Name + Helfer*in in einer Kachel; Helfer*in wirkt sofort (Knopf unten rechts für Bug-Meldungen und Ideen)
-      accRow('Profil', [
-        h('label.field', h('span', 'Name'), nameIn),
-        toggle('Helfer*in', !!s.tester, v => saveSettings({ tester: v })),
-      ], h('button.btn.small', { type: 'button', onclick: saveName }, 'Speichern')),
+      accRow('Name', [nameIn], h('button.btn.small', { type: 'button', onclick: saveName }, 'Speichern')),
+      // Helfer*in: Schalter statt Knopf, wirkt sofort (Knopf unten rechts für Bug-Meldungen und Ideen)
+      accRow('Helfer*in', [stateLine('Knopf für Bugs und Ideen.')], toggle('', !!s.tester, v => saveSettings({ tester: v }))),
       accRow('Tutorial', [stateLine('Zeigt beide Teile noch einmal.')],
         h('button.btn.small', {
           type: 'button',
@@ -522,7 +521,7 @@ export async function renderProfile(root, section) {
         : !st.persisted && st.supported ? h('button.btn.small', {
           type: 'button',
           onclick: async () => { toast((await askPersist()) ? 'Speicher ist jetzt dauerhaft' : 'Der Browser lehnt ab. Als App installiert klappt es meist.', 4000); renderData(); },
-        }, 'Dauerhaft anfordern') : null));
+        }, 'Schützen') : null)); // bittet den Browser, die Daten nicht von sich aus zu räumen
     cards.push(accRow('App', [stateLine(installed ? 'Als App installiert.' : 'Startet vom Home-Bildschirm, auch offline.')],
       installed ? null : h('button.btn.small', {
         type: 'button',
