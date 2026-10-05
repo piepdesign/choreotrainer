@@ -689,7 +689,7 @@ a.stat-link:hover { background: var(--surface-2); }
 .small-link { font-size: 11px; }
 .dropzone .dz-import { margin-top: 10px; position: relative; z-index: 1; }
 .class-card { max-width: 760px; }
-.pop .toggle, .share-card .toggle { justify-self: start; }
+.pop .toggle, .share-card .toggle, .confirm-card .toggle { justify-self: start; }
 .acc-text .toggle { display: flex; margin-top: 10px; }
 .confirm-card p { margin: 0; font-size: 13px; line-height: 1.55; }
 .section-tools { display: flex; gap: 14px; align-items: baseline; } /* Überschrift rechts: Knopf + Hinweis */

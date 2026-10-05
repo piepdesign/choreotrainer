@@ -541,7 +541,7 @@ export async function renderTrain(root, recId) {
       h('div.btns', [['tl', '↖'], ['tr', '↗'], ['c', '·'], ['bl', '↙'], ['br', '↘']].map(([k, l]) =>
         small(l, () => { C.pos = k; saveCountView(C); update(); refreshPop(); }, C.pos === k))),
       toggle('Halbe „+“', C.plus, v => { C.plus = v; saveCountView(C); update(); }),
-      toggle('Zähler sichtbar', C.show, v => { C.show = v; saveCountView(C); update(); }),
+      toggle('Zähler', C.show, v => { C.show = v; saveCountView(C); update(); }),
     ];
   };
 
