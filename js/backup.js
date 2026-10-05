@@ -51,19 +51,16 @@ export async function promptInstall() {
 // true = installiert bzw. Anleitung gezeigt, false = abgebrochen
 export async function installApp() {
   if (canPromptInstall()) return promptInstall();
-  const { confirmDialog } = await import('./ui.js');
+  const { guideDialog } = await import('./ui.js');
   const ua = navigator.userAgent;
   const chromium = !!navigator.userAgentData?.brands?.some(b => /Chromium|Google Chrome|Microsoft Edge/.test(b.brand));
-  const text = isIOS()
-    ? 'iPhone und iPad lassen Websites nicht selbst installieren. In Safari auf Teilen tippen (Quadrat mit Pfeil nach oben), dann „Zum Home-Bildschirm“. Die App hat dort einen eigenen Speicher, vorhandene Daten über eine Sicherung mitnehmen.'
-    : chromium
-      ? 'Der Browser bietet die Installation gerade nicht an, meist weil ChoreoTrainer hier schon installiert ist. Öffnen über das App-Symbol rechts in der Adressleiste, sonst im Browser-Menü „App installieren“.'
-      : /Firefox\//.test(ua)
-        ? 'Firefox kann Web-Apps nicht installieren. Dafür ChoreoTrainer in Chrome, Edge oder Safari öffnen.'
-        : /Safari\//.test(ua)
-          ? 'In Safari: Ablage › Zum Dock hinzufügen.'
-          : 'Im Browser-Menü „App installieren“ bzw. „Zum Startbildschirm hinzufügen“ wählen.';
-  await confirmDialog({ title: 'INSTALLIEREN', ok: 'OK', danger: false, cancel: false, text });
+  // iPhone/iPad: alle Browser dort nutzen dasselbe Teilen-Menü („Zum Home-Bildschirm“)
+  const guide = isIOS() ? { title: 'INSTALLIEREN', steps: [['share', 'Im Browser auf Teilen tippen'], ['addHome', '„Zum Home-Bildschirm“ wählen'], ['phone', 'App vom Home-Bildschirm öffnen']], note: 'Die App hat einen eigenen Speicher. Daten per Sicherung mitnehmen.' }
+    : chromium ? { title: 'SCHON INSTALLIERT?', steps: [['addressBar', 'Öffnen: App-Symbol in der Adressleiste'], ['menu', 'Sonst: Browser-Menü › App installieren']] }
+      : /Firefox\//.test(ua) ? { title: 'INSTALLIEREN', steps: [['browsers', 'In Chrome, Edge oder Safari öffnen']], note: 'Firefox kann keine Web-Apps installieren.' }
+        : /Safari\//.test(ua) ? { title: 'INSTALLIEREN', steps: [['menuBar', 'Menü „Ablage“ öffnen'], ['dock', '„Zum Dock hinzufügen“ wählen']] }
+          : { title: 'INSTALLIEREN', steps: [['menu', 'Browser-Menü öffnen'], ['addHome', '„App installieren“ wählen']] };
+  await guideDialog(guide);
   return true;
 }
 

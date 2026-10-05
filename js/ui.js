@@ -155,6 +155,30 @@ export function confirmDialog({ title, text, ok = 'Bestätigen', danger = true, 
   });
 }
 
+// Anleitung in Schritten: je Schritt eine vereinfachte Grafik und ein kurzer Satz, darunter ein Hinweis (optional)
+const GUIDE_ICONS = {
+  share: '<path d="M14 11h-2.5A1.5 1.5 0 0 0 10 12.5v14a1.5 1.5 0 0 0 1.5 1.5h13a1.5 1.5 0 0 0 1.5-1.5v-14a1.5 1.5 0 0 0-1.5-1.5H22M18 4v15M14 8l4-4 4 4"/>',
+  addHome: '<rect x="8" y="8" width="20" height="20" rx="4"/><path d="M18 13v10M13 18h10"/>',
+  phone: '<rect x="11" y="3.5" width="14" height="29" rx="2.5"/><rect x="14.5" y="9" width="7" height="7" rx="1.5" fill="currentColor"/><path d="M16.5 29h3"/>',
+  addressBar: '<rect x="2.5" y="11" width="31" height="14" rx="7"/><path d="M7 18h11"/><rect x="23" y="14.5" width="7" height="6" rx="1"/><path d="M26.5 14.5v-2"/>',
+  menu: '<rect x="4" y="5" width="28" height="26" rx="2"/><path d="M27 10.5v.01M27 14v.01M27 17.5v.01M9 23h14"/>',
+  menuBar: '<rect x="3" y="7" width="30" height="22" rx="2"/><path d="M3 12h30M7 9.5h5M15 9.5h5"/>',
+  dock: '<path d="M4 27h28"/><rect x="7" y="17" width="7" height="7" rx="1.5"/><rect x="15" y="17" width="7" height="7" rx="1.5" fill="currentColor"/><rect x="23" y="17" width="7" height="7" rx="1.5"/>',
+  browsers: '<circle cx="18" cy="18" r="13"/><path d="M5 18h26M18 5c4 4 4 22 0 26M18 5c-4 4-4 22 0 26"/>',
+};
+export function guideDialog({ title, steps, note = null, ok = 'OK' }) {
+  return new Promise(resolve => {
+    const close = () => { box.remove(); resolve(true); };
+    const svg = id => `<svg viewBox="0 0 36 36" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${GUIDE_ICONS[id]}</svg>`;
+    const box = h('div.modal', { onclick: e => { if (e.target === box) close(); } },
+      h('div.modal-card.guide-card', h('h2.wide', title),
+        h('ol.guide', steps.map(([icon, text], i) => h('li', h('span.guide-num', String(i + 1)), h('span.guide-ico', { html: svg(icon) }), h('span.guide-text', text)))),
+        note ? h('p.guide-note', note) : null,
+        h('div.actions', h('button.btn.small.primary', { type: 'button', onclick: close }, ok))));
+    document.body.append(box);
+  });
+}
+
 export function preferences(values, onChange, statValues = null, { baseLabel = true, tester = false, hints = false } = {}) {
   // hints: im Intro ein Satz unter jedem Titel, was die Einstellung bewirkt
   const HINTS = {

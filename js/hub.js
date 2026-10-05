@@ -211,7 +211,7 @@ export async function renderHub(root) {
   root.append(
     h('div', { style: { height: '12px' } }),
     dropzone(f => { state.pendingFile = f; go('#/upload'); }),
-    appHint(),
+    appHint() || '', // null würde als Text „null“ erscheinen
     h('div.stats', chosen.map(id => stat(label(id), values[id].value, values[id].hint, `#/profile/${STAT_TARGET[id] || 'overview'}`))),
     h('div.columns',
       h('div.col-choreos',
