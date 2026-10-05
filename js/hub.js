@@ -6,6 +6,7 @@ import { baseStats } from './stats.js';
 import { settings, BASE_STATS } from './settings.js';
 import { songLink } from './providers.js';
 import { classPickers, icon } from './ui.js';
+import { exportClassDialog, exportChoreoDialog, chooseFile, importExport, importSummary } from './share.js';
 
 export async function loadAll() {
   const [classes, choreos, recordings, sessions] = await Promise.all(
@@ -362,7 +363,15 @@ export async function renderClass(root, id) {
     h('div.stripes', { style: { marginTop: '8px' } }, header),
     h('div.actions', { style: { margin: '14px 0 28px' } },
       h('button.linkbtn', { onclick: () => { if (editBox.hidden) { editBox.replaceChildren(classEditor(cls, header, () => { editBox.hidden = true; }, classes)); editBox.hidden = false; } else editBox.hidden = true; } }, 'Bearbeiten'),
-      h('a.linkbtn', { href: `#/upload?class=${id}`, onclick: () => { state.pendingFile = null; } }, 'Neue Aufnahme')),
+      h('a.linkbtn', { href: `#/upload?class=${id}`, onclick: () => { state.pendingFile = null; } }, 'Neue Aufnahme'),
+      h('button.linkbtn', { type: 'button', onclick: () => importInto(id) }, 'Choreo importieren'),
+      h('button.linkbtn', {
+        type: 'button',
+        onclick: async () => {
+          try { const r = await exportClassDialog(cls); if (r) toast(`Exportiert: ${r.choreos} Choreo${r.choreos === 1 ? '' : 's'}${r.files ? `, ${r.files} Dateien (${Math.round(r.bytes / 1e6)} MB)` : ''}`, 3500); }
+          catch (e) { console.error(e); toast(`Export fehlgeschlagen: ${e.message}`, 5000); }
+        },
+      }, 'Exportieren')),
     editBox,
     ...(mine.length ? mine.map(c => choreoBlock(c, recsByChoreo[c.id] || [], sessions, urls)) : [h('p.empty', 'Keine Choreos in dieser Class.')]),
     h('div.actions', { style: { marginTop: '40px' } },
@@ -376,6 +385,19 @@ export async function renderClass(root, id) {
       }, 'Class löschen')),
   );
   return () => urls.forEach(u => URL.revokeObjectURL(u));
+}
+
+// Import aus Class-Übersicht, Class-Formular und Einstellungen: Datei wählen, einspielen, zur Class springen
+export async function importInto(classId) {
+  const file = await chooseFile();
+  if (!file) return null;
+  try {
+    const r = await importExport(file, { classId });
+    if (!r) return null;
+    toast(importSummary(r), 4500);
+    go(`#/class/${r.classId}`, { replace: location.hash === `#/class/${r.classId}` });
+    return r;
+  } catch (e) { console.error(e); toast(e.message, 5000); return null; }
 }
 
 // Farbe wirkt sofort als Vorschau auf den Kopfstreifen. Speichern behält sie, Abbrechen setzt sie zurück.
@@ -455,6 +477,13 @@ function choreoBlock(c, recs, sessions, urls) {
       })),
       h('div.actions', { style: { marginTop: '10px' } },
         h('a.linkbtn', { href: `#/upload?choreo=${c.id}`, onclick: () => { state.pendingFile = null; } }, '+ Aufnahme hinzufügen'),
+        h('button.linkbtn', {
+          type: 'button',
+          onclick: async () => {
+            try { const r = await exportChoreoDialog(c); if (r) toast(`Choreo exportiert${r.files ? `: ${r.files} Dateien (${Math.round(r.bytes / 1e6)} MB)` : ', ohne Videos'}`, 3500); }
+            catch (e) { console.error(e); toast(`Export fehlgeschlagen: ${e.message}`, 5000); }
+          },
+        }, 'Exportieren'),
         h('button.linkbtn', {
           onclick: async () => {
             const name = c.title || c.song?.title || 'Ohne Song';

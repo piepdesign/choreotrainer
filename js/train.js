@@ -9,6 +9,7 @@ import { recTitle } from './hub.js';
 import { go, toast } from './app.js';
 import { settings, saveSettings, PANEL_SECTIONS } from './settings.js';
 import { icon } from './ui.js';
+import { exportChoreoDialog } from './share.js';
 import { prime, needsCapture } from './audio.js';
 
 const MARKER_TYPES = {
@@ -965,7 +966,14 @@ export async function renderTrain(root, recId) {
           const next = recs.find(r => r.id !== rec.id);
           go(next ? `#/train/${next.id}` : `#/class/${cls.id}`, { replace: true });
         },
-      }, 'Aufnahme löschen')),
+      }, 'Aufnahme löschen'),
+      h('button.linkbtn', {
+        type: 'button',
+        onclick: async () => {
+          try { const r = await exportChoreoDialog(choreo); if (r) toast(`Choreo exportiert${r.files ? `: ${r.files} Dateien (${Math.round(r.bytes / 1e6)} MB)` : ', ohne Videos'}`, 3500); }
+          catch (e) { console.error(e); toast(`Export fehlgeschlagen: ${e.message}`, 5000); }
+        },
+      }, 'Choreo exportieren')),
   ];
   const KEYS = [
     ['␣', 'Play/Pause'], ['← →', '±2 s (⇧ ±0,2)'], ['M', 'Spiegeln'], ['↑ ↓', 'Tempo'],

@@ -1,6 +1,7 @@
 // Classes ohne Video anlegen, bearbeiten, löschen. Genutzt im Intro und im Profil.
 import { db, uid, deleteClass } from './db.js';
 import { classPickers } from './ui.js';
+import { chooseFile, importExport, importSummary } from './share.js';
 import { h, PALETTE, textOn, WEEKDAYS, CLASS_TITLES, CLASS_LEVELS, classTitle, classCells, byClassOrder } from './util.js';
 
 const norm = s => String(s || '').trim().toLowerCase();
@@ -96,12 +97,26 @@ export function classForm(onSaved) {
     },
   }, '+ Class hinzufügen');
   const cancelBtn = h('button.linkbtn', { type: 'button', hidden: true, onclick: () => { clear(); msg.textContent = ''; } }, 'Abbrechen');
+  // Class (oder Choreo) aus einer Export-Datei übernehmen
+  const importBtn = h('button.linkbtn', {
+    type: 'button',
+    onclick: async () => {
+      const file = await chooseFile();
+      if (!file) return;
+      try {
+        const r = await importExport(file);
+        if (!r) return;
+        msg.textContent = importSummary(r);
+        onSaved?.(await db.get('classes', r.classId));
+      } catch (e) { msg.textContent = e.message; }
+    },
+  }, 'Class importieren');
 
   const el = h('div.classform',
     title,
     h('div.row', field('Style', f.category), field('Level', f.level), field('Wochentag', f.weekday), field('Uhrzeit', f.time), field('Coach', f.coach)),
     h('div', { style: { marginTop: '14px' } }, h('span.label.color-label', 'Farbe'), swatches),
-    h('div.actions', saveBtn, cancelBtn, msg));
+    h('div.actions', saveBtn, cancelBtn, importBtn, msg));
   el.edit = cls => {
     editing = cls;
     for (const k of KEYS) f[k].value = cls[k] || '';

@@ -437,6 +437,14 @@ main:has(.train) { padding-bottom: 0; }
 .modal { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, .45); display: grid; place-items: center; padding: 16px; }
 .modal-card { background: var(--bg); border: 1px solid var(--rule); padding: 22px; max-width: 520px; width: 100%; display: grid; gap: 14px; }
 .modal-card h2 { margin: 0; font-size: 22px; }
+/* Export/Import-Dialoge */
+.share-card .field { display: grid; gap: 6px; }
+.share-card .field > span { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.share-card .seg { justify-self: start; }
+.share-card select { width: 100%; }
+.share-list { display: grid; gap: 6px; max-height: 40vh; overflow: auto; padding: 8px 10px; background: var(--surface); }
+.share-item { display: flex; gap: 10px; align-items: center; font-size: 13px; cursor: pointer; }
+.share-item input { margin: 0; accent-color: var(--fg); }
 .tooltip { position: fixed; z-index: 70; pointer-events: none; background: var(--fg); color: var(--bg); font-size: 11px; padding: 6px 8px; max-width: 280px; }
 
 /* ── Intro ───────────────────────────────────── */

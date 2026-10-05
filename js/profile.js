@@ -3,7 +3,7 @@
 // Class-Farben, Werte immer in Textfarbe, Tooltip auf jedem Datenpunkt.
 import { db, deleteAllData } from './db.js';
 import { h, tt, isTouch, fmt, fmtDuration, relDate, fmtRecDate, classTitle, stripe, byClassOrder, WEEKDAYS, textOn, plural } from './util.js';
-import { loadAll, dots, choreoCard, recTitle, nextClass } from './hub.js';
+import { loadAll, dots, choreoCard, recTitle, nextClass, importInto } from './hub.js';
 import { songLink } from './providers.js';
 import { baseStats, latestRating, choreoLength, weekStart, dayKey } from './stats.js';
 import { settings, saveSettings, applyTheme, resetSettings, BASE_STATS } from './settings.js';
@@ -527,6 +527,10 @@ export async function renderProfile(root, section) {
           }),
         }, 'Datei wählen')),
     ];
+    cards.push(accRow('Importieren', [h('p.acc-lead', 'Übernimmt einen Export:'),
+        h('ul.acc-list', h('li', 'eine Class mit ihren Choreos'), h('li', 'oder eine einzelne Choreo')),
+        h('p.acc-note', 'Choreos kommen in ihre Class, gibt es die nicht, fragt die App. Exportieren in der Class-Übersicht bzw. im Seitenpanel einer Choreo.')],
+      h('button.btn.small', { type: 'button', onclick: () => importInto() }, 'Datei wählen')));
     if (missing.length) cards.push(accRow('Videos zuordnen', [
         h('p.acc-lead', `${plural(missing.length, 'Aufnahme', 'Aufnahmen')} ohne Video:`),
         h('ul.acc-list', missing.slice(0, 4).map(r => h('li', r.fileName || r.title || 'Aufnahme')), missing.length > 4 ? h('li', `… und ${missing.length - 4} weitere`) : null),

@@ -65,7 +65,7 @@ async function videoBlobs() {
 }
 export async function videoBytes() { return (await videoBlobs()).reduce((a, [, b]) => a + b.size, 0); }
 
-function download(blob, name) {
+export function download(blob, name) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
@@ -75,34 +75,45 @@ function download(blob, name) {
   setTimeout(() => URL.revokeObjectURL(a.href), 60000);
 }
 
+// Datei bauen bzw. lesen (gemeinsam für Sicherung und Export von Class/Choreo). blobs: [[Schlüssel, Blob]]
+export function packFile(head, blobs, name) {
+  let offset = 0;
+  const files = blobs.map(([key, b]) => { const f = { key, name: b.name || '', type: b.type || '', size: b.size, offset }; offset += b.size; return f; });
+  const bytes = new TextEncoder().encode(JSON.stringify({ ...head, files }));
+  const len = new Uint8Array(8);
+  new DataView(len.buffer).setBigUint64(0, BigInt(bytes.length), true);
+  download(new Blob([MAGIC, len, bytes, ...blobs.map(([, b]) => b)], { type: 'application/octet-stream' }), name);
+  return { files: files.length, bytes: offset };
+}
+// Liefert den Kopf; head.videos = [[Schlüssel, File]] als Ausschnitte der Datei (nichts wird kopiert). null = keine CT-Datei
+export async function unpackFile(file) {
+  if (!/\.ctbackup$/i.test(file.name || '')) return null;
+  if (new TextDecoder().decode(await file.slice(0, 8).arrayBuffer()) !== MAGIC) return null;
+  const len = Number(new DataView(await file.slice(8, 16).arrayBuffer()).getBigUint64(0, true));
+  if (!(len > 0 && 16 + len <= file.size)) return null;
+  let head;
+  try { head = JSON.parse(new TextDecoder().decode(await file.slice(16, 16 + len).arrayBuffer())); } catch { return null; }
+  if (!head?.data) return null;
+  const base = 16 + len;
+  head.videos = (head.files || []).filter(f => base + f.offset + f.size <= file.size)
+    .map(f => [f.key, new File([file.slice(base + f.offset, base + f.offset + f.size)], f.name || f.key, { type: f.type })]);
+  return head;
+}
+
 export async function exportBackup({ videos = true } = {}) {
   const data = await collect();
   const date = new Date().toISOString().slice(0, 10);
   const counts = Object.fromEntries(STORES.map(s => [s, data[s].length]));
   const blobs = videos ? await videoBlobs() : []; // „Ohne Videos“: gleiche Datei, nur ohne angehängte Dateien
-  let offset = 0;
-  const files = blobs.map(([key, b]) => { const f = { key, name: b.name || '', type: b.type || '', size: b.size, offset }; offset += b.size; return f; });
-  const head = new TextEncoder().encode(JSON.stringify({ format: FORMAT, version: 2, exportedAt: Date.now(), data, files }));
-  const len = new Uint8Array(8);
-  new DataView(len.buffer).setBigUint64(0, BigInt(head.length), true);
-  download(new Blob([MAGIC, len, head, ...blobs.map(([, b]) => b)], { type: 'application/octet-stream' }), `choreotrainer-sicherung-${date}.ctbackup`);
-  return { counts, videos: files.length, bytes: offset };
+  const r = packFile({ format: FORMAT, version: 2, exportedAt: Date.now(), data }, blobs, `choreotrainer-sicherung-${date}.ctbackup`);
+  return { counts, videos: r.files, bytes: r.bytes };
 }
 
-// Nur .ctbackup. Die Videos bleiben Ausschnitte der gewählten Datei (nichts wird in den Arbeitsspeicher kopiert).
 export async function readBackup(file) {
-  const fail = () => { throw new Error('Bitte eine ChoreoTrainer-Sicherung (.ctbackup) wählen.'); };
-  if (!/\.ctbackup$/i.test(file.name || '')) fail();
-  if (new TextDecoder().decode(await file.slice(0, 8).arrayBuffer()) !== MAGIC) fail();
-  const len = Number(new DataView(await file.slice(8, 16).arrayBuffer()).getBigUint64(0, true));
-  if (!(len > 0 && 16 + len <= file.size)) fail();
-  let backup;
-  try { backup = JSON.parse(new TextDecoder().decode(await file.slice(16, 16 + len).arrayBuffer())); } catch { fail(); }
-  if (backup?.format !== FORMAT || !backup.data) fail();
-  const base = 16 + len;
-  backup.videos = (backup.files || []).filter(f => base + f.offset + f.size <= file.size)
-    .map(f => [f.key, new File([file.slice(base + f.offset, base + f.offset + f.size)], f.name || f.key, { type: f.type })]);
-  return backup;
+  const head = await unpackFile(file);
+  if (head?.format === 'choreotrainer-export') throw new Error('Das ist ein Export einer Class bzw. Choreo. Bitte unter „Importieren“ einspielen.');
+  if (head?.format !== FORMAT) throw new Error('Bitte eine ChoreoTrainer-Sicherung (.ctbackup) wählen.');
+  return head;
 }
 
 // Speicher freigeben: alle Choreos mit Aufnahmen, Videos, Songdateien und Einheiten löschen.
