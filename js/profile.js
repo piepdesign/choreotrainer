@@ -430,7 +430,14 @@ export async function renderProfile(root, section) {
       // Name + Helfer*in in einer Kachel; Helfer*in wirkt sofort (Knopf unten rechts für Bug-Meldungen und Ideen)
       accRow('Name', [nameIn], h('button.btn.small', { type: 'button', onclick: saveName }, 'Speichern')),
       // Helfer*in: Schalter statt Knopf, wirkt sofort (Knopf unten rechts für Bug-Meldungen und Ideen)
-      accRow('Helfer*in', [stateLine('Knopf für Bugs und Ideen.')], toggle('', !!s.tester, v => saveSettings({ tester: v }))),
+      accRow('Helfer*in', [stateLine('Knopf für Bugs und Ideen.')], (() => {
+        // Knopf wie die übrigen, Beschriftung zeigt den Zustand; aktiviert = gefüllt
+        const b = h('button.btn.small', { type: 'button' });
+        const show = on => { b.textContent = on ? 'Aktiviert' : 'Deaktiviert'; b.classList.toggle('primary', on); };
+        b.addEventListener('click', async () => { const on = !settings().tester; await saveSettings({ tester: on }); show(on); });
+        show(!!s.tester);
+        return b;
+      })()),
       accRow('Tutorial', [stateLine('Zeigt beide Teile noch einmal.')],
         h('button.btn.small', {
           type: 'button',
@@ -453,7 +460,7 @@ export async function renderProfile(root, section) {
             location.hash = '#/';
             location.reload();
           },
-        }, 'Alles löschen'))));
+        }, 'Löschen'))));
 
   // ── Daten: erst Sichern/Einspielen, dann Zustand (Speicher, App), zuletzt Löschen ──
   const dataBox = h('div.acc');
@@ -501,9 +508,9 @@ export async function renderProfile(root, section) {
               setTimeout(() => location.reload(), 600); // Einstellungen und Ansichten frisch laden
             } catch (e) { console.error(e); toast(e.message, 5000); }
           }),
-        }, 'Datei wählen')),
+        }, 'Einspielen')),
       accRow('Importieren', [stateLine('Übernimmt eine Class oder Choreo.')],
-        h('button.btn.small', { type: 'button', onclick: () => importInto() }, 'Datei wählen')),
+        h('button.btn.small', { type: 'button', onclick: () => importInto() }, 'Importieren')),
     ];
     if (missing.length) cards.push(accRow('Videos zuordnen', [stateLine(`${plural(missing.length, 'Aufnahme', 'Aufnahmen')} ohne Video.`)],
       h('button.btn.small', {
