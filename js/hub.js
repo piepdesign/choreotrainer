@@ -395,8 +395,7 @@ export async function renderClass(root, id) {
   return () => urls.forEach(u => URL.revokeObjectURL(u));
 }
 
-// Hinweis „Als App installieren“ in der Base: nur im Browser (nicht installiert), abschaltbar
-// (hier „Ausblenden“ oder Einstellungen › App › Hinweis)
+// Hinweis „Als App installieren“ in der Base: nur im Browser (nicht installiert), mit „Ausblenden“ abschaltbar
 function appHint() {
   if (isInstalled() || !settings().appHint) return null;
   const bar = h('div.app-hint',
@@ -405,7 +404,7 @@ function appHint() {
       h('button.btn.small', { type: 'button', onclick: async () => { if (await installApp()) go('#/', { replace: true }); } }, 'Installieren'),
       h('button.linkbtn.small-link', {
         type: 'button',
-        onclick: async () => { await saveSettings({ appHint: false }); bar.remove(); toast('Ausgeblendet. Wieder einblenden: Einstellungen › App.', 3500); },
+        onclick: async () => { await saveSettings({ appHint: false }); bar.remove(); },
       }, 'Ausblenden')));
   return bar;
 }

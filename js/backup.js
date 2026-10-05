@@ -45,17 +45,36 @@ export async function promptInstall() {
   return outcome === 'accepted';
 }
 
-// Installieren: wo der Browser es anbietet (Chrome, Android) direkt, sonst kurz zeigen, wie es geht.
+// Installieren: Wo der Browser es anbietet (Chrome, Edge, Android), startet der Knopf die echte Installation.
+// Sonst geht es technisch nicht per Knopf (iPhone/iPad: Apple erlaubt es Websites nicht; Chrome bietet es nicht an,
+// wenn die App dort schon installiert ist) – dann je nach Browser der nächste Schritt.
 // true = installiert bzw. Anleitung gezeigt, false = abgebrochen
 export async function installApp() {
   if (canPromptInstall()) return promptInstall();
   const { confirmDialog } = await import('./ui.js');
-  await confirmDialog({
-    title: 'INSTALLIEREN', ok: 'OK', danger: false, cancel: false,
-    text: isIOS() ? 'In Safari: Teilen › Zum Home-Bildschirm. Danach die App vom Home-Bildschirm öffnen. Sie hat dort einen eigenen Speicher, vorhandene Daten über eine Sicherung mitnehmen.'
-      : 'Im Browser-Menü „App installieren“ bzw. „Zum Startbildschirm hinzufügen“ wählen.',
-  });
+  const ua = navigator.userAgent;
+  const chromium = !!navigator.userAgentData?.brands?.some(b => /Chromium|Google Chrome|Microsoft Edge/.test(b.brand));
+  const text = isIOS()
+    ? 'iPhone und iPad lassen Websites nicht selbst installieren. In Safari auf Teilen tippen (Quadrat mit Pfeil nach oben), dann „Zum Home-Bildschirm“. Die App hat dort einen eigenen Speicher, vorhandene Daten über eine Sicherung mitnehmen.'
+    : chromium
+      ? 'Der Browser bietet die Installation gerade nicht an, meist weil ChoreoTrainer hier schon installiert ist. Öffnen über das App-Symbol rechts in der Adressleiste, sonst im Browser-Menü „App installieren“.'
+      : /Firefox\//.test(ua)
+        ? 'Firefox kann Web-Apps nicht installieren. Dafür ChoreoTrainer in Chrome, Edge oder Safari öffnen.'
+        : /Safari\//.test(ua)
+          ? 'In Safari: Ablage › Zum Dock hinzufügen.'
+          : 'Im Browser-Menü „App installieren“ bzw. „Zum Startbildschirm hinzufügen“ wählen.';
+  await confirmDialog({ title: 'INSTALLIEREN', ok: 'OK', danger: false, cancel: false, text });
   return true;
+}
+
+// Empfehlen: Teilen-Menü des Geräts (Messenger, Social Media, Mail …), sonst Link kopieren
+export const SHARE_URL = 'https://tinyurl.com/choreotrainer';
+export async function shareApp() {
+  const data = { title: 'CHOREO—TRAINER', text: 'Choreos aus dem Tanzkurs nachlernen: Spiegeln, Tempo, Loop und 8er-Count.', url: SHARE_URL };
+  if (navigator.share) {
+    try { await navigator.share(data); return 'shared'; } catch (e) { if (e?.name === 'AbortError') return 'aborted'; }
+  }
+  try { await navigator.clipboard.writeText(`${data.text} ${data.url}`); return 'copied'; } catch { return 'failed'; }
 }
 
 export function registerServiceWorker() {

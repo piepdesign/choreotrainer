@@ -123,7 +123,7 @@ export async function runIntro() {
           h('p.intro-lead', 'Installiert startet ChoreoTrainer vom Home-Bildschirm, auch ohne Internet, und der Browser räumt deine Daten nicht von sich aus.'),
           tiles,
           isIOS() ? h('p.intro-lead', 'Am iPhone hat die installierte App einen eigenen Speicher. Am besten jetzt installieren und dort weitermachen.') : null,
-          h('p.intro-lead', '(Später unter Einstellungen › App)'));
+          h('p.intro-lead', '(Jederzeit unter Einstellungen › App)'));
       },
       canGo: () => true,
       skippable: true,

@@ -10,7 +10,7 @@ import { settings, saveSettings, applyTheme, resetSettings, BASE_STATS } from '.
 import { classManager } from './classform.js';
 import { go, toast, replaceHash } from './app.js';
 import { preferences, toggle, confirmDialog } from './ui.js';
-import { storageState, askPersist, isInstalled, isIOS, canPromptInstall, promptInstall, exportBackup, readBackup, restoreBackup, missingVideos, relinkVideos, videoBytes, deleteRecordings, freeStorage, installApp } from './backup.js';
+import { storageState, askPersist, isInstalled, isIOS, canPromptInstall, promptInstall, exportBackup, readBackup, restoreBackup, missingVideos, relinkVideos, videoBytes, deleteRecordings, freeStorage, installApp, shareApp, SHARE_URL } from './backup.js';
 
 const DAY = 86400000;
 const NS = 'http://www.w3.org/2000/svg';
@@ -547,14 +547,22 @@ export async function renderProfile(root, section) {
   if (settingsPage) { renderData(); addEventListener('ct-install', renderData); }
   const dataSec = sect('data', 'Daten', dataBox);
 
-  // ── App: installieren und Hinweis in der Base ──
+  // ── App: installieren und weiterempfehlen ──
   const appBox = h('div.acc');
   function renderApp() {
     const installed = isInstalled();
     appBox.replaceChildren(
       accRow('Installieren', [stateLine(installed ? 'Als App installiert.' : 'Startet vom Home-Bildschirm, auch offline.')],
         installed ? null : h('button.btn.small', { type: 'button', onclick: async () => { await installApp(); renderApp(); } }, 'Installieren')),
-      accRow('Hinweis', [stateLine('Erinnert in der Base daran, solange nicht installiert.')], onOffBtn('appHint')));
+      accRow('Empfehlen', [stateLine('Link zu ChoreoTrainer weitergeben.')],
+        h('button.btn.small', {
+          type: 'button',
+          onclick: async () => {
+            const r = await shareApp();
+            if (r === 'copied') toast('Link kopiert, zum Einfügen in Messenger oder Social Media.', 3500);
+            if (r === 'failed') toast(`Link: ${SHARE_URL}`, 6000);
+          },
+        }, 'Teilen')));
   }
   if (settingsPage) { renderApp(); addEventListener('ct-install', renderApp); }
   const appSec = sect('app', 'App', appBox);
