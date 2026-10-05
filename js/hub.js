@@ -32,6 +32,7 @@ export function dropzone(onFile) {
     h('span.label', tt('(Video ablegen oder klicken zum Auswählen)', '(Tippen, um ein Video auszuwählen)')));
   const take = f => {
     if (!f) return;
+    if (/\.ctbackup$/i.test(f.name)) { importInto(undefined, f); return; } // Export einer Class/Choreo abgelegt
     if (!f.type.startsWith('video/') && !/\.(mov|mp4|m4v|webm)$/i.test(f.name)) return toast('Bitte eine Videodatei wählen');
     onFile(f);
   };
@@ -214,10 +215,12 @@ export async function renderHub(root) {
       h('div.col-songs',
         h('div.section-head', h('h2.wide', 'LETZTE SONGS')),
         songs.length ? songList : h('p.empty', 'Noch keine Songs.'))),
-    h('div.section-head', h('h2.wide', 'CLASSES'), classes.length ? h('span.label', '# Choreos') : null),
+    h('div.section-head', h('h2.wide', 'CLASSES'), h('span.section-tools',
+      h('button.linkbtn', { type: 'button', onclick: () => importInto() }, 'Importieren'),
+      classes.length ? h('span.label', '# Choreos') : null)),
     classes.length
       ? sortableStripes(classes.sort(byClassOrder), c => stripe(c, String(choreos.filter(x => x.classId === c.id).length)))
-      : h('p.empty', 'Lege Classes im Profil an oder beim ersten Upload.'),
+      : h('p.empty', 'Lege Classes in den Einstellungen an, beim ersten Upload oder importiere eine.'),
   );
 
   // Songliste an die Höhe der Choreo-Zeile koppeln
@@ -388,8 +391,8 @@ export async function renderClass(root, id) {
 }
 
 // Import aus Class-Übersicht, Class-Formular und Einstellungen: Datei wählen, einspielen, zur Class springen
-export async function importInto(classId) {
-  const file = await chooseFile();
+export async function importInto(classId, picked) {
+  const file = picked || await chooseFile();
   if (!file) return null;
   try {
     const r = await importExport(file, { classId });

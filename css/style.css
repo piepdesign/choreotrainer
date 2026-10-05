@@ -629,7 +629,7 @@ a.stat-link:hover { background: var(--surface-2); }
 /* ── Konto: Kacheln wie Provider/Statistiken, Knopf unten an derselben Stelle ── */
 .acc { display: flex; flex-wrap: wrap; gap: var(--tile-gap); }
 .acc > .acc-card { flex: 1 1 240px; }
-.acc-card { display: flex; flex-direction: column; gap: 14px; background: var(--surface); padding: 16px; min-height: 150px; }
+.acc-card { display: flex; flex-direction: column; gap: 12px; background: var(--surface); padding: 16px; } /* Höhe nach Inhalt; in einer Reihe gleich hoch (flex), Knopf unten */
 .acc-card .acc-text { flex: 1; }
 .acc-title { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--fg); margin-bottom: -4px; }
 .acc-text input[type=text] { width: 100%; }
@@ -678,6 +678,7 @@ a.stat-link:hover { background: var(--surface-2); }
 
 /* Cover spielt gerade die Hörprobe */
 /* Hörprobe: Rahmen innen auf dem Cover als Negativ des Bildes (Differenz), sichtbar auf hellen und dunklen Covern */
+.section-tools { display: flex; gap: 14px; align-items: baseline; } /* Überschrift rechts: Knopf + Hinweis */
 .pack-info { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin-top: 6px; } /* Upload: Verkleinern */
 .cover-wrap { position: relative; display: block; flex: none; width: fit-content; height: fit-content; align-self: start; justify-self: start; line-height: 0; }
 .cover-wrap::after { content: ''; position: absolute; inset: 0; border: 3px solid #fff; mix-blend-mode: difference; opacity: 0; pointer-events: none; transition: opacity .15s; }

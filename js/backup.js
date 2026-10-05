@@ -2,7 +2,7 @@
 // Die Sicherung enthält alle Eingaben (Classes, Choreos, Aufnahmen samt Markern/Notizen/Status, Einheiten, Profil)
 // und wahlweise die Videos und Songdateien. Ohne Videos werden sie nach dem Wiederherstellen über Dateiname, Größe
 // und Länge wieder ihren Aufnahmen zugeordnet.
-import { db, untracked, deleteChoreo } from './db.js';
+import { db, untracked, deleteChoreo, releaseUndoVideos } from './db.js';
 
 const STORES = ['classes', 'choreos', 'recordings', 'sessions'];
 const FORMAT = 'choreotrainer-sicherung';
@@ -12,7 +12,17 @@ export async function storageState() {
   const s = navigator.storage;
   const persisted = s?.persisted ? await s.persisted().catch(() => false) : false;
   const est = s?.estimate ? await s.estimate().catch(() => null) : null;
-  return { supported: !!s?.persist, persisted, usage: est?.usage ?? null, quota: est?.quota ?? null };
+  return { supported: !!s?.persist, persisted, usage: est?.usage ?? null, quota: est?.quota ?? null, idb: est?.usageDetails?.indexedDB ?? null };
+}
+// Gelöschte Videos wirklich freigeben: Solange die Seite offen ist, halten Verweise (Rückgängig, Vorschauen) die
+// Dateien fest, der Browser löscht sie erst nach dem Neuladen (in Chrome gemessen: danach binnen etwa 30 s).
+export function freeStorage() {
+  releaseUndoVideos();
+  try { sessionStorage.setItem('ct-freed', '1'); } catch { /* egal */ }
+  location.reload();
+}
+export function freedNotice() {
+  try { if (!sessionStorage.getItem('ct-freed')) return false; sessionStorage.removeItem('ct-freed'); return true; } catch { return false; }
 }
 export async function askPersist() {
   try { return navigator.storage?.persist ? await navigator.storage.persist() : false; } catch { return false; }

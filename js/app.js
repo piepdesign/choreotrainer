@@ -10,7 +10,7 @@ import { h } from './util.js';
 import { stopPreview } from './providers.js';
 import { themeIcon, toolIcon } from './ui.js';
 import { maybeTour } from './tour.js';
-import { registerServiceWorker } from './backup.js';
+import { registerServiceWorker, freedNotice } from './backup.js';
 
 export const state = { pendingFile: null };
 
@@ -175,6 +175,7 @@ addEventListener('drop', e => e.preventDefault());
 addEventListener('hashchange', route);
 requestPersist();
 registerServiceWorker(); // installierbar + offline startbar
+if (freedNotice()) setTimeout(() => toast('Gelöschte Videos werden freigegeben, das dauert bis zu einer Minute.', 5000), 800);
 
 // ⌘Z / Strg+Z rückgängig, ⌘⇧Z / Strg+⇧Z wiederherstellen. In Textfeldern gilt das eigene Rückgängig des Feldes.
 let undoBusy = false;

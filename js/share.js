@@ -66,7 +66,7 @@ export async function exportClassDialog(cls) {
   let mode = choreos.length ? 'all' : 'none', videos = true;
   const checks = choreos.map(c => h('input', { type: 'checkbox', checked: true, value: c.id }));
   const list = h('div.share-list', { hidden: true }, choreos.map((c, i) => h('label.share-item', checks[i], h('span', choreoName(c)))));
-  const modeSeg = seg([['all', 'Alle Choreos'], ['pick', 'Auswahl'], ['none', 'Ohne Choreos']].filter(([v]) => choreos.length || v === 'none'),
+  const modeSeg = seg([['all', 'Alle'], ['pick', 'Auswahl'], ['none', 'Ohne']].filter(([v]) => choreos.length || v === 'none'),
     () => mode, v => { mode = v; list.hidden = v !== 'pick'; });
   const go = await dialog('CLASS EXPORTIEREN', [
     h('p.label', label(cls)),

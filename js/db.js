@@ -107,6 +107,15 @@ export const db = {
   async keys(name) { return wrap((await store(name)).getAllKeys()); },
 };
 
+// Gelöschte Videos sofort aus dem Rückgängig-Verlauf nehmen (z. B. vor „Speicher freigeben“)
+export function releaseUndoVideos() {
+  for (const g of [...undoStack, ...redoStack, group || []]) for (const e of g) {
+    if (e.name !== 'videos') continue;
+    if (isBlob(e.before)) e.before = undefined;
+    if (isBlob(e.after)) e.after = undefined;
+  }
+}
+
 // Während fn läuft, wird nichts gemerkt (z. B. Ansicht speichert beim Verlassen ihren Stand)
 export async function untracked(fn) {
   closeGroup();
