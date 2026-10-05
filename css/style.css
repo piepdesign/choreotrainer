@@ -699,6 +699,8 @@ a.stat-link:hover { background: var(--surface-2); }
 .pop .toggle, .share-card .toggle, .confirm-card .toggle { justify-self: start; }
 .acc-text .toggle { display: flex; margin-top: 10px; }
 .confirm-card p { margin: 0; font-size: 13px; line-height: 1.55; }
+.app-hint { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; margin-top: var(--tile-gap); padding: 12px 16px; background: var(--surface); font-size: 12px; }
+.app-hint-actions { display: flex; align-items: baseline; gap: 14px; }
 .section-tools { display: flex; gap: 14px; align-items: baseline; } /* Überschrift rechts: Knopf + Hinweis */
 .pack-info { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin-top: 6px; } /* Upload: Verkleinern */
 .cover-wrap { position: relative; display: block; flex: none; width: fit-content; height: fit-content; align-self: start; justify-self: start; line-height: 0; }

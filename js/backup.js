@@ -45,6 +45,19 @@ export async function promptInstall() {
   return outcome === 'accepted';
 }
 
+// Installieren: wo der Browser es anbietet (Chrome, Android) direkt, sonst kurz zeigen, wie es geht.
+// true = installiert bzw. Anleitung gezeigt, false = abgebrochen
+export async function installApp() {
+  if (canPromptInstall()) return promptInstall();
+  const { confirmDialog } = await import('./ui.js');
+  await confirmDialog({
+    title: 'INSTALLIEREN', ok: 'OK', danger: false, cancel: false,
+    text: isIOS() ? 'In Safari: Teilen › Zum Home-Bildschirm. Danach die App vom Home-Bildschirm öffnen. Sie hat dort einen eigenen Speicher, vorhandene Daten über eine Sicherung mitnehmen.'
+      : 'Im Browser-Menü „App installieren“ bzw. „Zum Startbildschirm hinzufügen“ wählen.',
+  });
+  return true;
+}
+
 export function registerServiceWorker() {
   if (!('serviceWorker' in navigator) || !isSecureContext) return;
   navigator.serviceWorker.register('./sw.js').then(async reg => {

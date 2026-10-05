@@ -1,4 +1,4 @@
-// Intro beim ersten Öffnen: Wortmarke → Name → Classes → Präferenzen → „wird vorbereitet“.
+// Intro beim ersten Öffnen: Wortmarke → Name → Classes → Präferenzen → App (nur im Browser) → „wird vorbereitet“.
 // Läuft einmal (auch für bestehende Nutzer*innen, vorhandene Classes sind vorbelegt).
 // Navigation unten fest: „<“ zurück, „Später“, „>“ weiter. Gleiche Größe und Stelle in jedem Schritt.
 import { h, isTouch, tt } from './util.js';
@@ -8,6 +8,7 @@ import { preferences } from './ui.js';
 import { loadAll } from './hub.js';
 import { baseStats } from './stats.js';
 import { db } from './db.js';
+import { isInstalled, isIOS, installApp } from './backup.js';
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const arrow = dir => `<svg viewBox="0 0 14 24" width="14" height="24" aria-hidden="true"><path d="${dir === 'next' ? 'M2 2l10 10-10 10' : 'M12 2 2 12l10 10'}" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>`;
@@ -42,7 +43,7 @@ export async function runIntro() {
   await show(h('div.intro-step.center', mark('')), { navVisible: false });
   await wait(13 * 50 + 750 + 1000);
 
-  const state = { name: settings().name || '', provider: settings().provider, theme: settings().theme, baseStats: [...settings().baseStats], hoverPreview: settings().hoverPreview, tester: settings().tester };
+  const state = { name: settings().name || '', provider: settings().provider, theme: settings().theme, baseStats: [...settings().baseStats], hoverPreview: settings().hoverPreview, tester: settings().tester, appHint: settings().appHint, appChoice: null };
 
   // Ein Schritt = { render(), canGo(), skippable }
   const steps = [
@@ -96,9 +97,40 @@ export async function runIntro() {
       canGo: () => !!state.provider,
       skippable: true,
     },
+    // Als App installieren? Nur, solange sie im Browser läuft. „Im Browser“ schaltet den Hinweis in der Base ab.
+    ...(isInstalled() ? [] : [{
+      render() {
+        // Symbole im Stil der Präferenz-Kacheln: Home-Bildschirm mit Pfeil bzw. Browserfenster
+        const ICON = {
+          install: '<rect x="8" y="2.5" width="10" height="21" rx="1.5"/><path d="M13 7v8M9.8 12l3.2 3.2 3.2-3.2M11 20.5h4"/>',
+          browser: '<rect x="2.5" y="4.5" width="21" height="17" rx="1.5"/><path d="M2.5 9h21M5.5 6.8h.01M8 6.8h.01"/>',
+        };
+        const svg = id => `<svg viewBox="0 0 26 26" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true">${ICON[id]}</svg>`;
+        const choice = (id, label, onPick) => h(`button${state.appChoice === id ? '.on' : ''}`, {
+          type: 'button', role: 'radio', 'aria-checked': String(state.appChoice === id),
+          onclick: async e => {
+            state.appChoice = id;
+            tiles.querySelectorAll('button').forEach(b => { const on = b === e.currentTarget; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
+            await onPick();
+            refreshNav();
+          },
+        }, h('i.brand', { html: svg(id) }), h('span', label));
+        const tiles = h('div.provider-tiles.app-choice', { role: 'radiogroup' },
+          choice('install', 'Installieren', async () => { state.appHint = true; await installApp(); }),
+          choice('browser', 'Im Browser nutzen', () => { state.appHint = false; }));
+        return h('div.intro-step',
+          h('h1.wide', 'ALS APP NUTZEN?'),
+          h('p.intro-lead', 'Installiert startet ChoreoTrainer vom Home-Bildschirm, auch ohne Internet, und der Browser räumt deine Daten nicht von sich aus.'),
+          tiles,
+          isIOS() ? h('p.intro-lead', 'Am iPhone hat die installierte App einen eigenen Speicher. Am besten jetzt installieren und dort weitermachen.') : null,
+          h('p.intro-lead', '(Später unter Einstellungen › App)'));
+      },
+      canGo: () => true,
+      skippable: true,
+    }]),
   ];
 
-  let index = 0;
+  let index = 0, skipPrefs = false;
   let resolveDone;
   const done = new Promise(r => { resolveDone = r; });
 
@@ -111,7 +143,9 @@ export async function runIntro() {
   async function go(delta) {
     // beim Verlassen speichern, was eingetragen ist
     if (index === 0) await saveSettings({ name: state.name });
-    if (index === 2) await saveSettings({ provider: state.provider, theme: state.theme, baseStats: state.baseStats, hoverPreview: state.hoverPreview, tester: state.tester });
+    if (index === 2 && !skipPrefs) await saveSettings({ provider: state.provider, theme: state.theme, baseStats: state.baseStats, hoverPreview: state.hoverPreview, tester: state.tester });
+    if (index === 3) await saveSettings({ appHint: state.appHint });
+    skipPrefs = false;
     index += delta;
     if (index >= steps.length) { resolveDone(); return; }
     await show(steps[index].render());
@@ -120,7 +154,7 @@ export async function runIntro() {
   back.addEventListener('click', () => go(-1));
   next.addEventListener('click', () => go(1));
   later.addEventListener('click', () => {
-    if (index === 2) { index = steps.length; resolveDone(); return; } // Präferenzen überspringen: nichts speichern
+    if (index === 2) skipPrefs = true; // Präferenzen überspringen: nichts speichern, weiter zum nächsten Schritt
     go(1);
   });
   await show(steps[0].render());

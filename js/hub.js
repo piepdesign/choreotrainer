@@ -3,7 +3,8 @@ import { db, deleteChoreo, deleteClass, deleteRecording } from './db.js';
 import { h, isTouch, onHold, holdGate, tt, fmt, fmtRecDate, fmtDuration, relDate, classTitle, classMeta, stripe, inlineEdit, PALETTE, textOn, WEEKDAYS, byClassOrder, CLASS_TITLES, CLASS_LEVELS } from './util.js';
 import { state, go, toast } from './app.js';
 import { baseStats } from './stats.js';
-import { settings, BASE_STATS } from './settings.js';
+import { settings, saveSettings, BASE_STATS } from './settings.js';
+import { isInstalled, installApp } from './backup.js';
 import { songLink } from './providers.js';
 import { classPickers, icon, confirmDialog } from './ui.js';
 import { classForm } from './classform.js';
@@ -210,6 +211,7 @@ export async function renderHub(root) {
   root.append(
     h('div', { style: { height: '12px' } }),
     dropzone(f => { state.pendingFile = f; go('#/upload'); }),
+    appHint(),
     h('div.stats', chosen.map(id => stat(label(id), values[id].value, values[id].hint, `#/profile/${STAT_TARGET[id] || 'overview'}`))),
     h('div.columns',
       h('div.col-choreos',
@@ -391,6 +393,21 @@ export async function renderClass(root, id) {
     addRow(h('a.btn.small', { href: `#/upload?class=${id}`, onclick: () => { state.pendingFile = null; } }, 'Neue Choreo'), () => importInto(id)),
   );
   return () => urls.forEach(u => URL.revokeObjectURL(u));
+}
+
+// Hinweis „Als App installieren“ in der Base: nur im Browser (nicht installiert), abschaltbar
+// (hier „Ausblenden“ oder Einstellungen › App › Hinweis)
+function appHint() {
+  if (isInstalled() || !settings().appHint) return null;
+  const bar = h('div.app-hint',
+    h('span', 'Als App installieren: startet vom Home-Bildschirm, auch offline.'),
+    h('span.app-hint-actions',
+      h('button.btn.small', { type: 'button', onclick: async () => { if (await installApp()) go('#/', { replace: true }); } }, 'Installieren'),
+      h('button.linkbtn.small-link', {
+        type: 'button',
+        onclick: async () => { await saveSettings({ appHint: false }); bar.remove(); toast('Ausgeblendet. Wieder einblenden: Einstellungen › App.', 3500); },
+      }, 'Ausblenden')));
+  return bar;
 }
 
 // Neue Class aus der Base: Class-Formular im Fenster, danach Base neu aufbauen

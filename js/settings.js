@@ -29,6 +29,7 @@ const DEFAULTS = {
   tourDone: false, // Tutorial Teil 1 (Base, Profil, Einstellungen) gesehen
   tourTrainDone: false, // Tutorial Teil 2 (Trainingsansicht) gesehen
   tester: false, // Helfer*in: Knopf unten rechts für Bug-Meldungen und Ideen
+  appHint: true, // Hinweis in der Base, als App zu installieren (nur solange nicht installiert)
 };
 
 let cache = null;

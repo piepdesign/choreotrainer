@@ -10,7 +10,7 @@ import { settings, saveSettings, applyTheme, resetSettings, BASE_STATS } from '.
 import { classManager } from './classform.js';
 import { go, toast, replaceHash } from './app.js';
 import { preferences, toggle, confirmDialog } from './ui.js';
-import { storageState, askPersist, isInstalled, isIOS, canPromptInstall, promptInstall, exportBackup, readBackup, restoreBackup, missingVideos, relinkVideos, videoBytes, deleteRecordings, freeStorage } from './backup.js';
+import { storageState, askPersist, isInstalled, isIOS, canPromptInstall, promptInstall, exportBackup, readBackup, restoreBackup, missingVideos, relinkVideos, videoBytes, deleteRecordings, freeStorage, installApp } from './backup.js';
 
 const DAY = 86400000;
 const NS = 'http://www.w3.org/2000/svg';
@@ -424,20 +424,21 @@ export async function renderProfile(root, section) {
   // Kachel als Spalte: Überschrift, ein Satz (bzw. Felder), Knopf. Der Inhalt füllt die Höhe, so sitzen alle Knöpfe einer Reihe auf gleicher Höhe.
   const accRow = (title, body, button) => h('div.acc-card', h('span.acc-title', title), h('div.acc-text', body), button);
   const stateLine = text => h('p.acc-lead', text); // Zustand (keine Erklärung), z. B. Belegung
+  // An/Aus-Einstellung als Knopf wie die übrigen: Beschriftung zeigt den Zustand, aktiviert = gefüllt
+  const onOffBtn = key => {
+    const b = h('button.btn.small', { type: 'button' });
+    const show = on => { b.textContent = on ? 'Aktiviert' : 'Deaktiviert'; b.classList.toggle('primary', on); };
+    b.addEventListener('click', async () => { const on = !settings()[key]; await saveSettings({ [key]: on }); show(on); });
+    show(!!settings()[key]);
+    return b;
+  };
   // Konto: Profil, Tutorial, Neustart, ganz zuletzt das endgültige Löschen
   const account = sect('account', 'Konto',
     h('div.acc',
       // Name + Helfer*in in einer Kachel; Helfer*in wirkt sofort (Knopf unten rechts für Bug-Meldungen und Ideen)
       accRow('Name', [nameIn], h('button.btn.small', { type: 'button', onclick: saveName }, 'Speichern')),
       // Helfer*in: Schalter statt Knopf, wirkt sofort (Knopf unten rechts für Bug-Meldungen und Ideen)
-      accRow('Helfer*in', [stateLine('Knopf für Bugs und Ideen.')], (() => {
-        // Knopf wie die übrigen, Beschriftung zeigt den Zustand; aktiviert = gefüllt
-        const b = h('button.btn.small', { type: 'button' });
-        const show = on => { b.textContent = on ? 'Aktiviert' : 'Deaktiviert'; b.classList.toggle('primary', on); };
-        b.addEventListener('click', async () => { const on = !settings().tester; await saveSettings({ tester: on }); show(on); });
-        show(!!s.tester);
-        return b;
-      })()),
+      accRow('Helfer*in', [stateLine('Knopf für Bugs und Ideen.')], onOffBtn('tester')),
       accRow('Tutorial', [stateLine('Zeigt beide Teile noch einmal.')],
         h('button.btn.small', {
           type: 'button',
@@ -475,7 +476,6 @@ export async function renderProfile(root, section) {
   async function renderData() {
     const [st, missing, vBytes] = await Promise.all([storageState(), missingVideos(), videoBytes()]);
     const last = settings().lastBackup;
-    const installed = isInstalled();
     // Gelöschte Videos gibt der Browser erst frei, wenn die Seite neu geladen wurde (vorher halten Verweise sie fest)
     const pending = (st.idb ?? st.usage ?? 0) - vBytes;
     const cards = [
@@ -529,15 +529,6 @@ export async function renderProfile(root, section) {
           type: 'button',
           onclick: async () => { toast((await askPersist()) ? 'Speicher ist jetzt dauerhaft' : 'Der Browser lehnt ab. Als App installiert klappt es meist.', 4000); renderData(); },
         }, 'Schützen') : null)); // bittet den Browser, die Daten nicht von sich aus zu räumen
-    cards.push(accRow('App', [stateLine(installed ? 'Als App installiert.' : 'Startet vom Home-Bildschirm, auch offline.')],
-      installed ? null : h('button.btn.small', {
-        type: 'button',
-        onclick: async () => {
-          if (canPromptInstall()) { await promptInstall(); renderData(); return; }
-          // ohne Installations-Angebot des Browsers: kurz zeigen, wie es geht
-          await confirmDialog({ title: 'INSTALLIEREN', text: isIOS() ? 'In Safari: Teilen › Zum Home-Bildschirm. Die App hat dort einen eigenen Speicher, danach die Sicherung einspielen.' : 'Im Browser-Menü „App installieren“ bzw. „Zum Startbildschirm hinzufügen“ wählen.', ok: 'OK', danger: false, cancel: false });
-        },
-      }, 'Installieren')));
     cards.push(accRow('Aufnahmen löschen', [stateLine('Löscht Choreos und Videos, Classes bleiben.')],
       h('button.btn.small.danger', {
         type: 'button',
@@ -556,6 +547,18 @@ export async function renderProfile(root, section) {
   if (settingsPage) { renderData(); addEventListener('ct-install', renderData); }
   const dataSec = sect('data', 'Daten', dataBox);
 
+  // ── App: installieren und Hinweis in der Base ──
+  const appBox = h('div.acc');
+  function renderApp() {
+    const installed = isInstalled();
+    appBox.replaceChildren(
+      accRow('Installieren', [stateLine(installed ? 'Als App installiert.' : 'Startet vom Home-Bildschirm, auch offline.')],
+        installed ? null : h('button.btn.small', { type: 'button', onclick: async () => { await installApp(); renderApp(); } }, 'Installieren')),
+      accRow('Hinweis', [stateLine('Erinnert in der Base daran, solange nicht installiert.')], onOffBtn('appHint')));
+  }
+  if (settingsPage) { renderApp(); addEventListener('ct-install', renderApp); }
+  const appSec = sect('app', 'App', appBox);
+
   const panes = {
     overview: h('div.p-tab', overview, classSec),
     time: h('div.p-tab', time, sessionSec),
@@ -563,8 +566,8 @@ export async function renderProfile(root, section) {
     choreos: h('div.p-tab', choreoSec),
   };
   if (settingsPage) {
-    root.append(h('section.p-head', h('h1.wide.p-name', 'EINSTELLUNGEN')), h('div.p-tab.p-settings', prefs, manageSec, dataSec, account));
-    return () => { urls.forEach(u => URL.revokeObjectURL(u)); removeEventListener('ct-install', renderData); };
+    root.append(h('section.p-head', h('h1.wide.p-name', 'EINSTELLUNGEN')), h('div.p-tab.p-settings', prefs, manageSec, dataSec, appSec, account));
+    return () => { urls.forEach(u => URL.revokeObjectURL(u)); removeEventListener('ct-install', renderData); removeEventListener('ct-install', renderApp); };
   }
   function showTab(id, user = false) {
     current = id;

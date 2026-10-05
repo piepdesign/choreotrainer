@@ -206,7 +206,7 @@ export function mainTour() {
       [tt('Ziehen', 'Halten + Ziehen'), 'Sortiert die Classes']] },
     { target: '[data-nav="profile"]', title: 'Profil', text: [[tap, 'Zeigt Übungszeit, Status und alle Choreos']] },
     { route: /^#\/profile/, target: '.p-nav', title: 'Reiter', text: [[tap, 'Wechselt zwischen Übersicht, Übungszeit, Status und Choreos']] },
-    { target: '[data-nav="settings"]', title: 'Einstellungen', text: () => [[svgIco(document.querySelector('[data-nav="settings"] svg')?.outerHTML), 'Musikprovider, Hörprobe, Statistiken der Base, Classes verwalten, Daten sichern, Konto']] },
+    { target: '[data-nav="settings"]', title: 'Einstellungen', text: () => [[svgIco(document.querySelector('[data-nav="settings"] svg')?.outerHTML), 'Musikprovider, Hörprobe, Statistiken der Base, Classes verwalten, Daten sichern, App, Konto']] },
     { route: /^#\/settings/, target: '.theme-toggle', block: true, title: 'Ansicht', text: [
       [svgIco(themeIcon('light')), 'Hell'],
       [svgIco(themeIcon('dark')), 'Dunkel'],
