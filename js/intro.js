@@ -109,14 +109,16 @@ export async function runIntro() {
         const choice = (id, label, onPick) => h(`button${state.appChoice === id ? '.on' : ''}`, {
           type: 'button', role: 'radio', 'aria-checked': String(state.appChoice === id),
           onclick: async e => {
+            const mark = sel => tiles.querySelectorAll('button').forEach(b => { const on = b === sel; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
             state.appChoice = id;
-            tiles.querySelectorAll('button').forEach(b => { const on = b === e.currentTarget; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
-            await onPick();
+            mark(e.currentTarget);
+            // abgebrochen (z. B. Installations-Fenster des Browsers geschlossen): Auswahl wieder aufheben
+            if ((await onPick()) === false) { state.appChoice = null; state.appHint = settings().appHint; mark(null); }
             refreshNav();
           },
         }, h('i.brand', { html: svg(id) }), h('span', label));
         const tiles = h('div.provider-tiles.app-choice', { role: 'radiogroup' },
-          choice('install', 'Installieren', async () => { state.appHint = true; await installApp(); }),
+          choice('install', 'Installieren', async () => { state.appHint = true; return installApp(); }),
           choice('browser', 'Im Browser nutzen', () => { state.appHint = false; }));
         return h('div.intro-step',
           h('h1.wide', 'ALS APP NUTZEN?'),

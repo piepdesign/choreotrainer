@@ -567,6 +567,11 @@ a.p-row:hover { background: var(--surface-2); }
 
 /* ── Class-Verwaltung (Intro, Profil) ───────── */
 .class-manager { display: grid; gap: 28px; }
+.class-manager > .add-row { margin-top: -14px; } /* Knöpfe direkt unter dem Formular */
+.cm-list > .cm-row[hidden] { display: none; } /* wird gerade bearbeitet, die Vorschau steht an ihrer Stelle */
+.cm-draft .cm-actions { opacity: .7; }
+.cm-draft.empty .cc-title { opacity: .5; } /* Platzhalter, solange kein Style gewählt ist */
+.classform > .cm-draft { margin-bottom: 14px; }
 .cm-list { display: grid; gap: 3px; }
 .cm-row { display: flex; gap: 0 16px; align-items: center; padding: 10px 14px; font-size: 14px; letter-spacing: .02em; white-space: nowrap; }
 .cm-actions { display: flex; gap: 14px; flex: none; }
@@ -786,6 +791,9 @@ body.intro-open .tester-fab { display: none; }
 .tour-kbd { white-space: nowrap; }
 .tour-ico svg { display: block; }
 .tour-list .tour-note { grid-column: 1 / -1; color: var(--muted); }
+.tour-list .tour-say { grid-column: 1 / -1; }
+.tour-list:has(.tour-say + .tour-say) .tour-say { position: relative; padding-left: 14px; } /* mehrere Sätze: je einer mit Strich davor */
+.tour-list:has(.tour-say + .tour-say) .tour-say::before { content: '–'; position: absolute; left: 0; color: var(--muted); }
 .tour-hint { margin: 4px 0 0; }
 body.touring .tester-fab { display: none; }
 .tour-done { z-index: 95; }
