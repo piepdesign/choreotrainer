@@ -89,9 +89,10 @@ export function classPickers(classes, { styles = [], levels = [] } = {}) {
 // Schlichte Einzelauswahl: Text-Optionen in einer Zeile, die gewählte unterstrichen + Punkt
 // Kleine Strich-Icons (SVG, currentColor)
 const ICONS = {
-  // Seitenpanel: Rahmen mit rechter Spalte (offen = gefüllt)
-  panelOpen: '<rect x="1.5" y="2.5" width="17" height="13" rx="1.5"/><rect x="12" y="2.5" width="6.5" height="13" fill="currentColor" stroke="none"/>',
-  panelClosed: '<rect x="1.5" y="2.5" width="17" height="13" rx="1.5"/><line x1="12.5" y1="2.5" x2="12.5" y2="15.5"/>',
+  // Seitenpanel: Rahmen mit rechter Spalte (offen = gefüllt). Schmale Ansicht: Panel liegt unter dem Video,
+  // dort zeigt das Icon den Streifen unten (CSS blendet je nach Breite eine der beiden Fassungen aus)
+  panelOpen: '<rect x="1.5" y="2.5" width="17" height="13" rx="1.5"/><g class="pi-side"><rect x="12" y="2.5" width="6.5" height="13" fill="currentColor" stroke="none"/></g><g class="pi-below"><rect x="1.5" y="10.5" width="17" height="5" fill="currentColor" stroke="none"/></g>',
+  panelClosed: '<rect x="1.5" y="2.5" width="17" height="13" rx="1.5"/><g class="pi-side"><line x1="12.5" y1="2.5" x2="12.5" y2="15.5"/></g><g class="pi-below"><line x1="1.5" y1="10.5" x2="18.5" y2="10.5"/></g>',
   // Breite füllen: Pfeile nach außen
   fitWidth: '<rect x="1.5" y="3.5" width="17" height="11" rx="1.5"/><path d="M5 9h10M5 9l2.2-2.2M5 9l2.2 2.2M15 9l-2.2-2.2M15 9l-2.2 2.2"/>',
   // Komplett zeigen: Bild innerhalb des Rahmens

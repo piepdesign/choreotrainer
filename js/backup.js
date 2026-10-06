@@ -56,7 +56,7 @@ export async function installApp() {
   const chromium = !!navigator.userAgentData?.brands?.some(b => /Chromium|Google Chrome|Microsoft Edge/.test(b.brand));
   // iPhone/iPad: alle Browser dort nutzen dasselbe Teilen-Menü („Zum Home-Bildschirm“)
   const guide = isIOS() ? { title: 'INSTALLIEREN', steps: [['share', 'Im Browser auf Teilen tippen'], ['addHome', '„Zum Home-Bildschirm“ wählen'], ['phone', 'App vom Home-Bildschirm öffnen']], note: 'Die App hat einen eigenen Speicher. Daten per Sicherung mitnehmen.' }
-    : chromium ? { title: 'SCHON INSTALLIERT?', steps: [['addressBar', 'Öffnen: App-Symbol in der Adressleiste'], ['menu', 'Sonst: Browser-Menü › App installieren']] }
+    : chromium ? { title: 'ÖFFNEN ODER INSTALLIEREN', steps: [['addressBar', 'Öffnen: App-Symbol in der Adressleiste'], ['menu', 'Sonst: Browser-Menü › App installieren']] }
       : /Firefox\//.test(ua) ? { title: 'INSTALLIEREN', steps: [['browsers', 'In Chrome, Edge oder Safari öffnen']], note: 'Firefox kann keine Web-Apps installieren.' }
         : /Safari\//.test(ua) ? { title: 'INSTALLIEREN', steps: [['menuBar', 'Menü „Ablage“ öffnen'], ['dock', '„Zum Dock hinzufügen“ wählen']] }
           : { title: 'INSTALLIEREN', steps: [['menu', 'Browser-Menü öffnen'], ['addHome', '„App installieren“ wählen']] };

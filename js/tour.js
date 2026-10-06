@@ -146,6 +146,7 @@ function tour(steps, { finish, onEnd, scope = null } = {}) {
       step = list[i];
       if (step.when && !step.when()) continue; // z. B. noch keine Classes
       await step.before?.();
+      target = null; // solange die nächste Stelle gesucht wird, gelten keine Klicks auf die vorige
       target = await find(step);
       if (!target || stopped) continue; // Stelle nicht da (z. B. keine Classes): Schritt auslassen
       num.textContent = `${i + 1} / ${list.length}`;
@@ -179,6 +180,7 @@ function confirmBox({ title, text, button = 'Los geht’s', skip = false }) {
 }
 
 // ── Inhalte ──
+const narrow = () => matchMedia('(max-width: 1000px)').matches; // Panel liegt dann unter dem Video
 const panelOpen = () => {
   const t = document.querySelector('.train');
   if (t?.classList.contains('panel-closed')) document.querySelector('.panel-btn')?.click();
@@ -211,7 +213,8 @@ export function mainTour() {
       [svgIco(themeIcon('light')), 'Hell'],
       [svgIco(themeIcon('dark')), 'Dunkel'],
       [svgIco(themeIcon('system')), 'Wie am Gerät eingestellt']] },
-    { target: '[data-nav="hub"]', title: 'Base', text: [[tap, 'Führt zurück zur Startseite']] },
+    // schmale Handys: „BASE“ ist ausgeblendet, dort führt die Wortmarke zurück
+    { target: () => [document.querySelector('[data-nav="hub"]'), document.querySelector('.wordmark')].find(visible), title: 'Base', text: [[tap, 'Führt zurück zur Startseite']] },
   ], {
     start: { title: 'TUTORIAL', text: [
       ['Teil 1', 'Base, Profil und Einstellungen'],
@@ -263,8 +266,8 @@ export function trainTour() {
       [ico('fitAll'), 'Ganzes Bild'],
       [ico('full'), ['Vollbild', key('F')]]] },
     // Seitenpanel: erst der Knopf, dann jeder Abschnitt
-    { target: '.panel-btn', block: true, title: 'Seitenpanel', text: [
-      [ico('panelOpen'), ['Blendet das Seitenpanel ein und aus', key('P')]],
+    { target: '.panel-btn', block: true, title: narrow() ? 'Panel' : 'Seitenpanel', text: () => [
+      [ico('panelOpen'), [narrow() ? 'Blendet das Panel unter dem Video ein und aus' : 'Blendet das Seitenpanel ein und aus', key('P')]],
       [ico('grip'), `${tt('Ziehen', 'Halten + Ziehen')} verschiebt einen Abschnitt`],
       [chip('▾'), 'Klappt einen Abschnitt auf und zu']] },
     { target: sec('song'), block: true, side: true, before: panelOpen, title: 'Song', text: [

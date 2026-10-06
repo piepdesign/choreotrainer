@@ -224,6 +224,7 @@ button.chip[data-hex] { width: 64px; height: 28px; padding: 0; }
 .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px solid var(--fg); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
 .btn.primary { background: var(--fg); color: var(--bg); }
 .btn:disabled { opacity: .35; cursor: not-allowed; }
+.btn.busy, .btn.busy:disabled { opacity: 1; cursor: progress; font-variant-numeric: tabular-nums; } /* arbeitet: Status lesbar */
 .btn.small { padding: 5px 9px; font-size: 11px; }
 .btn.danger:not(:disabled):hover { background: var(--c5); border-color: var(--c5); color: #000; }
 .btn, .ctl, .linkbtn, .rating button, .seg button, .pop-close { transition: opacity .15s, background-color .15s, border-color .15s, color .15s; }
@@ -251,7 +252,9 @@ button.chip[data-hex] { width: 64px; height: 28px; padding: 0; }
 .train-main .stage { flex: none; align-self: center; max-width: 100%; }
 .stage:fullscreen { width: 100vw !important; }
 .panel-btn { margin-left: auto; }
+.pi-below { display: none; }
 @media (max-width: 1000px) {
+  .pi-side { display: none; } .pi-below { display: inline; }
   .train, .train.panel-closed { grid-template-columns: 1fr; height: auto; }
   .train.panel-closed .side { display: none; }
 }
@@ -806,7 +809,8 @@ html, body { overflow-x: clip; } /* nichts darf seitlich herausragen und die Sei
 .touch .pick-tile, .touch .panel-head { touch-action: pan-y; }
 body.touch-drag, body.touch-drag * { user-select: none; -webkit-user-select: none; }
 /* kein Kontextmenü/Lupe beim Halten von Cover und Video */
-.cover-wrap img, .card .thumb, .mini-thumb, .stripe { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.cover-wrap img, a.card, a.mini, .card .thumb, .mini-thumb, .stripe { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.card .thumb img, .card .thumb canvas, .mini-thumb img, .mini-thumb canvas { -webkit-user-drag: none; } /* Halten hebt kein Bild zum Ziehen heraus */
 /* Doppeltippen zoomt nicht (verschiebt sonst die Ansicht), Eingabefelder ab 16 px: Safari zoomt sonst beim Antippen */
 html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 .touch input:not(.intro-input), .touch select, .touch textarea { font-size: 16px !important; }

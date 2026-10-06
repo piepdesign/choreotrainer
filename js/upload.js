@@ -17,30 +17,32 @@ export async function renderUpload(root, kind, refId) {
   state.pendingFile = null;
   let previewUrl = null;
   // Komprimieren läuft ab der Videoauswahl im Hintergrund, Speichern wartet darauf (oder nimmt das Original)
-  let job = null, packed = null, packing = false, keepOriginal = false;
+  let job = null, packed = null, packing = false, keepOriginal = false, packPct = null;
   const packInfo = h('span.label.pack-info');
   const mbOf = b => `${Math.max(1, Math.round(b / 1e6))} MB`;
   function startPack() {
     job?.cancel();
     packed = null; keepOriginal = false;
     if (!file) { job = null; return; }
-    packing = true;
+    packing = true; packPct = null;
     const mine = compressVideo(file, p => {
       if (job !== mine) return;
-      packInfo.replaceChildren(`Verkleinere … ${Math.round(p * 100)} %`, ' ', h('button.linkbtn', { type: 'button', onclick: useOriginal }, 'Original behalten'));
-      if (saving) saveBtn.textContent = `Verkleinere … ${Math.round(p * 100)} %`;
+      packPct = Math.round(p * 100);
+      packInfo.replaceChildren(`Verkleinere … ${packPct} %`, ' ', keepBtn());
+      if (saving) saveBtn.textContent = `Verkleinere … ${packPct} %`;
     });
     job = mine;
-    packInfo.replaceChildren('Prüfe Video …');
-    mine.promise.then(f => {
+    packInfo.replaceChildren('Prüfe Video …', ' ', keepBtn());
+    mine.promise.then(({ file: f, reason }) => {
       if (job !== mine) return;
       packing = false;
       packed = keepOriginal ? null : f;
-      packInfo.replaceChildren(packed ? `Verkleinert: ${mbOf(file.size)} → ${mbOf(packed.size)}` : keepOriginal ? 'Original wird gespeichert' : 'Original wird gespeichert (schon klein genug oder Browser kann es nicht)');
+      packInfo.replaceChildren(packed ? `Verkleinert: ${mbOf(file.size)} → ${mbOf(packed.size)}` : `Original wird gespeichert${keepOriginal ? '' : ` (${reason})`}`);
       if (saving) save();
     });
   }
   function useOriginal() { keepOriginal = true; job?.cancel(); }
+  const keepBtn = () => h('button.linkbtn', { type: 'button', onclick: useOriginal }, 'Original behalten');
   let saving = false;
 
   const classes = (await db.all('classes')).sort(byClassOrder);
@@ -174,10 +176,14 @@ export async function renderUpload(root, kind, refId) {
     const cls = Object.fromEntries(Object.entries(f).map(([k, el]) => [k, el.value.trim()]));
     if (!cls.category) { toast('Bitte mindestens den Style der Class angeben'); f.category.focus(); return; }
 
-    saveBtn.disabled = true;
+    // Knopf zeigt den Stand (nicht ausgegraut wie „disabled“, sonst ist er am Handy kaum lesbar), weitere Klicks zählen nicht
+    if (saving && packing) return;
+    saveBtn.classList.add('busy');
+    saveBtn.setAttribute('aria-busy', 'true');
     // noch am Verkleinern: warten (Fortschritt im Knopf), danach geht es von selbst weiter
-    if (packing && !keepOriginal) { saving = true; saveBtn.textContent = 'Verkleinere …'; return; }
+    if (packing && !keepOriginal) { saving = true; saveBtn.textContent = packPct == null ? 'Bereite vor …' : `Verkleinere … ${packPct} %`; return; }
     saving = false;
+    saveBtn.disabled = true;
     saveBtn.textContent = 'Speichere …';
     try {
       // Class finden oder anlegen
@@ -228,6 +234,7 @@ export async function renderUpload(root, kind, refId) {
       console.error(e);
       toast(`Speichern fehlgeschlagen: ${e.message}`, 5000);
       saveBtn.disabled = false;
+      saveBtn.classList.remove('busy'); saveBtn.removeAttribute('aria-busy');
       saveBtn.textContent = 'Speichern';
     }
   }

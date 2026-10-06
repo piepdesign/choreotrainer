@@ -80,9 +80,9 @@ export function hoverVideo(rec, urls, cls) {
   const v = h('video', { muted: true, playsinline: true, preload: 'none' });
   v.muted = true;
   v.style.display = 'none';
-  const canvas = h('canvas.frame', { hidden: true });
+  const canvas = h('canvas.frame', { hidden: true, draggable: 'false' });
   const ctx = canvas.getContext('2d');
-  const still = h('img.still', { src: rec?.thumb || null, alt: '', hidden: !rec?.thumb });
+  const still = h('img.still', { src: rec?.thumb || null, alt: '', hidden: !rec?.thumb, draggable: 'false' });
   const box = h(`div.${cls}`, canvas, still, v);
   if (!rec) return box;
 
@@ -129,7 +129,7 @@ export function hoverVideo(rec, urls, cls) {
   // läuft nur während des Hovers: Frame zeichnen, Bereich loopen, verpasstes mouseleave abfangen
   const tick = () => {
     if (!hover) return;
-    if (!box.matches(':hover') || document.hidden) { leave(); return; }
+    if ((!isTouch() && !box.matches(':hover')) || document.hidden) { leave(); return; } // Touch: endet beim Loslassen
     if (v.currentTime >= end() || v.ended) { v.currentTime = start; filter.reset(); v.play().catch(() => {}); }
     draw();
     raf = requestAnimationFrame(tick);
