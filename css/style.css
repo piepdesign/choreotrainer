@@ -409,12 +409,12 @@ main:has(.train) { padding-bottom: 0; }
 .rating button { flex: 1; padding: 8px 0; border: 1px solid var(--line); font-size: 12px; }
 .rating button.on { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 .markers { list-style: none; margin: 0; padding: 0; }
-.markers li { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--rule); font-size: 12px; }
+.markers li { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto; gap: 8px; min-height: 33px; box-sizing: border-box; /* gleich hoch mit und ohne Icons */ align-items: center; padding: 5px 0; border-bottom: 1px solid var(--rule); font-size: 12px; }
 .markers .name { display: flex; gap: 6px; align-items: center; text-align: left; min-width: 0; }
 .markers .name > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .markers .name:hover > span:last-child { text-decoration: underline; text-underline-offset: 3px; }
 .markers .menu { display: flex; gap: 2px; justify-self: end; } /* Icons rechtsbündig in der Zeile des Markers */
-.markers .mk-act { display: grid; place-items: center; width: 28px; height: 24px; color: var(--muted); }
+.markers .mk-act { display: grid; place-items: center; width: 28px; height: 22px; color: var(--muted); }
 .markers .mk-act:hover { color: var(--fg); background: var(--hover-fill); }
 .markers .mk-act svg { width: 16px; height: 15px; }
 .markers .t { font-variant-numeric: tabular-nums; text-decoration: underline; text-underline-offset: 3px; text-align: left; }
@@ -570,7 +570,8 @@ a.p-row:hover { background: var(--surface-2); }
 
 /* ── Class-Verwaltung (Intro, Profil) ───────── */
 .class-manager { display: grid; gap: 28px; }
-.class-manager > .add-row { margin-top: -14px; } /* Knöpfe direkt unter dem Formular */
+.class-manager > .add-row { margin-top: -14px; } /* „Weitere Class“ direkt unter der Liste */
+.classform > .actions { margin-top: 16px; }
 .cm-list > .cm-row[hidden] { display: none; } /* wird gerade bearbeitet, die Vorschau steht an ihrer Stelle */
 .cm-draft .ph { opacity: .5; } /* Platzhalter für noch leere Angaben */
 .classform > .cm-draft { margin-bottom: 14px; }

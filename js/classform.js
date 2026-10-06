@@ -1,6 +1,6 @@
 // Classes ohne Video anlegen, bearbeiten, löschen. Genutzt im Intro und im Profil.
 import { db, uid, deleteClass } from './db.js';
-import { classPickers } from './ui.js';
+import { classPickers, confirmDialog } from './ui.js';
 import { chooseFile, importExport, importSummary } from './share.js';
 import { h, PALETTE, textOn, WEEKDAYS, CLASS_TITLES, CLASS_LEVELS, classTitle, classCells, byClassOrder } from './util.js';
 
@@ -8,51 +8,95 @@ const norm = s => String(s || '').trim().toLowerCase();
 const KEYS = ['category', 'level', 'weekday', 'time', 'coach'];
 
 // Liste + Formular. onChange() nach jeder Änderung.
-// Die Vorschau der gerade eingetragenen Class steht als letzte Zeile in der Liste (beim Bearbeiten an Stelle der
-// Class), darunter die Felder, ganz unten „Class hinzufügen“ und „importieren“ wie in Base und Profil.
-// opts gehen ans Formular (Intro: ohne Import, mit „Fertig“). el.form = das Formular (z. B. für form.commit()).
-export function classManager(onChange, opts = {}) {
+// Der graue Formularbereich ist nur offen, solange eine Class angelegt oder bearbeitet wird: „Fertig“ übernimmt sie
+// und schließt ihn, „Bearbeiten“ öffnet ihn mit dieser Class, „Weitere Class“ unter der Liste mit einer neuen Zeile.
+// Die Vorschau steht dabei als Zeile in der Liste (beim Bearbeiten an Stelle der Class). Ohne Classes ist er offen.
+// el.form = das Formular (z. B. für form.commit() beim Weiter im Intro)
+export function classManager(onChange, { withImport = true } = {}) {
   const list = h('div.cm-list');
-  const form = classForm(async () => { await refresh(); onChange?.(); }, opts);
-  form.onClear = () => refresh();
+  let open = false, first = true;
+  const form = classForm(async () => { await refresh(); onChange?.(); }, { done: () => closeForm(), cancel: true });
+  form.preview.remove();
+  form.hidden = true;
+  const msg = h('span.label');
+  const moreBtn = h('button.btn.small', { type: 'button', onclick: () => openForm() }, 'Weitere Class');
+  // Class (oder Choreo) aus einer Export-Datei übernehmen
+  const importBtn = withImport ? h('button.linkbtn.small-link', {
+    type: 'button',
+    onclick: async () => {
+      const file = await chooseFile();
+      if (!file) return;
+      try {
+        const r = await importExport(file);
+        if (!r) return;
+        msg.textContent = importSummary(r);
+        await refresh();
+        onChange?.();
+      } catch (e) { msg.textContent = e.message; }
+    },
+  }, 'importieren') : null;
+  const addRow = h('div.actions.add-row', moreBtn, importBtn, msg);
+
+  function placePreview() {
+    list.querySelectorAll('.cm-row[hidden]').forEach(r => { r.hidden = false; });
+    if (!open) { form.preview.remove(); return; }
+    const row = form.editingId() && list.querySelector(`.cm-row[data-id="${form.editingId()}"]`);
+    if (row) { row.hidden = true; list.insertBefore(form.preview, row); } else list.append(form.preview);
+  }
+  function openForm(cls = null) {
+    if (cls) form.edit(cls); else form.reset();
+    open = true; form.hidden = false; addRow.hidden = true; msg.textContent = '';
+    placePreview();
+    form.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  function closeForm() {
+    open = false; form.hidden = true; addRow.hidden = false;
+    form.reset();
+    placePreview();
+  }
   async function refresh() {
     const classes = (await db.all('classes')).sort(byClassOrder);
     const choreos = await db.all('choreos');
     list.replaceChildren(...classes.map(c => {
       const n = choreos.filter(x => x.classId === c.id).length;
-      const row = h('div.cm-row', { style: { background: `#${c.color}`, color: textOn(c.color) } },
+      return h('div.cm-row', { 'data-id': c.id, style: { background: `#${c.color}`, color: textOn(c.color) } },
         ...classCells(c),
         h('span.cm-actions',
-          h('button.linkbtn', { type: 'button', onclick: () => { list.querySelectorAll('.cm-row[hidden]').forEach(r => { r.hidden = false; }); form.edit(c); row.hidden = true; list.insertBefore(form.preview, row); } }, 'Bearbeiten'),
+          h('button.linkbtn', { type: 'button', onclick: () => openForm(c) }, 'Bearbeiten'),
           h('button.linkbtn', {
             type: 'button',
             onclick: async () => {
-              const msg = n
-                ? `„${classTitle(c)}“ löschen? Damit verschwinden auch ${n} Choreo${n === 1 ? '' : 's'} samt Videos.`
-                : `„${classTitle(c)}“ löschen?`;
-              if (!confirm(msg)) return;
+              const ok = await confirmDialog({
+                title: 'CLASS LÖSCHEN',
+                text: n ? `„${classTitle(c)}“ und ${n} Choreo${n === 1 ? '' : 's'} samt Videos werden gelöscht.` : `„${classTitle(c)}“ wird gelöscht.`,
+                ok: 'Löschen',
+              });
+              if (!ok) return;
               await deleteClass(c.id);
-              form.cancelIf(c.id);
+              if (form.editingId() === c.id) closeForm();
               await refresh();
               onChange?.();
             },
           }, 'Löschen')));
-      return row;
-    }), form.preview);
+    }));
+    placePreview();
+    moreBtn.textContent = classes.length ? 'Weitere Class' : 'Neue Class';
+    if (first) { first = false; if (!classes.length) openForm(); }
     return classes;
   }
-  const el = h('div.class-manager', list, form, form.actions);
+  const el = h('div.class-manager', list, form, addRow);
   el.refresh = refresh;
   el.form = form;
   refresh();
   return el;
 }
 
-// Formular. onSaved(cls) nach Anlegen/Speichern. el.edit(cls) lädt eine Class zum Bearbeiten.
-// done: Knopf „Fertig“ (übernimmt die eingetragene Class, falls ausgefüllt, dann done()); der Speichern-Knopf heißt
-// dann „Weitere Class“ (übernimmt und leert das Formular für die nächste).
+// Formular. onSaved(cls) nach Anlegen/Speichern. el.edit(cls) lädt eine Class zum Bearbeiten, el.reset() leert.
+// done: Knopf „Fertig“ (übernimmt die eingetragene Class, falls ausgefüllt, dann done()).
+// more: zusätzlich „Weitere Class“ (übernimmt und leert für die nächste, z. B. im Fenster „Neue Class“).
+// cancel: „Abbrechen“ (verwirft und ruft done()). Ohne done: ein Knopf „Class hinzufügen“.
 // el.hasDraft(): Mindestangabe (Style) eingetragen · el.commit(): eingetragene Class speichern (ohne Meldung bei Doppel)
-export function classForm(onSaved, { heading = true, withImport = true, done = null } = {}) {
+export function classForm(onSaved, { heading = true, done = null, more = false, cancel = false } = {}) {
   const f = {
     ...classPickers([], { styles: CLASS_TITLES, levels: CLASS_LEVELS }),
     weekday: h('select', h('option', { value: '' }, '—'), WEEKDAYS.map(d => h('option', d))),
@@ -97,13 +141,8 @@ export function classForm(onSaved, { heading = true, withImport = true, done = n
     editing = null;
     pick(null);
     title.textContent = 'Neue Class';
-    saveBtn.textContent = addLabel;
-    cancelBtn.hidden = true;
-    if (doneBtn) doneBtn.hidden = false;
     draw();
-    el.onClear?.();
   };
-  const addLabel = done ? 'Weitere Class' : 'Class hinzufügen';
   // quiet: Doppel ohne Meldung übergehen (Weiter/Fertig: die Class gibt es dann ja schon)
   async function save({ quiet = false } = {}) {
       const vals = values();
@@ -124,27 +163,11 @@ export function classForm(onSaved, { heading = true, withImport = true, done = n
       await onSaved?.(klass);
       return klass;
   }
-  const saveBtn = h('button.btn.small', { type: 'button', onclick: () => save() }, addLabel);
-  const doneBtn = done ? h('button.btn.small.primary', { type: 'button', onclick: async () => { if (values().category) await save({ quiet: true }); done(); } }, 'Fertig') : null;
-  const cancelBtn = h('button.linkbtn', { type: 'button', hidden: true, onclick: () => { clear(); msg.textContent = ''; } }, 'Abbrechen');
-  // Class (oder Choreo) aus einer Export-Datei übernehmen
-  const importBtn = h('button.linkbtn.small-link', {
-    type: 'button',
-    onclick: async () => {
-      const file = await chooseFile();
-      if (!file) return;
-      try {
-        const r = await importExport(file);
-        if (!r) return;
-        msg.textContent = importSummary(r);
-        onSaved?.(await db.get('classes', r.classId));
-      } catch (e) { msg.textContent = e.message; }
-    },
-  }, 'importieren');
-
-  // Knöpfe wie in Base und Profil: „Class hinzufügen“, daneben klein „importieren“. Die Verwaltung setzt sie
-  // unter das Formular (el.actions), sonst stehen sie darin. Ebenso die Vorschau (el.preview): in der Liste bzw. oben.
-  const actions = h('div.actions.add-row', doneBtn, saveBtn, withImport ? importBtn : null, cancelBtn, msg);
+  // Fertig: eingetragene Class übernehmen (gibt es sie schon, bleibt das Formular mit Meldung offen), dann done()
+  const doneBtn = done ? h('button.btn.small.primary', { type: 'button', onclick: async () => { if (values().category && !(await save())) return; done(); } }, 'Fertig') : null;
+  const saveBtn = !done || more ? h(`button.btn.small${done ? '' : '.primary'}`, { type: 'button', onclick: () => save() }, done ? 'Weitere Class' : 'Class hinzufügen') : null;
+  const cancelBtn = cancel ? h('button.linkbtn', { type: 'button', onclick: () => { clear(); msg.textContent = ''; done?.(); } }, 'Abbrechen') : null;
+  const actions = h('div.actions', doneBtn, saveBtn, cancelBtn, msg);
   const el = h('div.classform',
     heading ? title : null,
     preview,
@@ -152,7 +175,6 @@ export function classForm(onSaved, { heading = true, withImport = true, done = n
     h('div', { style: { marginTop: '14px' } }, h('span.label.color-label', 'Farbe'), swatches),
     actions);
   el.preview = preview;
-  el.actions = actions;
   el.addEventListener('input', draw);
   el.addEventListener('change', draw);
   draw();
@@ -161,15 +183,12 @@ export function classForm(onSaved, { heading = true, withImport = true, done = n
     for (const k of KEYS) f[k].value = cls[k] || '';
     pick(cls.color);
     title.textContent = `${classTitle(cls)} bearbeiten`;
-    saveBtn.textContent = 'Speichern';
-    cancelBtn.hidden = false;
-    if (doneBtn) doneBtn.hidden = true;
     msg.textContent = '';
     draw();
     f.category.focus();
-    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   };
-  el.cancelIf = id => { if (editing?.id === id) clear(); };
+  el.reset = () => { clear(); msg.textContent = ''; };
+  el.editingId = () => editing?.id || null;
   el.hasDraft = () => !!values().category;
   el.commit = () => save({ quiet: true });
   return el;

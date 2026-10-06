@@ -75,11 +75,11 @@ export async function runIntro() {
       },
       canGo: () => !!state.name,
     },
-    // Classes: Weiter erscheint, sobald eine Class angelegt oder mindestens der Style eingetragen ist. Weiter bzw.
-    // „Fertig“ übernimmt die eingetragene Class, „Später“ nicht. Import gibt es hier nicht (später in Base/Profil).
+    // Classes: Weiter erscheint, sobald eine Class angelegt oder mindestens der Style eingetragen ist. Weiter
+    // übernimmt die eingetragene Class, „Später“ nicht. Import gibt es hier nicht (später in Base/Profil).
     {
       render() {
-        classMgr = classManager(() => refreshNav(), { withImport: false, done: () => go(1) });
+        classMgr = classManager(() => refreshNav(), { withImport: false });
         classMgr.addEventListener('input', () => refreshNav());
         classMgr.addEventListener('change', () => refreshNav());
         return h('div.intro-step',
@@ -141,11 +141,13 @@ export async function runIntro() {
   let resolveDone;
   const done = new Promise(r => { resolveDone = r; });
 
+  let navSeq = 0;
   async function refreshNav() {
-    const s = steps[index];
+    const s = steps[index], my = ++navSeq;
     back.hidden = index === 0;
     later.hidden = !s.skippable;
-    next.hidden = !(await s.canGo());
+    const ok = await s.canGo();
+    if (my === navSeq) next.hidden = !ok; // nur die jüngste Prüfung zählt (ältere können später fertig werden)
   }
   async function go(delta) {
     // beim Verlassen speichern, was eingetragen ist

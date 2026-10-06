@@ -414,7 +414,7 @@ function appHint() {
 export function newClassDialog() {
   let added = false;
   const close = () => { box.remove(); if (added) go(location.hash || '#/', { replace: true }); };
-  const form = classForm(() => { added = true; }, { heading: false, withImport: false, done: close });
+  const form = classForm(() => { added = true; }, { heading: false, done: close, more: true });
   const box = h('div.modal', { onclick: e => { if (e.target === box) close(); } },
     h('div.modal-card.class-card', h('h2.wide', 'NEUE CLASS'), form, h('button.linkbtn', { type: 'button', onclick: close, style: { justifySelf: 'start' } }, 'Abbrechen')));
   document.body.append(box);

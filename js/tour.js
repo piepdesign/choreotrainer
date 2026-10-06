@@ -167,12 +167,12 @@ function tour(steps, { finish, onEnd, scope = null } = {}) {
 }
 
 // Kurzes Bestätigungsfenster am Ende
-function confirmBox({ title, text, icon: part = null, button = 'Los geht’s', skip = false }) {
+function confirmBox({ title, text, button = 'Los geht’s', skip = false }) {
   return new Promise(resolve => {
     const ok = h('button.btn.primary', { type: 'button' }, button);
     const no = skip ? h('button.linkbtn', { type: 'button' }, 'Überspringen') : null;
     const body = h('div.tour-text'); fill(body, text);
-    const box = h('div.modal.tour-done', h('div.modal-card', part ? ico(part) : null, h('h2.wide', title), body, h('div.actions', ok, no))); // Icon: welcher Teil
+    const box = h('div.modal.tour-done', h('div.modal-card', h('h2.wide', title), body, h('div.actions', ok, no)));
     const close = go => { box.remove(); resolve(go); };
     ok.addEventListener('click', () => close(true));
     no?.addEventListener('click', () => close(false));
@@ -183,6 +183,9 @@ function confirmBox({ title, text, icon: part = null, button = 'Los geht’s', s
 }
 
 // ── Inhalte ──
+const markerList = () => document.querySelector('.panel-sec[data-k="marker"] .markers');
+const hasMarkers = () => !!markerList()?.querySelector('li .name');
+const markerOptions = on => markerList()?.showOptions?.(on); // Optionen des ersten Markers ein-/ausblenden
 const narrow = () => matchMedia('(max-width: 1000px)').matches; // Panel liegt dann unter dem Video
 const panelOpen = () => {
   const t = document.querySelector('.train');
@@ -202,7 +205,7 @@ export function mainTour() {
   return runTour([
     { route: /^#\/?$/, target: '.dropzone', block: true, title: 'Neue Choreo', text: [
       'Legt aus einem Kursvideo eine neue Choreo an.',
-      ...tt(['Videos lassen sich auch direkt hierher ziehen.'], [])] },
+      'Importieren übernimmt eine exportierte Class oder Choreo.'] },
     { route: /^#\/?$/, target: '.stats', block: true, title: 'Statistiken', text: [
       'Die Kacheln zeigen Kennzahlen zu deinem Üben.',
       'Jede Kachel führt zur passenden Auswertung im Profil.'] },
@@ -219,8 +222,8 @@ export function mainTour() {
     // schmale Handys: „BASE“ ist ausgeblendet, dort führt die Wortmarke zurück
     { target: () => [document.querySelector('[data-nav="hub"]'), document.querySelector('.wordmark')].find(visible), title: 'Base', text: ['Führt zurück zur Startseite.'] },
   ], {
-    start: { title: 'TUTORIAL', icon: 'part1', text: [REPEAT] },
-    finish: { title: 'GESCHAFFT!', text: [[ico('part2'), 'Teil 2 zeigt die Trainingsansicht, sobald du deine erste Choreo öffnest.']] },
+    start: { title: 'TUTORIAL', text: [[ico('part1'), REPEAT]] },
+    finish: { title: 'GESCHAFFT!', text: [[ico('part2'), 'Zeigt die Trainingsansicht, sobald du deine erste Choreo öffnest.']] },
     onEnd: () => saveSettings({ tourDone: true }),
   });
 }
@@ -272,13 +275,16 @@ export function trainTour() {
       `Das Cover öffnet den Song beim Musikprovider, ${tt('Darüberfahren', 'Halten')} spielt eine Hörprobe.`,
       'Der Startpunkt legt fest, wo im Song das Video beginnt.',
       'Eine Songdatei lässt sich als Tonquelle laden.'] },
-    { target: sec('marker'), block: true, side: true, before: panelOpen, title: 'Marker', text: [
+    // Optionen-Icons nur erklären, wenn sie zu sehen sind: beim ersten Marker eingeblendet. Ohne Marker nur die Liste.
+    { target: sec('marker'), block: true, side: true, before: () => { panelOpen(); markerOptions(true); }, title: 'Marker', text: () => hasMarkers() ? [
       'Die Zeit springt zum Marker, der Name zeigt seine Optionen.',
       [ico('rename'), 'Umbenennen'],
       [ico('jump'), 'Hierhin springen'],
       [ico('setNow'), 'Auf jetzt setzen'],
-      [ico('trash'), 'Löschen']] },
-    { target: sec('notes'), block: true, side: true, before: panelOpen, title: 'Notizen', text: [
+      [ico('trash'), 'Löschen']] : [
+      'Listet die gesetzten Marker, die Zeit springt zum Marker.',
+      'Der Name eines Markers zeigt Umbenennen, Hierhin springen, Auf jetzt setzen und Löschen.'] },
+    { target: sec('notes'), block: true, side: true, before: () => { panelOpen(); markerOptions(false); }, title: 'Notizen', text: [
       'Eigene Notizen zur Aufnahme, speichern automatisch.'] },
     { target: sec('status'), block: true, side: true, before: panelOpen, title: 'Status', text: [
       'Bewertet von 1 bis 5, wie gut du die Choreo kannst.'] },
@@ -290,7 +296,7 @@ export function trainTour() {
       'Alle Tastenkürzel.'] },
   ], {
     scope: /^#\/train\//,
-    start: { title: 'TRAININGSANSICHT', icon: 'part2', text: [REPEAT] },
+    start: { title: 'TRAININGSANSICHT', text: [[ico('part2'), REPEAT]] },
     finish: { title: 'VIEL SPASS BEIM ÜBEN!' },
     onEnd: () => saveSettings({ tourTrainDone: true }),
   });

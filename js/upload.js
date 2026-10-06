@@ -4,7 +4,7 @@ import { h, fmt, parseTime, isoDate, classTitle, classMeta, PALETTE, textOn, WEE
 import { songPicker, songKeyOf, sameSong } from './song.js';
 import { identifyAudio } from './recognize.js';
 import { alignToSong, checkAudio } from './align.js';
-import { classPickers } from './ui.js';
+import { classPickers, confirmDialog } from './ui.js';
 import { dropzone } from './hub.js';
 import { state, go, toast } from './app.js';
 import { compressVideo } from './compress.js';
@@ -108,7 +108,7 @@ export async function renderUpload(root, kind, refId) {
       renderSongStep('Prüfe, welcher Song in der Datei ist …');
       const found = await identifyAudio(f).catch(() => null);
       if (found && !sameSong(found, chosen)
-        && !confirm(`Die Datei klingt nach „${[found.artist, found.title].filter(Boolean).join(' — ')}“, gewählt ist aber „${chosen.title}“. Trotzdem verwenden?`)) {
+        && !(await confirmDialog({ title: 'ANDERER SONG?', text: `Die Datei klingt nach „${[found.artist, found.title].filter(Boolean).join(' — ')}“, gewählt ist aber „${chosen.title}“.`, ok: 'Trotzdem verwenden', danger: false }))) {
         renderSongStep();
         return;
       }

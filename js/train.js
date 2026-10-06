@@ -8,7 +8,7 @@ import { alignToSong, checkAudio } from './align.js';
 import { recTitle } from './hub.js';
 import { go, toast } from './app.js';
 import { settings, saveSettings, PANEL_SECTIONS } from './settings.js';
-import { icon, toggle } from './ui.js';
+import { icon, toggle, confirmDialog } from './ui.js';
 import { exportChoreoDialog } from './share.js';
 import { prime, needsCapture } from './audio.js';
 
@@ -791,6 +791,8 @@ export async function renderTrain(root, recId) {
   // Klick auf einen Marker blendet rechts in seiner Zeile Icons ein: Umbenennen · Hierhin · Auf jetzt setzen · Löschen
   const markerList = h('ul.markers');
   let menuFor = null, renaming = false;
+  // fürs Tutorial: Optionen des ersten Markers zeigen bzw. wieder schließen
+  markerList.showOptions = on => { menuFor = on && rec.markers[0] ? rec.markers[0].id : null; renaming = false; renderMarkers(); };
   function renderMarkers() {
     markerList.replaceChildren(...(rec.markers.length ? rec.markers.map(m => {
       // Der Marker trägt seinen Namen selbst; ohne Namen steht dort der Typ
@@ -884,7 +886,7 @@ export async function renderTrain(root, recId) {
       songFileRow.querySelector('.label')?.replaceChildren('Prüfe, welcher Song in der Datei ist …');
       const found = await identifyAudio(file).catch(() => null);
       if (found && !sameSong(found, song)
-        && !confirm(`Die Datei klingt nach „${[found.artist, found.title].filter(Boolean).join(' — ')}“, die Choreo ist aber „${song.title}“. Trotzdem verwenden?`)) {
+        && !(await confirmDialog({ title: 'ANDERER SONG?', text: `Die Datei klingt nach „${[found.artist, found.title].filter(Boolean).join(' — ')}“, die Choreo ist aber „${song.title}“.`, ok: 'Trotzdem verwenden', danger: false }))) {
         renderSongFile();
         return;
       }
@@ -907,7 +909,7 @@ export async function renderTrain(root, recId) {
         h('button.linkbtn', {
           type: 'button',
           onclick: async () => {
-            if (!confirm('Songdatei aus dieser Choreo entfernen?')) return;
+            if (!(await confirmDialog({ title: 'SONGDATEI ENTFERNEN', text: 'Die Songdatei wird aus dieser Choreo entfernt.', ok: 'Entfernen' }))) return;
             await db.del('videos', songKey);
             songBlob = null;
             delete rec.fileOffset;
@@ -955,9 +957,11 @@ export async function renderTrain(root, recId) {
       h('button.linkbtn', {
         onclick: async () => {
           const last = recs.length === 1;
-          if (!confirm(last
-            ? 'Das ist die einzige Aufnahme. Aufnahme samt Video und damit die ganze Choreo löschen?'
-            : `„${recTitle(rec, recIndex)}“ samt Video löschen?`)) return;
+          if (!(await confirmDialog({
+            title: last ? 'CHOREO LÖSCHEN' : 'AUFNAHME LÖSCHEN',
+            text: last ? 'Das ist die einzige Aufnahme. Sie wird samt Video gelöscht und damit die ganze Choreo.' : `„${recTitle(rec, recIndex)}“ wird samt Video gelöscht.`,
+            ok: 'Löschen',
+          }))) return;
           deleted = true;
           video.pause();
           await deleteRecording(rec.id);
