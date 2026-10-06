@@ -409,10 +409,10 @@ function appHint() {
   return bar;
 }
 
-// Neue Class aus der Base: Class-Formular im Fenster, danach Base neu aufbauen
-function newClassDialog() {
+// Neue Class (Base, Profil): Class-Formular im Fenster, danach die aktuelle Seite neu aufbauen
+export function newClassDialog() {
   const close = () => box.remove();
-  const form = classForm(() => { close(); go('#/', { replace: true }); }, { heading: false, withImport: false });
+  const form = classForm(() => { close(); go(location.hash || '#/', { replace: true }); }, { heading: false, withImport: false });
   const box = h('div.modal', { onclick: e => { if (e.target === box) close(); } },
     h('div.modal-card.class-card', h('h2.wide', 'NEUE CLASS'), form, h('button.linkbtn', { type: 'button', onclick: close, style: { justifySelf: 'start' } }, 'Abbrechen')));
   document.body.append(box);
@@ -420,7 +420,7 @@ function newClassDialog() {
 }
 
 // „Neu …“ als Knopf, daneben klein „importieren“ (unter der letzten Choreo bzw. Class)
-function addRow(main, onImport) {
+export function addRow(main, onImport) {
   return h('div.actions.add-row', main, h('button.linkbtn.small-link', { type: 'button', onclick: onImport }, 'importieren'));
 }
 

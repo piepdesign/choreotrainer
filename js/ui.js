@@ -163,6 +163,8 @@ const GUIDE_ICONS = {
   phone: '<rect x="11" y="3.5" width="14" height="29" rx="2.5"/><rect x="14.5" y="9" width="7" height="7" rx="1.5" fill="currentColor"/><path d="M16.5 29h3"/>',
   addressBar: '<rect x="2.5" y="11" width="31" height="14" rx="7"/><path d="M7 18h11"/><rect x="23" y="14.5" width="7" height="6" rx="1"/><path d="M26.5 14.5v-2"/>',
   menu: '<rect x="4" y="5" width="28" height="26" rx="2"/><path d="M27 10.5v.01M27 14v.01M27 17.5v.01M9 23h14"/>',
+  menuH: '<rect x="4" y="5" width="28" height="26" rx="2"/><path d="M21 10h.01M24.5 10h.01M28 10h.01M9 23h14"/>', // Edge: ··· waagrecht
+  phoneMenu: '<rect x="10" y="3.5" width="16" height="29" rx="2.5"/><path d="M22 8v.01M22 10.5v.01M22 13v.01M16.5 29h3"/>', // Handy mit ⋮ oben rechts
   menuBar: '<rect x="3" y="7" width="30" height="22" rx="2"/><path d="M3 12h30M7 9.5h5M15 9.5h5"/>',
   dock: '<path d="M4 27h28"/><rect x="7" y="17" width="7" height="7" rx="1.5"/><rect x="15" y="17" width="7" height="7" rx="1.5" fill="currentColor"/><rect x="23" y="17" width="7" height="7" rx="1.5"/>',
   browsers: '<circle cx="18" cy="18" r="13"/><path d="M5 18h26M18 5c4 4 4 22 0 26M18 5c-4 4-4 22 0 26"/>',

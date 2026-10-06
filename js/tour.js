@@ -301,9 +301,16 @@ export function trainTour() {
 }
 
 // Startet den passenden Teil, wenn er noch nicht gesehen wurde
+// Wartet, bis kein Fenster (Installieren, Musikprovider …) mehr offen ist, damit sich nichts überlagert
+const busy = () => !!document.querySelector('.modal') || document.body.classList.contains('intro-open');
+async function whenFree(ms) {
+  await wait(ms);
+  while (busy()) await wait(300);
+  await wait(300); // kurz Luft nach dem Schließen
+}
 export function maybeTour(hash) {
   if (active || document.body.classList.contains('intro-open')) return;
   const s = settings();
-  if (!s.tourDone && /^#?\/?$/.test(hash)) setTimeout(() => { if (!active) mainTour(); }, 500);
-  else if (s.tourDone && !s.tourTrainDone && /^#\/train\//.test(hash)) setTimeout(() => { if (!active && /^#\/train\//.test(location.hash)) trainTour(); }, 900);
+  if (!s.tourDone && /^#?\/?$/.test(hash)) whenFree(500).then(() => { if (!active && /^#?\/?$/.test(location.hash)) mainTour(); });
+  else if (s.tourDone && !s.tourTrainDone && /^#\/train\//.test(hash)) whenFree(900).then(() => { if (!active && /^#\/train\//.test(location.hash)) trainTour(); });
 }

@@ -3,12 +3,12 @@
 // Class-Farben, Werte immer in Textfarbe, Tooltip auf jedem Datenpunkt.
 import { db, deleteAllData } from './db.js';
 import { h, tt, isTouch, fmt, fmtDuration, relDate, fmtRecDate, classTitle, stripe, byClassOrder, WEEKDAYS, textOn, plural } from './util.js';
-import { loadAll, dots, choreoCard, recTitle, nextClass, importInto } from './hub.js';
+import { loadAll, dots, choreoCard, recTitle, nextClass, importInto, addRow, newClassDialog } from './hub.js';
 import { songLink } from './providers.js';
 import { baseStats, latestRating, choreoLength, weekStart, dayKey } from './stats.js';
 import { settings, saveSettings, applyTheme, resetSettings, BASE_STATS } from './settings.js';
 import { classManager } from './classform.js';
-import { go, toast, replaceHash } from './app.js';
+import { go, toast, replaceHash, state } from './app.js';
 import { preferences, toggle, confirmDialog } from './ui.js';
 import { storageState, askPersist, isInstalled, isIOS, canPromptInstall, promptInstall, exportBackup, readBackup, restoreBackup, missingVideos, relinkVideos, videoBytes, deleteRecordings, freeStorage, installApp, shareApp, SHARE_URL } from './backup.js';
 
@@ -387,7 +387,9 @@ export async function renderProfile(root, section) {
     viewSeg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === view));
   }
   const viewSeg = h('div.seg', [['gallery', 'Galerie'], ['list', 'Liste']].map(([v, l]) => h('button.ctl', { type: 'button', 'data-v': v, onclick: () => { view = v; try { localStorage.setItem('ct-choreo-view', v); } catch { /* egal */ } renderChoreos(); } }, l)));
-  const choreoSec = sect('choreos', null, h('div.actions.p-tools', viewSeg, sortWrap, h('span.label', `${choreos.length} insgesamt`)), choreoBox);
+  const choreoSec = sect('choreos', null, h('div.actions.p-tools', viewSeg, sortWrap, h('span.label', `${choreos.length} insgesamt`)), choreoBox,
+    // wie in Base und Class-Ansicht: unter der letzten Choreo neu anlegen oder importieren
+    addRow(h('a.btn.small', { href: '#/upload', onclick: () => { state.pendingFile = null; } }, 'Neue Choreo'), () => importInto()));
   renderChoreos();
 
   // ── Classes ──
@@ -398,7 +400,8 @@ export async function renderProfile(root, section) {
       const sec = real.filter(x => mine.some(m => m.id === x.choreoId)).reduce((t, x) => t + x.seconds, 0);
       const nc = nextClass(c)?.split(' · ').at(-1) || '';
       return stripe(c, [plural(mine.length, 'CHOREO', 'CHOREOS'), fmtDuration(sec).toUpperCase(), nc.toUpperCase()]);
-    })));
+    })),
+    addRow(h('button.btn.small', { type: 'button', onclick: newClassDialog }, 'Neue Class'), () => importInto()));
   const manageSec = sect('manage', 'Classes verwalten', classManager(() => go('#/settings', { keep: true })));
 
   // ── Einheiten ──

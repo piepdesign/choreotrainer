@@ -129,19 +129,21 @@ export async function openSong(song) {
   }, 1800);
 }
 
-// Auswahl beim ersten Mal, wird gemerkt (im Profil änderbar)
+// Auswahl beim ersten Öffnen eines Songs, falls im Intro übersprungen. Wird gemerkt (Einstellungen › Präferenzen).
+// Kacheln wie in den Präferenzen
 export function askProvider() {
   return new Promise(resolve => {
     const close = val => { box.remove(); resolve(val); };
     const box = h('div.modal', { onclick: e => { if (e.target === box) close(null); } },
-      h('div.modal-card',
+      h('div.modal-card.provider-card',
         h('h2.wide', 'WO HÖRST DU MUSIK?'),
-        h('p.label', 'Songs öffnen sich künftig dort. Angemeldet bist du direkt beim Anbieter, die App speichert nur deine Wahl. Ändern kannst du sie im Profil.'),
-        h('div.chips', PROVIDERS.map(([id, name]) => h('button.btn.provider-btn', {
-          type: 'button',
+        h('p', 'Songs öffnen sich dort, in der App oder im Browser.'),
+        h('div.provider-tiles', { role: 'radiogroup' }, PROVIDERS.map(([id, name]) => h('button', {
+          type: 'button', role: 'radio', 'aria-checked': 'false',
           onclick: async () => { await saveSettings({ provider: id }); close(id); },
-        }, h('i.brand', { html: brandIcon(id, 16) }), name))),
-        h('button.linkbtn', { type: 'button', onclick: () => close(null) }, 'Abbrechen')));
+        }, h('i.brand', { html: brandIcon(id, 26) }), h('span', name)))),
+        h('p.label', 'Änderbar unter Einstellungen › Präferenzen'),
+        h('div.actions', h('button.linkbtn', { type: 'button', onclick: () => close(null) }, 'Abbrechen'))));
     document.body.append(box);
   });
 }

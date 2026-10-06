@@ -52,16 +52,26 @@ export async function promptInstall() {
 export async function installApp() {
   if (canPromptInstall()) return promptInstall();
   const { guideDialog } = await import('./ui.js');
-  const ua = navigator.userAgent;
-  const chromium = !!navigator.userAgentData?.brands?.some(b => /Chromium|Google Chrome|Microsoft Edge/.test(b.brand));
-  // iPhone/iPad: alle Browser dort nutzen dasselbe Teilen-Menü („Zum Home-Bildschirm“)
-  const guide = isIOS() ? { title: 'INSTALLIEREN', steps: [['share', 'Im Browser auf Teilen tippen'], ['addHome', '„Zum Home-Bildschirm“ wählen'], ['phone', 'App vom Home-Bildschirm öffnen']], note: 'Die App hat einen eigenen Speicher. Daten per Sicherung mitnehmen.' }
-    : chromium ? { title: 'ÖFFNEN ODER INSTALLIEREN', steps: [['addressBar', 'Öffnen: App-Symbol in der Adressleiste'], ['menu', 'Sonst: Browser-Menü › App installieren']] }
-      : /Firefox\//.test(ua) ? { title: 'INSTALLIEREN', steps: [['browsers', 'In Chrome, Edge oder Safari öffnen']], note: 'Firefox kann keine Web-Apps installieren.' }
-        : /Safari\//.test(ua) ? { title: 'INSTALLIEREN', steps: [['menuBar', 'Menü „Ablage“ öffnen'], ['dock', '„Zum Dock hinzufügen“ wählen']] }
-          : { title: 'INSTALLIEREN', steps: [['menu', 'Browser-Menü öffnen'], ['addHome', '„App installieren“ wählen']] };
-  await guideDialog(guide);
+  await guideDialog({ title: 'ANLEITUNG', ...installGuide() });
   return true;
+}
+
+// Schritte je System. Begriffe wie dort: iPhone/iPad „Home-Bildschirm“, Android „Startbildschirm“.
+// Symbole zeigen die Bedienelemente des jeweiligen Systems (Teilen-Symbol, ⋮ bzw. ··· im Menü, Menüleiste …).
+export function installGuide() {
+  const ua = navigator.userAgent;
+  const brands = navigator.userAgentData?.brands?.map(b => b.brand).join(' ') || '';
+  const edge = /Edg\//.test(ua) || /Microsoft Edge/.test(brands);
+  const chromium = edge || /Chromium|Google Chrome|Opera|Brave/.test(brands) || /Chrome\//.test(ua);
+  // iPhone/iPad: alle Browser dort nutzen dasselbe Teilen-Menü (in neueren Versionen teils hinter „···“)
+  if (isIOS()) return { steps: [['share', 'Teilen öffnen (ggf. über „···“)'], ['addHome', '„Zum Home-Bildschirm“ wählen'], ['phone', 'App vom Home-Bildschirm öffnen']], note: 'Die App hat einen eigenen Speicher. Daten per Sicherung mitnehmen.' };
+  // Android: Chrome, Samsung Internet, Firefox u. a. installieren über ihr Menü (⋮ oder ≡)
+  if (/Android/.test(ua)) return { steps: [['phoneMenu', 'Browser-Menü öffnen (⋮ oder ≡)'], ['addHome', '„App installieren“ oder „Zum Startbildschirm“ wählen'], ['phone', 'App vom Startbildschirm öffnen']] };
+  // Rechner, Chrome/Edge ohne Angebot: meist schon installiert (dann öffnet das Symbol die App)
+  if (chromium) return { steps: [['addressBar', 'App-Symbol in der Adressleiste: öffnet oder installiert'], [edge ? 'menuH' : 'menu', `Sonst: Browser-Menü ${edge ? '(···) › Apps' : '(⋮)'} › „… als App installieren“`]] };
+  if (/Firefox\//.test(ua)) return { steps: [['browsers', 'In Chrome, Edge oder Safari öffnen']], note: 'Firefox am Rechner kann keine Web-Apps installieren.' };
+  if (/Safari\//.test(ua) && /Macintosh/.test(ua)) return { steps: [['menuBar', 'Menü „Ablage“ öffnen'], ['dock', '„Zum Dock hinzufügen“ wählen']] };
+  return { steps: [['menu', 'Browser-Menü öffnen'], ['addHome', '„App installieren“ wählen']] };
 }
 
 // Empfehlen: Teilen-Menü des Geräts (Messenger, Social Media, Mail …), sonst Link kopieren

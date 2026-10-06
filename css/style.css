@@ -444,6 +444,7 @@ main:has(.train) { padding-bottom: 0; }
 .choreo-block { background: var(--surface); border-top: 0 !important; padding: 14px; margin-bottom: var(--tile-gap); }
 
 /* ── Auswahlfenster / Tooltip ─────────────────── */
+.intro-open .modal { z-index: 85; } /* Fenster aus dem Intro (z. B. Installieren) über dem Intro, nicht dahinter */
 .modal { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, .45); display: grid; place-items: center; padding: 16px; }
 .modal-card { background: var(--bg); border: 1px solid var(--rule); padding: 22px; max-width: 520px; width: 100%; display: grid; gap: 14px; }
 .modal-card h2 { margin: 0; font-size: 22px; }
@@ -717,7 +718,9 @@ a.stat-link:hover { background: var(--surface-2); }
 .guide-note { margin: 0; padding: 10px 12px; border-left: 2px solid var(--fg); font-size: 12px; color: var(--muted); }
 .pref-onoff { display: flex; }
 .pref-onoff .btn { min-width: 128px; justify-content: center; }
-.confirm-card p { margin: 0; font-size: 13px; line-height: 1.55; }
+.confirm-card p, .provider-card p { margin: 0; font-size: 13px; line-height: 1.55; }
+.provider-card .provider-tiles > button { flex-basis: 30%; min-height: 80px; } /* 3 je Zeile, am Handy 2 */
+@media (max-width: 600px) { .provider-card .provider-tiles > button { flex-basis: 40%; } }
 .app-hint { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; margin-top: var(--tile-gap); padding: 12px 16px; background: var(--surface); font-size: 12px; }
 .app-hint-actions { display: flex; align-items: baseline; gap: 14px; }
 .section-tools { display: flex; gap: 14px; align-items: baseline; } /* Überschrift rechts: Knopf + Hinweis */
