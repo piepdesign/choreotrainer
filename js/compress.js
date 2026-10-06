@@ -38,9 +38,9 @@ export function compressVideo(file, onProgress = () => {}) {
     if (k === 1 && stats.averageBitrate && stats.averageBitrate <= bitrate * 1.3) return keep('schon klein genug');
     if (!(await M.canEncodeVideo('avc', { width, height, bitrate }))) return keep('Gerät kann kein H.264 erzeugen');
     if (!(await track.canDecode())) return keep('Gerät kann dieses Videoformat nicht lesen');
-    // fastStart aus: Inhaltsverzeichnis am Dateiende. Für lokale Wiedergabe egal, spart aber eine zweite Kopie
-    // des ganzen Videos im Arbeitsspeicher (am iPhone sonst Absturzgefahr bei langen Videos)
-    const output = new M.Output({ format: new M.Mp4OutputFormat({ fastStart: false }), target: new M.BufferTarget() });
+    // Inhaltsverzeichnis (moov) an den Dateianfang wie bei normalen MP4: Safari am iPhone spielte Dateien mit
+    // moov am Ende teils nicht an (Mithören „hängt“). Kostet beim Abschluss kurz eine zweite Kopie im Speicher.
+    const output = new M.Output({ format: new M.Mp4OutputFormat({ fastStart: 'in-memory' }), target: new M.BufferTarget() });
     conversion = await M.Conversion.init({
       input, output,
       video: { width, height, fit: 'contain', codec: 'avc', bitrate, keyFrameInterval: 1, ...(frameRate ? { frameRate } : {}) },

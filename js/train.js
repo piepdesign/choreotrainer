@@ -324,11 +324,13 @@ export async function renderTrain(root, recId) {
   const bLoop = ctl('Loop', { title: 'Loop an/aus (L) · ohne In/Out zwischen Start und Ende', onclick: () => toggleLoop() });
   const bClear = ctl('×', { title: 'In/Out löschen', onclick: () => { P.loopIn = P.loopOut = null; P.loopOn = false; update(); } });
   // Ohne Tempo zählt nichts: dann beim Einschalten den Takt ermitteln (auf dem Handy muss das im Antippen starten)
+  let provisionalBpm = false;
   const bCount = ctl('8er', {
     title: '8er-Count an/aus (C)',
     onclick: () => {
       P.countOn = !P.countOn;
-      if (P.countOn && !P.bpm) { prime(blob); runAnalysis(true); }
+      // auch bei nur vorläufigem Tempo (Deezer, am Handy ohne Mithören gesetzt): jetzt im Antippen erkennen
+      if (P.countOn && (!P.bpm || provisionalBpm)) { provisionalBpm = false; prime(blob); runAnalysis(true); }
       update();
     },
   });
@@ -527,8 +529,8 @@ export async function renderTrain(root, recId) {
       h('div.pop-head', h('span', 'Tempo (BPM)'), h('button.pop-close', { type: 'button', title: 'Schließen', 'aria-label': 'Schließen', onclick: closePop }, '×')),
       bpmIn,
       h('div.btns',
-        small('÷2', () => { if (P.bpm) { P.bpm /= 2; P.manualBeat = true; update(); bpmIn.value = Math.round(P.bpm * 10) / 10; } }),
-        small('×2', () => { if (P.bpm) { P.bpm *= 2; P.manualBeat = true; update(); bpmIn.value = Math.round(P.bpm * 10) / 10; } }),
+        // fein nachstellen statt halbieren/verdoppeln
+        ...[-0.1, 0.1].map(d => small(`${d < 0 ? '−' : '+'}0,1`, () => { if (P.bpm) { P.bpm = Math.min(240, Math.max(40, Math.round((P.bpm + d) * 10) / 10)); P.manualBeat = true; provisionalBpm = false; update(); bpmIn.value = P.bpm; } })),
       ),
       h('div.btns',
         // ±10 ms war nicht wahrnehmbar: ganzen Count verschieben (welcher Count die „1“ ist) und fein ±25 ms
@@ -1162,7 +1164,7 @@ export async function renderTrain(root, recId) {
   // Takt automatisch schätzen; auf dem Handy nicht, wenn dafür mitgehört werden muss (geht nur nach Antippen)
   if (!P.bpm && !rec.beatTried) {
     if (needsCapture(blob)) {
-      if (song?.bpm) { P.bpm = song.bpm; P.anchor = 0; } // vorläufig Deezer-Tempo, „1“ dann per Knopf setzen
+      if (song?.bpm) { P.bpm = song.bpm; P.anchor = 0; provisionalBpm = true; } // vorläufig Deezer-Tempo, Erkennung beim Antippen von 8er
       status.textContent = '8ER ANTIPPEN, DANN WIRD DER TAKT ERMITTELT';
     }
     else setTimeout(() => runAnalysis(false), 300);

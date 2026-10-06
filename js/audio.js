@@ -115,11 +115,14 @@ export async function capture(blob, sampleRate, onProgress = () => {}) {
         v.onended = resolve;
         v.onerror = () => reject(new Error('Wiedergabe abgebrochen'));
         setTimeout(() => reject(new Error('Mithören dauert zu lange')), (dur / speed + 30) * 1000);
-        // hängt die Wiedergabe (z. B. vom Handy angehalten), nicht ewig warten
+        // hängt die Wiedergabe (z. B. vom Handy angehalten), nicht ewig warten. Lädt das Video noch (readyState < 3,
+        // am iPhone bei großen Dateien mehrere Sekunden) oder hat iOS es pausiert, erst nachladen bzw. weiterspielen,
+        // abgebrochen wird nach 20 s ohne Fortschritt (vorher 4 s, das reichte am iPhone oft nicht)
         let last = -1, still = 0;
         const watch = setInterval(() => {
           if (v.ended) { clearInterval(watch); return; }
-          if (v.currentTime === last) { if (++still >= 8) { clearInterval(watch); reject(new Error('Mithören hängt. Bitte erneut auf den Knopf tippen.')); } } else { still = 0; last = v.currentTime; }
+          if (v.paused) v.play().catch(() => {});
+          if (v.currentTime === last) { if (++still >= 40) { clearInterval(watch); reject(new Error('Mithören hängt. Bitte erneut auf den Knopf tippen.')); } } else { still = 0; last = v.currentTime; }
         }, 500);
         v.addEventListener('ended', () => clearInterval(watch), { once: true });
       });
