@@ -24,7 +24,13 @@ function open() {
     };
     // andere offene Tabs mit alter Version blockieren das Upgrade nicht dauerhaft
     req.onblocked = () => console.warn('Datenbank-Upgrade wartet auf andere ChoreoTrainer-Tabs');
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      // Ein anderer Tab löscht die Datenbank (Werkseinstellungen) oder hebt die Version an: Verbindung hier freigeben
+      // und neu laden. Sonst wartet das Löschen auf diesen Tab, und dort hängt jeder Zugriff, bis er geschlossen wird.
+      db.onversionchange = () => { db.close(); dbPromise = null; location.reload(); };
+      resolve(db);
+    };
     req.onerror = () => reject(req.error);
   });
   return dbPromise;
