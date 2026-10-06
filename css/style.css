@@ -818,7 +818,8 @@ html, body { overflow-x: clip; } /* nichts darf seitlich herausragen und die Sei
   /* Class-Zeilen: oben Titel und Icons (Bearbeiten/Löschen), darunter Tag · Uhrzeit · Coach */
   .cm-list { grid-template-columns: minmax(0, 1fr); }
   .cm-list > .cm-row { display: flex; flex-wrap: wrap; align-items: center; row-gap: 2px; padding-right: 8px; }
-  .cm-list > .cm-row .cc-title { flex: 1 1 calc(100% - 70px); min-width: 0; }
+  .cm-list > .cm-row .cc-title { flex: 1 1 calc(100% - 70px); min-width: 0; line-height: 22px; } /* Zeilenhöhe wie die Icons */
+  .cm-list > .cm-row.cm-draft .cc-title { flex-basis: 100%; } /* Vorschau ohne Icons: Angaben trotzdem darunter */
   .cm-list > .cm-row .cm-actions { order: 1; }
   .cm-list > .cm-row .cc-meta { order: 2; font-size: 12px; }
   .cm-list > .cm-row .cc-meta:nth-child(2)::before, .cm-list > .cm-row .cc-meta:empty + .cc-meta::before { content: none; }
