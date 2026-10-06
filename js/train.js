@@ -528,17 +528,12 @@ export async function renderTrain(root, recId) {
     return [
       h('div.pop-head', h('span', 'Tempo (BPM)'), h('button.pop-close', { type: 'button', title: 'Schließen', 'aria-label': 'Schließen', onclick: closePop }, '×')),
       bpmIn,
-      h('div.btns',
-        // fein nachstellen statt halbieren/verdoppeln
-        ...[-0.1, 0.1].map(d => small(`${d < 0 ? '−' : '+'}0,1`, () => { if (P.bpm) { P.bpm = Math.min(240, Math.max(40, Math.round((P.bpm + d) * 10) / 10)); P.manualBeat = true; provisionalBpm = false; update(); bpmIn.value = P.bpm; } })),
-      ),
-      h('div.btns',
-        // ±10 ms war nicht wahrnehmbar: ganzen Count verschieben (welcher Count die „1“ ist) und fein ±25 ms
-        small('« 1 Count', () => shiftAnchor(-1, 'beat')),
-        small('1 Count »', () => shiftAnchor(1, 'beat'))),
-      h('div.btns',
-        small('−25 ms', () => shiftAnchor(-0.025)),
-        small('+25 ms', () => shiftAnchor(0.025))),
+      // BPM nachstellen: grob ±1, fein ±0,1 (statt halbieren/verdoppeln; die „1“ setzt Anfangscount bzw. Tap)
+      h('div.btns', [-1, -0.1, 0.1, 1].map(d => small(`${d < 0 ? '−' : '+'}${String(Math.abs(d)).replace('.', ',')}`, () => {
+        if (!P.bpm) return;
+        P.bpm = Math.min(240, Math.max(40, Math.round((P.bpm + d) * 10) / 10));
+        P.manualBeat = true; provisionalBpm = false; update(); bpmIn.value = P.bpm;
+      }))),
       h('div.btns',
         small(tt('Anfangscount (1)', 'Anfangscount'), () => setOne()),
         small(tt('Tap (T)', 'Tap'), () => tap())),
@@ -571,17 +566,6 @@ export async function renderTrain(root, recId) {
     video.currentTime = loopRange().a;
     update();
   }
-  // Zählung verschieben: ganze Schläge oder Sekunden; kurz anzeigen, damit man die Wirkung sieht
-  function shiftAnchor(n, unit) {
-    if (!P.bpm) { toast('Erst Tempo setzen (Tap oder BPM)'); return; }
-    P.anchor += unit === 'beat' ? n * (60 / P.bpm) : n;
-    P.manualBeat = true;
-    update();
-    status.textContent = unit === 'beat' ? `„1“ ${n > 0 ? 'EINEN COUNT SPÄTER' : 'EINEN COUNT FRÜHER'}` : `ZÄHLUNG ${n > 0 ? '+' : '−'}25 MS`;
-    clearTimeout(shiftAnchor.t);
-    shiftAnchor.t = setTimeout(() => { status.textContent = ''; }, 1600);
-  }
-
   function setOne() {
     if (!P.bpm) { toast('Erst Tempo setzen (Tap oder BPM)'); return; }
     const beat = 60 / P.bpm;

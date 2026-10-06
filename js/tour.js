@@ -257,7 +257,7 @@ export function trainTour() {
       [null, `Ohne ${IO} loopt er zwischen Start- und Ende-Marker.`]] },
     { target: '.controls > .ctl-group:nth-child(3)', block: true, title: 'Count', text: [
       [chip('8er'), 'Blendet den Zähler ein oder aus.'],
-      [chip('BPM'), 'Tempo, Verschieben, Klick und Anzeige.'],
+      [chip('BPM'), 'Tempo, Klick und Anzeige.'],
       [chip('1'), ['Setzt den Anfangscount an die aktuelle Stelle.', key('1')]],
       [chip('Tap'), ['Tippt die BPM im Takt ein.', key('T')]]] },
     { target: '.controls > .ctl-group:nth-child(4)', block: true, title: 'Bild', text: [
