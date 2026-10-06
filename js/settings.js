@@ -1,17 +1,18 @@
 // Profil und Präferenzen (Store „settings“). Einmal laden, danach synchron lesbar.
 import { db } from './db.js';
+import { tr } from './i18n.js';
 
 export const BASE_STATS = [
-  ['last', 'Zuletzt geübt'],
-  ['week', 'Übungszeit Woche'],
-  ['total', 'Übungszeit gesamt'],
-  ['status', 'Ø Status'],
+  ['last', tr('Zuletzt geübt')],
+  ['week', tr('Übungszeit Woche')],
+  ['total', tr('Übungszeit gesamt')],
+  ['status', tr('Ø Status')],
   ['choreos', 'Choreos'],
-  ['duration', 'Dauer gesamt'],
-  ['streak', 'Serie'],
+  ['duration', tr('Dauer gesamt')],
+  ['streak', tr('Serie')],
   ['classes', 'Classes'],
-  ['recordings', 'Aufnahmen'],
-  ['sessions', 'Einheiten'],
+  ['recordings', tr('Aufnahmen')],
+  ['sessions', tr('Einheiten')],
 ];
 export const DEFAULT_STATS = ['last', 'week', 'total', 'status', 'choreos', 'duration'];
 

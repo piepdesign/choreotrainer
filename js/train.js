@@ -1,4 +1,5 @@
 // Trainingsansicht: Player mit Spiegeln, Tempo, Lautstärke, Bild, Loop, 8er-Count, Markern, Song-Zeitleiste
+import { tr, num } from './i18n.js';
 import { db, uid, deleteRecording, deleteChoreo, untracked } from './db.js';
 import { h, holdGate, isTouch, tt, fmt, fmtDate, WEEKDAYS, fmtRecDate, fmtDuration, relDate, parseTime, debounce, inlineEdit, fitInput, classTitle, classMeta, PALETTE, textOn } from './util.js';
 import { analyzeBeat } from './beat.js';
@@ -13,10 +14,10 @@ import { exportChoreoDialog } from './share.js';
 import { prime, needsCapture } from './audio.js';
 
 const MARKER_TYPES = {
-  start: { label: 'START', color: 'var(--fg)', key: 'S' },
-  end: { label: 'ENDE', color: 'var(--fg)', key: 'E' },
-  memo: { label: 'NOTIZ', color: 'var(--c4)', key: 'N' }, // Typ-Schlüssel bleibt „memo“ (gespeicherte Daten)
-  highlight: { label: 'HIGHLIGHT', color: 'var(--c1)', key: 'H' },
+  start: { label: tr('START'), color: 'var(--fg)', key: 'S' },
+  end: { label: tr('ENDE'), color: 'var(--fg)', key: 'E' },
+  memo: { label: tr('NOTIZ'), color: 'var(--c4)', key: 'N' }, // Typ-Schlüssel bleibt „memo“ (gespeicherte Daten)
+  highlight: { label: tr('HIGHLIGHT'), color: 'var(--c1)', key: 'H' },
 };
 
 // Darstellung des Counts gilt für alle Aufnahmen (Ansichtssache, nicht Aufnahme-Eigenschaft)
@@ -28,7 +29,7 @@ function saveCountView(c) {
   try { localStorage.setItem('ct-count', JSON.stringify(c)); } catch { /* egal */ }
 }
 
-const RATING_HINT = ['', 'noch gar nicht', 'Bruchstücke', 'mit Video', 'fast frei', 'sitzt'];
+const RATING_HINT = ['', tr('noch gar nicht'), tr('Bruchstücke'), tr('mit Video'), tr('fast frei'), tr('sitzt')];
 
 export async function renderTrain(root, recId) {
   const rec = await db.get('recordings', recId);
@@ -48,9 +49,9 @@ export async function renderTrain(root, recId) {
       go(`#/train/${recId}`, { replace: true });
     });
     root.append(h('div.empty',
-      h('p', 'Das Video zu dieser Aufnahme fehlt in diesem Browser.'),
+      h('p', tr('Das Video zu dieser Aufnahme fehlt in diesem Browser.')),
       h('p.label', [rec.fileName, rec.duration && fmt(rec.duration)].filter(Boolean).join(' · ')),
-      h('div.actions', h('button.btn.small', { type: 'button', onclick: () => input.click() }, 'Video wählen')), input));
+      h('div.actions', h('button.btn.small', { type: 'button', onclick: () => input.click() }, tr('Video wählen'))), input));
     return;
   }
   const songKey = `song:${choreo.id}`; // Songdatei gehört zur Choreo, gilt für alle Aufnahmen
@@ -169,13 +170,13 @@ export async function renderTrain(root, recId) {
   const sTrack = h('div.track');
   const sPh = h('div.ph'), sStatic = h('div');
   sTrack.append(sStatic, sPh);
-  const songRow = h('div.tl-row', h('span.label', 'Song'), sTrack);
+  const songRow = h('div.tl-row', h('span.label', tr('Song')), sTrack);
   // 8er-Zeile: jede Acht ein Feld. Klick = diese Acht loopen, Ziehen oder ⇧-Klick = mehrere,
   // Klick auf die aktive Auswahl = Loop aus.
   const eTrack = h('div.track.eights');
   // Auswahl der Achten steht als Tooltip an der Zeile (Zeitangaben nur noch unten in der Bedienleiste)
-  const eightRow = h('div.tl-row', h('span.label', '8er'), eTrack);
-  const timeline = h('div.timeline', h('div.tl-row', h('span.label', 'Video'), vTrack), eightRow, songRow);
+  const eightRow = h('div.tl-row', h('span.label', tr('8er')), eTrack);
+  const timeline = h('div.timeline', h('div.tl-row', h('span.label', tr('Video')), vTrack), eightRow, songRow);
 
   scrub(vTrack, r => { video.currentTime = r * dur(); });
   scrub(sTrack, r => {
@@ -217,12 +218,12 @@ export async function renderTrain(root, recId) {
       return h(`div.cell${inLoop ? '.sel' : ''}${picking ? '.pick' : ''}`, {
         'data-k': k,
         style: { left: `${(x.a / d) * 100}%`, width: `${((x.b - x.a) / d) * 100}%` },
-        title: `${x.i ? `Acht ${x.i}` : 'Auftakt'} · ${fmt(x.a, true)}–${fmt(x.b, true)}`,
+        title: `${x.i ? `Acht ${x.i}` : tr('Auftakt')} · ${fmt(x.a, true)}–${fmt(x.b, true)}`,
       }, x.i && (x.b - x.a) / d > 0.035 ? String(x.i) : '');
     }));
     const selCells = list.filter(x => looped && x.a >= la - 0.05 && x.b <= lb + 0.05);
-    const lbl = x => x.i ?? 'Auftakt';
-    eTrack.title = selCells.length ? (selCells.length === 1 ? (selCells[0].i ? `Acht ${selCells[0].i}` : 'Auftakt') : `Achten ${lbl(selCells[0])}–${lbl(selCells.at(-1))}`) : '';
+    const lbl = x => x.i ?? tr('Auftakt');
+    eTrack.title = selCells.length ? (selCells.length === 1 ? (selCells[0].i ? tr('Acht {n}', { n: selCells[0].i }) : tr('Auftakt')) : tr('Achten {a}–{b}', { a: lbl(selCells[0]), b: lbl(selCells.at(-1)) })) : '';
   }
   const cellAt = e => {
     const el = document.elementFromPoint(e.clientX, eTrack.getBoundingClientRect().top + 4);
@@ -268,7 +269,7 @@ export async function renderTrain(root, recId) {
       if (video.currentTime < a || video.currentTime >= b) video.currentTime = a;
       if (P.loopIn == null && P.loopOut == null) {
         const s = markerTime('start'), e = markerTime('end');
-        toast(s != null || e != null ? `Loop ${fmt(a)}–${fmt(b)} (Start/Ende)` : 'Loop über das ganze Video', 1800);
+        toast(s != null || e != null ? tr('Loop {a}–{b} (Start/Ende)', { a: fmt(a), b: fmt(b) }) : tr('Loop über das ganze Video'), 1800);
       }
     }
     update();
@@ -296,7 +297,7 @@ export async function renderTrain(root, recId) {
     if (rec.songOffset == null || !song.duration) {
       sStatic.replaceChildren();
       sPh.hidden = true;
-      sTrack.title = 'Startpunkt im Song rechts unter SONG eintragen';
+      sTrack.title = tr('Startpunkt im Song rechts unter SONG eintragen');
       return;
     }
     sPh.hidden = false;
@@ -307,26 +308,26 @@ export async function renderTrain(root, recId) {
       sParts.push(h(`div.mk.${m.type}`, { style: { left: sp(rec.songOffset + m.t) } }));
     }
     sStatic.replaceChildren(...sParts);
-    sTrack.title = `Video läuft im Song von ${fmt(rec.songOffset)} bis ${fmt(rec.songOffset + d)}`;
+    sTrack.title = tr('Video läuft im Song von {a} bis {b}', { a: fmt(rec.songOffset), b: fmt(rec.songOffset + d) });
   }
 
   // ── Bedienleiste ──
   const ctl = (label, attrs = {}) => h('button.ctl', { type: 'button', ...attrs }, label);
   // Feste Breite für Schalter mit wechselndem Text (Mono-Schrift: Zeichen × Laufweite), damit nichts springt
   const fixed = (el, chars) => { el.classList.add('fixed'); el.style.width = `calc(${chars}ch + ${chars * 0.08}em + 20px)`; return el; };
-  const bPlay = h('button.ctl.icon-ctl', { type: 'button', title: tt('Play/Pause (Leertaste)', 'Play/Pause'), 'aria-label': 'Play/Pause', html: icon('play'), onclick: () => togglePlay() });
-  const bMirror = h('button.ctl.icon-ctl', { type: 'button', title: tt('Spiegeln (M)', 'Spiegeln'), 'aria-label': 'Spiegeln', html: icon('mirror'), onclick: () => { P.mirror = !P.mirror; update(); } });
-  const bRate = h('button.ctl.icon-ctl.rate', { type: 'button', title: 'Tempo', 'aria-label': 'Tempo', html: icon('tempo'), onclick: e => popover(e.currentTarget, ratePop) });
-  const bVol = h('button.ctl.icon-ctl', { type: 'button', title: 'Lautstärke', 'aria-label': 'Lautstärke', onclick: e => popover(e.currentTarget, volPop) });
-  const bImg = h('button.ctl.icon-ctl', { type: 'button', title: 'Bild: Helligkeit/Kontrast', 'aria-label': 'Bild: Helligkeit/Kontrast', html: icon('image'), onclick: e => popover(e.currentTarget, imgPop) });
-  const bIn = ctl('In', { title: 'Loop-Anfang setzen (I)', onclick: () => setIn() });
-  const bOut = ctl('Out', { title: 'Loop-Ende setzen (O)', onclick: () => setOut() });
-  const bLoop = ctl('Loop', { title: 'Loop an/aus (L) · ohne In/Out zwischen Start und Ende', onclick: () => toggleLoop() });
-  const bClear = ctl('×', { title: 'In/Out löschen', onclick: () => { P.loopIn = P.loopOut = null; P.loopOn = false; update(); } });
+  const bPlay = h('button.ctl.icon-ctl', { type: 'button', title: tt(tr('Play/Pause (Leertaste)'), tr('Play/Pause')), 'aria-label': tr('Play/Pause'), html: icon('play'), onclick: () => togglePlay() });
+  const bMirror = h('button.ctl.icon-ctl', { type: 'button', title: tt(tr('Spiegeln (M)'), tr('Spiegeln')), 'aria-label': tr('Spiegeln'), html: icon('mirror'), onclick: () => { P.mirror = !P.mirror; update(); } });
+  const bRate = h('button.ctl.icon-ctl.rate', { type: 'button', title: tr('Tempo'), 'aria-label': tr('Tempo'), html: icon('tempo'), onclick: e => popover(e.currentTarget, ratePop) });
+  const bVol = h('button.ctl.icon-ctl', { type: 'button', title: tr('Lautstärke'), 'aria-label': tr('Lautstärke'), onclick: e => popover(e.currentTarget, volPop) });
+  const bImg = h('button.ctl.icon-ctl', { type: 'button', title: tr('Bild: Helligkeit/Kontrast'), 'aria-label': tr('Bild: Helligkeit/Kontrast'), html: icon('image'), onclick: e => popover(e.currentTarget, imgPop) });
+  const bIn = ctl('In', { title: tr('Loop-Anfang setzen (I)'), onclick: () => setIn() });
+  const bOut = ctl('Out', { title: tr('Loop-Ende setzen (O)'), onclick: () => setOut() });
+  const bLoop = ctl('Loop', { title: tr('Loop an/aus (L) · ohne In/Out zwischen Start und Ende'), onclick: () => toggleLoop() });
+  const bClear = ctl('×', { title: tr('In/Out löschen'), onclick: () => { P.loopIn = P.loopOut = null; P.loopOn = false; update(); } });
   // Ohne Tempo zählt nichts: dann beim Einschalten den Takt ermitteln (auf dem Handy muss das im Antippen starten)
   let provisionalBpm = false;
-  const bCount = ctl('8er', {
-    title: '8er-Count an/aus (C)',
+  const bCount = ctl(tr('8er'), {
+    title: tr('8er-Count an/aus (C)'),
     onclick: () => {
       P.countOn = !P.countOn;
       // auch bei nur vorläufigem Tempo (Deezer, am Handy ohne Mithören gesetzt): jetzt im Antippen erkennen
@@ -335,9 +336,9 @@ export async function renderTrain(root, recId) {
     },
   });
   // „1“ und „Tap“ direkt in der Leiste (ohne Tastatur sonst nur im Menü erreichbar, das dann das Video verdeckt)
-  const bOne = ctl('1', { title: 'Anfangscount: hier ist die 1 (Taste 1)', onclick: () => setOne() });
-  const bTap = ctl('Tap', { title: 'Im Takt tippen, ab einer „1“ mindestens viermal (Taste T)', onclick: () => tap() });
-  const bBpm = fixed(ctl('', { title: 'Takt einstellen', onclick: e => popover(e.currentTarget, countPop) }), 9);
+  const bOne = ctl('1', { title: tr('Anfangscount: hier ist die 1 (Taste 1)'), onclick: () => setOne() });
+  const bTap = ctl('Tap', { title: tr('Im Takt tippen, ab einer „1“ mindestens viermal (Taste T)'), onclick: () => tap() });
+  const bBpm = fixed(ctl('', { title: tr('Takt einstellen'), onclick: e => popover(e.currentTarget, countPop) }), 9);
   bBpm.classList.add('bpm');
   const toggleFull = () => {
     if (document.fullscreenElement) { document.exitFullscreen(); return; }
@@ -345,11 +346,11 @@ export async function renderTrain(root, recId) {
     // iPhone kennt Vollbild nur für das Video selbst (eigener Player, ohne 8er-Overlay)
     if (req) req.call(stage); else video.webkitEnterFullscreen?.();
   };
-  const bFull = h('button.ctl.icon-ctl', { type: 'button', title: tt('Vollbild (F)', 'Vollbild'), 'aria-label': 'Vollbild', html: icon('full'), onclick: toggleFull });
+  const bFull = h('button.ctl.icon-ctl', { type: 'button', title: tt(tr('Vollbild (F)'), tr('Vollbild')), 'aria-label': tr('Vollbild'), html: icon('full'), onclick: toggleFull });
   // Video: Breite füllen (Bild wird oben/unten beschnitten) oder komplett zeigen
   let fit = settings().videoFit === 'width' ? 'width' : 'all';
-  const bFitW = h('button.ctl.icon-ctl', { type: 'button', title: 'Breite füllen', 'aria-label': 'Breite füllen', html: icon('fitWidth') });
-  const bFitA = h('button.ctl.icon-ctl', { type: 'button', title: 'Komplett zeigen', 'aria-label': 'Komplett zeigen', html: icon('fitAll') });
+  const bFitW = h('button.ctl.icon-ctl', { type: 'button', title: tr('Breite füllen'), 'aria-label': tr('Breite füllen'), html: icon('fitWidth') });
+  const bFitA = h('button.ctl.icon-ctl', { type: 'button', title: tr('Komplett zeigen'), 'aria-label': tr('Komplett zeigen'), html: icon('fitAll') });
   const setFit = v => {
     fit = v;
     bFitW.classList.toggle('on', v === 'width');
@@ -417,16 +418,16 @@ export async function renderTrain(root, recId) {
   // nach dem Verschieben kein Play/Pause auslösen
   stage.addEventListener('click', e => { if (panned) { e.stopPropagation(); panned = false; } }, true);
   stage.addEventListener('dblclick', toggleFull);
-  const bMark = h('button.ctl.icon-ctl', { type: 'button', title: 'Marker setzen', 'aria-label': 'Marker setzen', html: icon('marker'), onclick: e => popover(e.currentTarget, markPop) });
+  const bMark = h('button.ctl.icon-ctl', { type: 'button', title: tr('Marker setzen'), 'aria-label': tr('Marker setzen'), html: icon('marker'), onclick: e => popover(e.currentTarget, markPop) });
   const toggleAudio = () => {
-    if (!songBlob) { toast('Erst unter SONG eine Songdatei laden'); return; }
-    if (P.audio !== 'song' && rec.fileOffset === null) { toast('Die Songdatei passt nicht zum Video. Bitte die richtige Datei laden oder den Startpunkt von Hand eintragen.', 5000); return; }
-    if (P.audio !== 'song' && filePos() == null) { toast('Erst den Startpunkt im Song setzen (Startpunkt erkennen)'); return; }
+    if (!songBlob) { toast(tr('Erst unter SONG eine Songdatei laden')); return; }
+    if (P.audio !== 'song' && rec.fileOffset === null) { toast(tr('Die Songdatei passt nicht zum Video. Bitte die richtige Datei laden oder den Startpunkt von Hand eintragen.'), 5000); return; }
+    if (P.audio !== 'song' && filePos() == null) { toast(tr('Erst den Startpunkt im Song setzen (Startpunkt erkennen)')); return; }
     P.audio = P.audio === 'song' ? 'video' : 'song';
     update();
     syncSong(true);
   };
-  const bAudio = h('button.ctl.icon-ctl', { type: 'button', title: 'Ton: Video oder Song', 'aria-label': 'Ton: Video oder Song', html: icon('note'), onclick: toggleAudio });
+  const bAudio = h('button.ctl.icon-ctl', { type: 'button', title: tr('Ton: Video oder Song'), 'aria-label': tr('Ton: Video oder Song'), html: icon('note'), onclick: toggleAudio });
   const timeView = h('span.timeview', '');
   // Bedienleiste in festen Gruppen, überall gleich: Wiedergabe · Loop · Count · Bild & Ansicht.
   // Breit: eine Zeile, Gruppen durch Linien getrennt. Schmaler: Gruppen untereinander bzw. nebeneinander,
@@ -446,10 +447,10 @@ export async function renderTrain(root, recId) {
     applyVideo();
     bMirror.classList.toggle('on', P.mirror);
     // Werte nur im Tooltip, die Leiste zeigt Icons; „on“ = vom Normalwert abweichend
-    bRate.title = `Tempo ${P.rate.toFixed(2)}×${tt(' (↑ / ↓)', '')}`;
+    bRate.title = `${tr('Tempo')} ${num(P.rate, 2)}×${tt(' (↑ / ↓)', '')}`;
     bRate.classList.toggle('on', P.rate !== 1);
     // abweichendes Tempo zusätzlich als Faktor neben der Stoppuhr
-    const rateVal = P.rate !== 1 ? `${P.rate.toFixed(2)}×` : ''; // immer zwei Stellen, z. B. 0.90×
+    const rateVal = P.rate !== 1 ? `${num(P.rate, 2)}×` : ''; // immer zwei Stellen, z. B. 0,90× (Dezimalzeichen je Sprache)
     if (bRate.dataset.val !== rateVal) {
       bRate.innerHTML = icon('tempo') + (rateVal ? `<span class="ctl-val">${rateVal}</span>` : '');
       bRate.dataset.val = rateVal;
@@ -458,7 +459,7 @@ export async function renderTrain(root, recId) {
     const vol = P.muted ? 0 : Math.round(P.volume * 100);
     const volIcon = vol === 0 ? 'vol0' : vol < 50 ? 'vol1' : 'vol2';
     if (bVol.dataset.icon !== volIcon) { bVol.innerHTML = icon(volIcon); bVol.dataset.icon = volIcon; }
-    bVol.title = P.muted ? 'Lautstärke: stumm' : `Lautstärke ${vol} %`;
+    bVol.title = P.muted ? tr('Lautstärke: stumm') : tr('Lautstärke {p} %', { p: vol });
     bVol.classList.toggle('on', vol === 0);
     bImg.classList.toggle('on', P.brightness !== 100 || P.contrast !== 100);
     bIn.classList.toggle('on', P.loopIn != null);
@@ -466,9 +467,9 @@ export async function renderTrain(root, recId) {
     bLoop.classList.toggle('on', P.loopOn);
     bClear.hidden = P.loopIn == null && P.loopOut == null;
     bCount.classList.toggle('on', P.countOn);
-    bBpm.textContent = P.bpm ? `${Math.round(P.bpm * 10) / 10} BPM` : 'BPM ?';
+    bBpm.textContent = P.bpm ? `${num(Math.round(P.bpm * 10) / 10)} BPM` : 'BPM ?';
     bAudio.hidden = !songBlob;
-    bAudio.title = `Ton vom ${songMode() ? 'Song' : 'Video'} · umschalten${tt(' (A)', '')}`;
+    bAudio.title = `${songMode() ? tr('Ton vom Song · umschalten') : tr('Ton vom Video · umschalten')}${tt(' (A)', '')}`;
     bAudio.classList.toggle('on', songMode());
     renderStatic();
     persist();
@@ -506,18 +507,18 @@ export async function renderTrain(root, recId) {
   const small = (label, onclick, on) => h(`button.btn.small${on ? '.primary' : ''}`, { type: 'button', onclick }, label);
 
   const ratePop = () => [
-    ...slider('Tempo', 0.25, 1.5, 0.05, () => P.rate, v => { P.rate = v; }, v => `${v.toFixed(2)}×`),
-    h('div.btns', [0.5, 0.75, 0.9, 1].map(v => small(`${v}×`, () => { P.rate = v; update(); closePop(); }))),
-    h('div.note', 'Tonhöhe bleibt gleich.'),
+    ...slider(tr('Tempo'), 0.25, 1.5, 0.05, () => P.rate, v => { P.rate = v; }, v => `${num(v, 2)}×`),
+    h('div.btns', [0.5, 0.75, 0.9, 1].map(v => small(`${num(v)}×`, () => { P.rate = v; update(); closePop(); }))),
+    h('div.note', tr('Tonhöhe bleibt gleich.')),
   ];
   const volPop = () => [
-    ...slider('Lautstärke', 0, 1, 0.05, () => P.volume, v => { P.volume = v; P.muted = false; }, v => `${Math.round(v * 100)}`),
-    toggle('Stumm', P.muted, v => { P.muted = v; update(); }),
+    ...slider(tr('Lautstärke'), 0, 1, 0.05, () => P.volume, v => { P.volume = v; P.muted = false; }, v => `${Math.round(v * 100)}`),
+    toggle(tr('Stumm'), P.muted, v => { P.muted = v; update(); }),
   ];
   const imgPop = () => [
-    ...slider('Helligkeit', 50, 200, 5, () => P.brightness, v => { P.brightness = v; }, v => `${v}%`),
-    ...slider('Kontrast', 50, 200, 5, () => P.contrast, v => { P.contrast = v; }, v => `${v}%`),
-    h('div.btns', small('Zurücksetzen', () => { P.brightness = P.contrast = 100; update(); closePop(); })),
+    ...slider(tr('Helligkeit'), 50, 200, 5, () => P.brightness, v => { P.brightness = v; }, v => `${v}%`),
+    ...slider(tr('Kontrast'), 50, 200, 5, () => P.contrast, v => { P.contrast = v; }, v => `${v}%`),
+    h('div.btns', small(tr('Zurücksetzen'), () => { P.brightness = P.contrast = 100; update(); closePop(); })),
   ];
   const markPop = () => [
     h('div.btns.btns-col', Object.entries(MARKER_TYPES).map(([type, m]) => small(tt(`${m.label} (${m.key})`, m.label), () => { addMarker(type); closePop(); }))),
@@ -526,27 +527,27 @@ export async function renderTrain(root, recId) {
     const bpmIn = h('input.bpm-input', { type: 'number', step: '0.1', min: '40', max: '240', value: P.bpm ? Math.round(P.bpm * 10) / 10 : '' });
     bpmIn.addEventListener('change', () => { const v = Number(bpmIn.value); if (v >= 40 && v <= 240) { P.bpm = v; P.manualBeat = true; update(); } });
     return [
-      h('div.pop-head', h('span', 'Tempo (BPM)'), h('button.pop-close', { type: 'button', title: 'Schließen', 'aria-label': 'Schließen', onclick: closePop }, '×')),
+      h('div.pop-head', h('span', tr('Tempo (BPM)')), h('button.pop-close', { type: 'button', title: tr('Schließen'), 'aria-label': tr('Schließen'), onclick: closePop }, '×')),
       bpmIn,
       // BPM nachstellen: grob ±1, fein ±0,1 (statt halbieren/verdoppeln; die „1“ setzt Anfangscount bzw. Tap)
-      h('div.btns', [-1, -0.1, 0.1, 1].map(d => small(`${d < 0 ? '−' : '+'}${String(Math.abs(d)).replace('.', ',')}`, () => {
+      h('div.btns', [-1, -0.1, 0.1, 1].map(d => small(`${d < 0 ? '−' : '+'}${num(Math.abs(d))}`, () => {
         if (!P.bpm) return;
         P.bpm = Math.min(240, Math.max(40, Math.round((P.bpm + d) * 10) / 10));
         P.manualBeat = true; provisionalBpm = false; update(); bpmIn.value = P.bpm;
       }))),
       h('div.btns',
-        small(tt('Anfangscount (1)', 'Anfangscount'), () => setOne()),
-        small(tt('Tap (T)', 'Tap'), () => tap())),
+        small(tt(tr('Anfangscount (1)'), tr('Anfangscount')), () => setOne()),
+        small(tt(tr('Tap (T)'), 'Tap'), () => tap())),
       h('div.btns',
-        small('Neu analysieren', () => { prime(blob); closePop(); P.manualBeat = false; runAnalysis(true); })),
-      toggle('Klick im Takt', P.click, v => { P.click = v; update(); }),
-      h('div.prow', h('span', 'Anzeige')),
+        small(tr('Neu analysieren'), () => { prime(blob); closePop(); P.manualBeat = false; runAnalysis(true); })),
+      toggle(tr('Klick im Takt'), P.click, v => { P.click = v; update(); }),
+      h('div.prow', h('span', tr('Anzeige'))),
       h('div.btns', [['s', 'S'], ['m', 'M'], ['l', 'L'], ['xl', 'XL']].map(([k, l]) =>
         small(l, () => { C.size = k; saveCountView(C); update(); refreshPop(); }, C.size === k))),
       h('div.btns', [['tl', '↖'], ['tr', '↗'], ['c', '·'], ['bl', '↙'], ['br', '↘']].map(([k, l]) =>
         small(l, () => { C.pos = k; saveCountView(C); update(); refreshPop(); }, C.pos === k))),
-      toggle('Halbe „+“', C.plus, v => { C.plus = v; saveCountView(C); update(); }),
-      toggle('Zähler', C.show, v => { C.show = v; saveCountView(C); update(); }),
+      toggle(tr('Halbe „+“'), C.plus, v => { C.plus = v; saveCountView(C); update(); }),
+      toggle(tr('Zähler'), C.show, v => { C.show = v; saveCountView(C); update(); }),
     ];
   };
 
@@ -567,7 +568,7 @@ export async function renderTrain(root, recId) {
     update();
   }
   function setOne() {
-    if (!P.bpm) { toast('Erst Tempo setzen (Tap oder BPM)'); return; }
+    if (!P.bpm) { toast(tr('Erst Tempo setzen (Tap oder BPM)')); return; }
     const beat = 60 / P.bpm;
     // Beat-Raster behalten, die nächstgelegene Zählzeit wird zur „1“
     const k = Math.round((video.currentTime - P.anchor) / beat);
@@ -575,7 +576,7 @@ export async function renderTrain(root, recId) {
     P.manualBeat = true;
     P.countOn = true;
     update();
-    toast('„1“ gesetzt');
+    toast(tr('„1“ gesetzt'));
   }
   let taps = [];
   function tap() {
@@ -635,19 +636,19 @@ export async function renderTrain(root, recId) {
 
   // ── Beat-Analyse ──
   async function runAnalysis(force) {
-    status.textContent = 'ANALYSIERE TAKT …';
+    status.textContent = tr('ANALYSIERE TAKT …');
     try {
       const r = await analyzeBeat(blob, song?.bpm);
       P.bpm = r.bpm;
       P.anchor = r.anchor;
       choreo.bpm = r.bpm;
       db.put('choreos', choreo);
-      status.textContent = `${Math.round(r.bpm)} BPM ERKANNT · „1“ PRÜFEN`;
+      status.textContent = tr('{bpm} BPM ERKANNT · „1“ PRÜFEN', { bpm: Math.round(r.bpm) });
       if (force) P.countOn = true;
     } catch (e) {
       console.warn(e);
       if (!P.bpm && song?.bpm) { P.bpm = song.bpm; P.anchor = 0; }
-      status.textContent = tt('TAKT NICHT ERKANNT · TAPPEN (T)', 'TAKT NICHT ERKANNT · TAP IM BPM-MENÜ');
+      status.textContent = tt(tr('TAKT NICHT ERKANNT · TAPPEN (T)'), tr('TAKT NICHT ERKANNT · TAP IM BPM-MENÜ'));
     }
     rec.beatTried = true;
     update();
@@ -691,7 +692,7 @@ export async function renderTrain(root, recId) {
     }
 
     vFill.style.width = vPh.style.left = `${(t / d) * 100}%`;
-    const songPos = song?.duration && rec.songOffset != null ? ` · Song ${fmt(rec.songOffset + t)}` : '';
+    const songPos = song?.duration && rec.songOffset != null ? ` · ${tr('Song')} ${fmt(rec.songOffset + t)}` : '';
     setText(timeView, `${fmt(t, true)} / ${fmt(d, true)}${songPos}`);
     const playIcon = video.paused ? 'play' : 'pause';
     if (bPlay.dataset.icon !== playIcon) { bPlay.innerHTML = icon(playIcon); bPlay.dataset.icon = playIcon; }
@@ -771,7 +772,7 @@ export async function renderTrain(root, recId) {
         renderRating();
       },
     }, v)));
-    ratingHint.textContent = cur ? `${cur}/5 · ${RATING_HINT[cur]}` : '1 = noch gar nicht · 5 = sitzt';
+    ratingHint.textContent = cur ? `${cur}/5 · ${RATING_HINT[cur]}` : tr('1 = noch gar nicht · 5 = sitzt');
   }
 
   // Klick auf einen Marker blendet rechts in seiner Zeile Icons ein: Umbenennen · Hierhin · Auf jetzt setzen · Löschen
@@ -781,7 +782,7 @@ export async function renderTrain(root, recId) {
   // Gibt es noch keinen Marker, steht dafür nur in der Liste ein Beispiel (nicht in rec.markers, wird nie gespeichert)
   let demo = null;
   markerList.showOptions = on => {
-    demo = on && !rec.markers.length ? [{ id: 'tour-demo', t: video.currentTime || 0, type: 'highlight', text: 'Beispiel' }] : null;
+    demo = on && !rec.markers.length ? [{ id: 'tour-demo', t: video.currentTime || 0, type: 'highlight', text: tr('Beispiel') }] : null;
     menuFor = on ? (demo || rec.markers)[0]?.id ?? null : null;
     renaming = false;
     renderMarkers();
@@ -793,9 +794,9 @@ export async function renderTrain(root, recId) {
       // Der Marker trägt seinen Namen selbst; ohne Namen steht dort der Typ
       const kind = h('span.kind', { style: { background: MARKER_TYPES[m.type].color, color: m.type === 'start' || m.type === 'end' ? 'var(--bg)' : '#000' } });
       const editing = menuFor === m.id && renaming;
-      const nameEl = editing ? h('div.name', kind) : h('button.name', { type: 'button', title: 'Marker bearbeiten', onclick: () => { menuFor = menuFor === m.id ? null : m.id; renaming = false; renderMarkers(); } }, kind);
+      const nameEl = editing ? h('div.name', kind) : h('button.name', { type: 'button', title: tr('Marker bearbeiten'), onclick: () => { menuFor = menuFor === m.id ? null : m.id; renaming = false; renderMarkers(); } }, kind);
       const li = h('li',
-        h('button.t', { type: 'button', title: 'Hierhin springen', onclick: () => { video.currentTime = m.t; } }, fmt(m.t, true)),
+        h('button.t', { type: 'button', title: tr('Hierhin springen'), onclick: () => { video.currentTime = m.t; } }, fmt(m.t, true)),
         nameEl);
       if (editing) {
         const input = h('input', { type: 'text', value: m.text || MARKER_TYPES[m.type].label, placeholder: MARKER_TYPES[m.type].label });
@@ -824,16 +825,16 @@ export async function renderTrain(root, recId) {
       if (menuFor === m.id && !renaming) {
         const act = (name, label, fn) => h('button.mk-act', { type: 'button', title: label, 'aria-label': label, html: icon(name), onclick: fn });
         li.append(h('div.menu',
-          act('rename', 'Umbenennen', () => { renaming = true; renderMarkers(); }),
-          act('jump', 'Hierhin springen', () => { video.currentTime = m.t; menuFor = null; renderMarkers(); }),
-          act('setNow', 'Auf jetzt setzen', () => { m.t = video.currentTime; rec.markers.sort((a, b) => a.t - b.t); menuFor = null; update(); renderMarkers(); }),
-          act('trash', 'Löschen', () => { rec.markers = rec.markers.filter(x => x !== m); menuFor = null; update(); renderMarkers(); })));
+          act('rename', tr('Umbenennen'), () => { renaming = true; renderMarkers(); }),
+          act('jump', tr('Hierhin springen'), () => { video.currentTime = m.t; menuFor = null; renderMarkers(); }),
+          act('setNow', tr('Auf jetzt setzen'), () => { m.t = video.currentTime; rec.markers.sort((a, b) => a.t - b.t); menuFor = null; update(); renderMarkers(); }),
+          act('trash', tr('Löschen'), () => { rec.markers = rec.markers.filter(x => x !== m); menuFor = null; update(); renderMarkers(); })));
       }
       return li;
-    }) : [h('li.muted', { style: { display: 'block' } }, tt('Noch keine Marker. Taste S/E/N/H oder Fähnchen in der Leiste.', 'Noch keine Marker. Über das Fähnchen in der Leiste setzen.'))]));
+    }) : [h('li.muted', { style: { display: 'block' } }, tt(tr('Noch keine Marker. Taste S/E/N/H oder Fähnchen in der Leiste.'), tr('Noch keine Marker. Über das Fähnchen in der Leiste setzen.')))]));
   }
 
-  const notesIn = h('textarea', { placeholder: '5, 6, 7, 8 Anmerkungen …' }, rec.notes || '');
+  const notesIn = h('textarea', { placeholder: tr('5, 6, 7, 8 Anmerkungen …') }, rec.notes || '');
   notesIn.addEventListener('input', () => { rec.notes = notesIn.value; saveRec(); });
 
   const offsetIn = h('input.offset-in', { type: 'text', placeholder: '0:00', value: rec.songOffset != null ? fmt(rec.songOffset, true) : '' });
@@ -871,17 +872,17 @@ export async function renderTrain(root, recId) {
   const songFileRow = h('div.song-step');
   async function setSongFile(file) {
     if (!file) return;
-    if (!/^audio\//.test(file.type) && !/\.(mp3|m4a|aac|wav|flac|aiff?)$/i.test(file.name)) { toast('Bitte eine Audiodatei wählen'); return; }
+    if (!/^audio\//.test(file.type) && !/\.(mp3|m4a|aac|wav|flac|aiff?)$/i.test(file.name)) { toast(tr('Bitte eine Audiodatei wählen')); return; }
     // Erst prüfen, ob wirklich Ton drin ist (z. B. als .mp3 gespeicherte Webseite nach Download-Fehler)
-    songFileRow.querySelector('.label')?.replaceChildren('Prüfe Songdatei …');
+    songFileRow.querySelector('.label')?.replaceChildren(tr('Prüfe Songdatei …'));
     const problem = await checkAudio(file);
     if (problem) { toast(problem, 8000); renderSongFile(); return; }
     // Ist es wirklich dieser Song? (Kurz bei Shazam nachfragen; scheitert das, geht es ohne Prüfung weiter)
     if (song?.title) {
-      songFileRow.querySelector('.label')?.replaceChildren('Prüfe, welcher Song in der Datei ist …');
+      songFileRow.querySelector('.label')?.replaceChildren(tr('Prüfe, welcher Song in der Datei ist …'));
       const found = await identifyAudio(file).catch(() => null);
       if (found && !sameSong(found, song)
-        && !(await confirmDialog({ title: 'ANDERER SONG?', text: `Die Datei klingt nach „${[found.artist, found.title].filter(Boolean).join(' — ')}“, die Choreo ist aber „${song.title}“.`, ok: 'Trotzdem verwenden', danger: false }))) {
+        && !(await confirmDialog({ title: tr('ANDERER SONG?'), text: tr('Die Datei klingt nach „{found}“, die Choreo ist aber „{chosen}“.', { found: [found.artist, found.title].filter(Boolean).join(' — '), chosen: song.title }), ok: tr('Trotzdem verwenden'), danger: false }))) {
         renderSongFile();
         return;
       }
@@ -898,13 +899,13 @@ export async function renderTrain(root, recId) {
   function renderSongFile() {
     songFileRow.hidden = !song;
     songFileRow.replaceChildren(songFileIn, songBlob
-      ? h('div', h('span.label.step-label', 'Songdatei'), h('div.actions',
-        h('span.label', `♪ ${songBlob.name || 'Songdatei'}`),
-        h('button.linkbtn', { type: 'button', onclick: () => songFileIn.click() }, 'Ersetzen'),
+      ? h('div', h('span.label.step-label', tr('Songdatei')), h('div.actions',
+        h('span.label', `♪ ${songBlob.name || tr('Songdatei')}`),
+        h('button.linkbtn', { type: 'button', onclick: () => songFileIn.click() }, tr('Ersetzen')),
         h('button.linkbtn', {
           type: 'button',
           onclick: async () => {
-            if (!(await confirmDialog({ title: 'SONGDATEI ENTFERNEN', text: 'Die Songdatei wird aus dieser Choreo entfernt.', ok: 'Entfernen' }))) return;
+            if (!(await confirmDialog({ title: tr('SONGDATEI ENTFERNEN'), text: tr('Die Songdatei wird aus dieser Choreo entfernt.'), ok: tr('Entfernen') }))) return;
             await db.del('videos', songKey);
             songBlob = null;
             delete rec.fileOffset;
@@ -913,18 +914,18 @@ export async function renderTrain(root, recId) {
             renderSongFile();
             update();
           },
-        }, 'Entfernen')))
+        }, tr('Entfernen'))))
       : h('div',
-        h('span.label.step-label', 'Songdatei (optional)'),
-        h('div.actions', h('button.btn.small', { type: 'button', onclick: () => songFileIn.click() }, 'Songdatei laden')),
-        h('div.label', { style: { marginTop: '6px' } }, 'Zum Trainieren auf den Song.')));
+        h('span.label.step-label', tr('Songdatei (optional)')),
+        h('div.actions', h('button.btn.small', { type: 'button', onclick: () => songFileIn.click() }, tr('Songdatei laden'))),
+        h('div.label', { style: { marginTop: '6px' } }, tr('Zum Trainieren auf den Song.'))));
   }
   songFileIn.addEventListener('change', () => setSongFile(songFileIn.files[0]));
   renderSongFile();
 
   const statText = () => {
     const secs = sessions.reduce((a, s) => a + s.seconds, 0) + (session?.seconds || 0);
-    return `Geübt ${fmtDuration(secs)} · zuletzt ${relDate(choreo.lastPracticed)}`;
+    return tr('Geübt {t} · zuletzt {when}', { t: fmtDuration(secs), when: relDate(choreo.lastPracticed) });
   };
   const statLine = h('div.label', statText());
 
@@ -948,45 +949,45 @@ export async function renderTrain(root, recId) {
         : h('a', { href: `#/train/${r.id}` }, recTitle(r, i)),
       h('span.muted', `${fmtRecDate(r.recordedAt)} · ${r.duration ? fmt(r.duration) : ''}`)))),
     h('div.actions', { style: { marginTop: '8px' } },
-      h('a.linkbtn', { href: `#/upload?choreo=${choreo.id}` }, '+ Aufnahme hinzufügen'),
+      h('a.linkbtn', { href: `#/upload?choreo=${choreo.id}` }, tr('+ Aufnahme hinzufügen')),
       h('button.linkbtn', {
         onclick: async () => {
           const last = recs.length === 1;
           if (!(await confirmDialog({
-            title: last ? 'CHOREO LÖSCHEN' : 'AUFNAHME LÖSCHEN',
-            text: last ? 'Das ist die einzige Aufnahme. Sie wird samt Video gelöscht und damit die ganze Choreo.' : `„${recTitle(rec, recIndex)}“ wird samt Video gelöscht.`,
-            ok: 'Löschen',
+            title: last ? tr('CHOREO LÖSCHEN') : tr('AUFNAHME LÖSCHEN'),
+            text: last ? tr('Das ist die einzige Aufnahme. Sie wird samt Video gelöscht und damit die ganze Choreo.') : tr('„{name}“ wird samt Video gelöscht.', { name: recTitle(rec, recIndex) }),
+            ok: tr('Löschen'),
           }))) return;
           deleted = true;
           video.pause();
           await deleteRecording(rec.id);
           if (last) await deleteChoreo(choreo.id);
-          toast(last ? 'Choreo gelöscht' : 'Aufnahme gelöscht');
+          toast(last ? tr('Choreo gelöscht') : tr('Aufnahme gelöscht'));
           const next = recs.find(r => r.id !== rec.id);
           go(next ? `#/train/${next.id}` : `#/class/${cls.id}`, { replace: true });
         },
-      }, 'Aufnahme löschen'),
+      }, tr('Aufnahme löschen')),
       h('button.linkbtn', {
         type: 'button',
         onclick: async () => {
-          try { const r = await exportChoreoDialog(choreo); if (r) toast(`Choreo exportiert${r.files ? `: ${r.files} Dateien (${Math.round(r.bytes / 1e6)} MB)` : ', ohne Videos'}`, 3500); }
-          catch (e) { console.error(e); toast(`Export fehlgeschlagen: ${e.message}`, 5000); }
+          try { const r = await exportChoreoDialog(choreo); if (r) toast(r.files ? tr('Choreo exportiert: {n} Dateien ({mb} MB)', { n: r.files, mb: Math.round(r.bytes / 1e6) }) : tr('Choreo exportiert, ohne Videos'), 3500); }
+          catch (e) { console.error(e); toast(tr('Export fehlgeschlagen: {msg}', { msg: e.message }), 5000); }
         },
-      }, 'Choreo exportieren')),
+      }, tr('Choreo exportieren'))),
   ];
   const KEYS = [
-    ['␣', 'Play/Pause'], ['← →', '±2 s (⇧ ±0,2)'], ['M', 'Spiegeln'], ['↑ ↓', 'Tempo'],
-    ['I / O', 'Loop In/Out'], ['L', 'Loop'], ['C', '8er-Count'], ['T', 'Tap-Tempo'],
-    ['1', 'Anfangscount'], ['S / E', 'Start/Ende'], ['N', 'Notiz'], ['H', 'Highlight'], ['F', 'Vollbild'], ['A', 'Ton Video/Song'], ['P', 'Seitenpanel'], ['⌘Z', 'Rückgängig'], ['⌘⇧Z', 'Wiederherstellen'],
+    ['␣', tr('Play/Pause')], ['← →', tr('±2 s (⇧ ±0,2)')], ['M', tr('Spiegeln')], ['↑ ↓', tr('Tempo')],
+    ['I / O', tr('Loop In/Out')], ['L', 'Loop'], ['C', tr('8er-Count')], ['T', tr('Tap-Tempo')],
+    ['1', tr('Anfangscount')], ['S / E', tr('Start/Ende')], ['N', tr('Notiz')], ['H', tr('Highlight')], ['F', tr('Vollbild')], ['A', tr('Ton Video/Song')], ['P', tr('Seitenpanel')], ['⌘Z', tr('Rückgängig')], ['⌘⇧Z', tr('Wiederherstellen')],
   ];
   const keysBody = [h('div.keys', { style: { '--rows': Math.ceil(KEYS.length / 2) } }, KEYS.map(([k, d]) => h('div', h('kbd', k), ' ', d)))];
   const SECTIONS = {
-    song: ['Song', [picker.el, songFileRow]],
-    marker: ['Marker', [markerList]],
-    notes: ['Notizen', [notesIn]],
-    status: ['Status', [ratingBox, ratingHint, h('div', { style: { marginTop: '8px' } }, statLine)]],
-    recs: ['Aufnahmen', recsBody],
-    ...(isTouch() ? {} : { keys: ['Tasten', keysBody] }), // ohne Tastatur keine Tastenliste
+    song: [tr('Song'), [picker.el, songFileRow]],
+    marker: [tr('Marker'), [markerList]],
+    notes: [tr('Notizen'), [notesIn]],
+    status: [tr('Status'), [ratingBox, ratingHint, h('div', { style: { marginTop: '8px' } }, statLine)]],
+    recs: [tr('Aufnahmen'), recsBody],
+    ...(isTouch() ? {} : { keys: [tr('Tasten'), keysBody] }), // ohne Tastatur keine Tastenliste
   };
   const panelState = settings().panel;
   const side = h('aside.side');
@@ -1018,7 +1019,7 @@ export async function renderTrain(root, recId) {
   // Abschnitt am Griff ziehen und zwischen den anderen ablegen
   // Ganzer Abschnittskopf ist Griff: erst ab 6 px Bewegung wird gezogen, sonst bleibt es ein Klick (auf/zu)
   function sortableSection(sec, head) {
-    head.title = 'Klicken: auf/zu · Ziehen: umsortieren';
+    head.title = tr('Klicken: auf/zu · Ziehen: umsortieren');
     const gate = holdGate(); // Touch: erst halten, dann ziehen (Wischen scrollt)
     head.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
@@ -1061,12 +1062,12 @@ export async function renderTrain(root, recId) {
 
   // Aufnahmetag = Class-Tag → Wochentag steht schon beim Class-Tag, nicht noch einmal am Datum
   const sameDay = !!cls.weekday && !!rec.recordedAt && WEEKDAYS[(new Date(rec.recordedAt).getDay() + 6) % 7] === cls.weekday;
-  const panelBtn = h('button.ctl.icon-ctl.panel-btn', { type: 'button', title: 'Seitenpanel ein/aus (P)', 'aria-label': 'Seitenpanel ein/aus' });
+  const panelBtn = h('button.ctl.icon-ctl.panel-btn', { type: 'button', title: tr('Seitenpanel ein/aus (P)'), 'aria-label': tr('Seitenpanel ein/aus') });
   const panelIcon = open => { panelBtn.innerHTML = icon(open ? 'panelOpen' : 'panelClosed'); panelBtn.classList.toggle('on', open); };
   // Titel und Interpret einzeilig (zu lang → „…“, beim Darüberfahren läuft er langsam durch), damit das Video mehr
   // Höhe bekommt. Schmale Spalte (Handy): mehrzeilig, dort steht er über dem Video und kostet keine Bildbreite.
   const titleInner = h('span.tt-inner',
-    inlineEdit((choreo.title || song?.title || 'Ohne Song').toUpperCase(), async v => { choreo.title = v; await db.put('choreos', choreo); }), song?.artist ? h('span.muted', { style: { fontWeight: 600 } }, ` — ${song.artist.toUpperCase()}`) : '');
+    inlineEdit((choreo.title || song?.title || tr('Ohne Song')).toUpperCase(), async v => { choreo.title = v; await db.put('choreos', choreo); }), song?.artist ? h('span.muted', { style: { fontWeight: 600 } }, ` — ${song.artist.toUpperCase()}`) : '');
   const titleEl = h('h1.wide.train-title', titleInner);
   titleEl.addEventListener('mouseenter', () => {
     const shift = titleEl.scrollWidth - titleEl.clientWidth;
@@ -1149,7 +1150,7 @@ export async function renderTrain(root, recId) {
   if (!P.bpm && !rec.beatTried) {
     if (needsCapture(blob)) {
       if (song?.bpm) { P.bpm = song.bpm; P.anchor = 0; provisionalBpm = true; } // vorläufig Deezer-Tempo, Erkennung beim Antippen von 8er
-      status.textContent = '8ER ANTIPPEN, DANN WIRD DER TAKT ERMITTELT';
+      status.textContent = tr('8ER ANTIPPEN, DANN WIRD DER TAKT ERMITTELT');
     }
     else setTimeout(() => runAnalysis(false), 300);
   }

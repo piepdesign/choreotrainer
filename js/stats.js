@@ -1,4 +1,5 @@
 // Kennzahlen aus den gespeicherten Daten. Genutzt von Base (Kacheln) und Profil (Details).
+import { tr, tn, num } from './i18n.js';
 import { fmtDuration, relDate } from './util.js';
 
 const DAY = 86400000;
@@ -45,7 +46,7 @@ export function baseStats({ classes, choreos, recordings, sessions, recsByChoreo
   const week = sessions.filter(s => s.start >= ws).reduce((s, x) => s + x.seconds, 0);
   const last = sessions.reduce((m, s) => Math.max(m, s.start), 0);
   const rated = choreos.map(latestRating).filter(Boolean);
-  const avg = rated.length ? (rated.reduce((a, b) => a + b, 0) / rated.length).toFixed(1).replace('.', ',') : '—';
+  const avg = rated.length ? num(rated.reduce((a, b) => a + b, 0) / rated.length, 1) : '—';
   const lengths = choreos.map(c => choreoLength(recsByChoreo[c.id]));
   const known = lengths.filter(x => x != null);
   const streak = practiceStreak(sessions);
@@ -57,9 +58,9 @@ export function baseStats({ classes, choreos, recordings, sessions, recsByChoreo
     choreos: { value: String(choreos.length) },
     duration: {
       value: known.length ? fmtMin(known.reduce((a, b) => a + b, 0)) : '—',
-      hint: known.length < choreos.length ? `${known.length} von ${choreos.length === 1 ? '1 Choreo' : `${choreos.length} Choreos`} mit Start/Ende` : 'aus Start/Ende bzw. In/Out',
+      hint: known.length < choreos.length ? tr('{n} von {total} mit Start/Ende', { n: known.length, total: tn(choreos.length, 'Choreo', 'Choreos') }) : tr('aus Start/Ende bzw. In/Out'),
     },
-    streak: { value: streak ? `${streak} ${streak === 1 ? 'Tag' : 'Tage'}` : '—' },
+    streak: { value: streak ? tn(streak, 'Tag', 'Tage') : '—' },
     classes: { value: String(classes.length) },
     recordings: { value: String(recordings.length) },
     sessions: { value: String(sessions.filter(s => s.seconds >= 30).length) },

@@ -1,6 +1,7 @@
 // Intro beim ersten Öffnen: Wortmarke → Name → Classes → Präferenzen → App (nur im Browser) → „wird vorbereitet“.
 // Läuft einmal (auch für bestehende Nutzer*innen, vorhandene Classes sind vorbelegt).
 // Navigation unten fest: „<“ zurück, „Später“, „>“ weiter. Gleiche Größe und Stelle in jedem Schritt.
+import { tr, lang, LANGS, setLang } from './i18n.js';
 import { h, isTouch, tt } from './util.js';
 import { settings, saveSettings, applyTheme, BASE_STATS } from './settings.js';
 import { classManager } from './classform.js';
@@ -11,14 +12,15 @@ import { db } from './db.js';
 import { isInstalled, isIOS, installApp } from './backup.js';
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
+const GLOBE = '<svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M2.5 10h15M10 2.5c2.6 2.4 2.6 12.6 0 15M10 2.5c-2.6 2.4-2.6 12.6 0 15"/></svg>';
 const arrow = dir => `<svg viewBox="0 0 14 24" width="14" height="24" aria-hidden="true"><path d="${dir === 'next' ? 'M2 2l10 10-10 10' : 'M12 2 2 12l10 10'}" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>`;
 
 export async function runIntro() {
   const box = h('div.intro');
   const stage = h('div.intro-stage');
-  const back = h('button.intro-arrow', { type: 'button', 'aria-label': 'Zurück', html: arrow('back') });
-  const later = h('button.linkbtn.intro-later', { type: 'button' }, 'Später');
-  const next = h('button.intro-arrow', { type: 'button', 'aria-label': 'Weiter', html: arrow('next') });
+  const back = h('button.intro-arrow', { type: 'button', 'aria-label': tr('Zurück'), html: arrow('back') });
+  const later = h('button.linkbtn.intro-later', { type: 'button' }, tr('Später'));
+  const next = h('button.intro-arrow', { type: 'button', 'aria-label': tr('Weiter'), html: arrow('next') });
   const nav = h('div.intro-nav', back, later, next);
   // Navigation direkt unter dem Inhalt (statt am Bildschirmrand), beides zusammen mittig
   box.append(h('div.intro-frame', stage, nav));
@@ -40,16 +42,21 @@ export async function runIntro() {
   const mark = cls => h(`h1.wide.intro-mark${cls}`,
     h('span.line', letters('CHOREO—', 0)),
     h('span.line', letters('TRAINER', 7), h('sup', '©')));
-  await show(h('div.intro-step.center', mark('')), { navVisible: false });
-  await wait(13 * 50 + 750 + 1000);
+  // Nach einem Sprachwechsel (lädt neu) ohne Wortmarke direkt beim Namen weiter, Eingabe bleibt
+  let resume = null;
+  try { resume = JSON.parse(sessionStorage.getItem('ct-intro-resume')); sessionStorage.removeItem('ct-intro-resume'); } catch { /* neu */ }
+  if (!resume) {
+    await show(h('div.intro-step.center', mark('')), { navVisible: false });
+    await wait(13 * 50 + 750 + 1000);
+  }
 
-  const state = { name: settings().name || '', provider: settings().provider, theme: settings().theme, baseStats: [...settings().baseStats], hoverPreview: settings().hoverPreview, tester: settings().tester, appHint: settings().appHint, appChoice: null };
+  const state = { name: resume?.name ?? (settings().name || ''), provider: settings().provider, theme: settings().theme, baseStats: [...settings().baseStats], hoverPreview: settings().hoverPreview, tester: settings().tester, appHint: settings().appHint, appChoice: null };
 
   // Ein Schritt = { render(), canGo(), skippable }
   const steps = [
     {
       render() {
-        const input = h('input.intro-input', { type: 'text', autofocus: true, value: state.name, placeholder: 'DEIN NAME', autocomplete: 'off', spellcheck: 'false' });
+        const input = h('input.intro-input', { type: 'text', autofocus: true, value: state.name, placeholder: tr('DEIN NAME'), autocomplete: 'off', spellcheck: 'false' });
         const sync = () => { state.name = input.value.trim().toUpperCase(); refreshNav(); };
         input.addEventListener('input', sync);
         input.addEventListener('keydown', e => { if (e.key === 'Enter' && state.name) go(1); });
@@ -70,8 +77,27 @@ export async function runIntro() {
           sync();
         };
         addEventListener('keydown', grab, true);
+        // Sprache: Weltkugel mit Kürzel unter dem Namen, klappt die Sprachen aus; Wahl lädt neu (Name bleibt)
+        const langBtn = h('button.lang-btn', { type: 'button', title: tr('Sprache'), 'aria-label': tr('Sprache'), 'aria-haspopup': 'menu', 'aria-expanded': 'false', html: `${GLOBE}<span>${lang.toUpperCase()}</span>` });
+        let menu = null;
+        const closeMenu = () => { menu?.remove(); menu = null; langBtn.setAttribute('aria-expanded', 'false'); };
+        langBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          if (menu) { closeMenu(); return; }
+          menu = h('div.theme-menu.lang-menu', { role: 'menu' }, LANGS.map(([id, name]) => h(`button${id === lang ? '.on' : ''}`, {
+            type: 'button', role: 'menuitemradio', 'aria-checked': String(id === lang), lang: id,
+            onclick: () => {
+              if (id === lang) { closeMenu(); return; }
+              try { sessionStorage.setItem('ct-intro-resume', JSON.stringify({ name: input.value.trim().toUpperCase() })); } catch { /* egal */ }
+              setLang(id);
+            },
+          }, h('b', id.toUpperCase()), name)));
+          langBtn.after(menu);
+          langBtn.setAttribute('aria-expanded', 'true');
+        });
+        addEventListener('pointerdown', e => { if (menu && !menu.contains(e.target) && !langBtn.contains(e.target)) closeMenu(); });
         // breite Linie bleibt, das Feld selbst ist so breit wie der Inhalt: Cursor steht direkt vor „DEIN NAME“
-        return h('div.intro-step.center', h('h1.wide', 'HI, WIE HEISST DU?'), h('label.intro-field', input));
+        return h('div.intro-step.center', h('h1.wide', tr('HI, WIE HEISST DU?')), h('label.intro-field', input), h('div.intro-lang', langBtn));
       },
       canGo: () => !!state.name,
     },
@@ -83,8 +109,8 @@ export async function runIntro() {
         classMgr.addEventListener('input', () => refreshNav());
         classMgr.addEventListener('change', () => refreshNav());
         return h('div.intro-step',
-          h('h1.wide', `WILLKOMMEN, ${state.name.toUpperCase()}.`),
-          h('p.intro-lead', 'Welche Class(es) besuchst du regelmäßig?'),
+          h('h1.wide', tr('WILLKOMMEN, {name}.', { name: state.name.toUpperCase() })),
+          h('p.intro-lead', tr('Welche Class(es) besuchst du regelmäßig?')),
           classMgr);
       },
       canGo: async () => !!classMgr?.form.hasDraft() || (await db.all('classes')).length > 0,
@@ -94,8 +120,8 @@ export async function runIntro() {
     {
       render() {
         return h('div.intro-step',
-          h('h1.wide', 'DEINE PRÄFERENZEN'),
-          h('p.intro-lead', '(Alles später im Profil änderbar)'),
+          h('h1.wide', tr('DEINE PRÄFERENZEN')),
+          h('p.intro-lead', tr('(Alles später unter Einstellungen änderbar)')),
           preferences(state, patch => { Object.assign(state, patch); if (patch.theme) applyTheme(patch.theme); refreshNav(); },
             loadAll().then(baseStats), { baseLabel: false, tester: true, hints: true }));
       },
@@ -123,14 +149,14 @@ export async function runIntro() {
           },
         }, h('i.brand', { html: svg(id) }), h('span', label));
         const tiles = h('div.provider-tiles.app-choice', { role: 'radiogroup' },
-          choice('install', 'Installieren', async () => { state.appHint = true; return installApp(); }),
-          choice('browser', 'Im Browser nutzen', () => { state.appHint = false; }));
+          choice('install', tr('Installieren'), async () => { state.appHint = true; return installApp(); }),
+          choice('browser', tr('Im Browser nutzen'), () => { state.appHint = false; }));
         return h('div.intro-step',
-          h('h1.wide', 'ALS APP NUTZEN?'),
-          h('p.intro-lead', 'Installiert startet ChoreoTrainer wie eine eigene App, auch ohne Internet, und der Browser räumt deine Daten nicht von sich aus.'),
+          h('h1.wide', tr('ALS APP NUTZEN?')),
+          h('p.intro-lead', tr('Installiert startet ChoreoTrainer wie eine eigene App, auch ohne Internet, und der Browser räumt deine Daten nicht von sich aus.')),
           tiles,
-          isIOS() ? h('p.intro-lead', 'Am iPhone hat die installierte App einen eigenen Speicher. Am besten jetzt installieren und dort weitermachen.') : null,
-          h('p.intro-lead', '(Jederzeit unter Einstellungen › App)'));
+          isIOS() ? h('p.intro-lead', tr('Am iPhone hat die installierte App einen eigenen Speicher. Am besten jetzt installieren und dort weitermachen.')) : null,
+          h('p.intro-lead', tr('(Jederzeit unter Einstellungen › App)')));
       },
       canGo: () => !!state.appChoice, // „>“ erst nach einer Wahl (abgebrochene Installation hebt sie wieder auf)
       skippable: true,
@@ -174,9 +200,9 @@ export async function runIntro() {
 
   // 5 · Übergang, mind. 3 s, damit alles lädt und der Text gelesen werden kann
   await show(h('div.intro-step.center',
-    h('p.intro-lead', `Einen Moment ${state.name.toUpperCase()}, dein`),
+    h('p.intro-lead', tr('Einen Moment {name}, dein', { name: state.name.toUpperCase() })),
     mark('.static'),
-    h('p.intro-lead', 'wird vorbereitet …'),
+    h('p.intro-lead', tr('wird vorbereitet …')),
     h('div.intro-bar', h('i'))), { navVisible: false });
   await saveSettings({ introDone: true });
   await wait(3000);

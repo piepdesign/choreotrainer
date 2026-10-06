@@ -1,6 +1,7 @@
 // Tempo- und Beat-Schätzung aus der Tonspur des Videos, komplett im Browser.
 // Ergebnis: { bpm, anchor } – anchor ist die Zeit (s) eines Beats im Video.
 // Welcher Beat die „1“ einer Acht ist, kann die Automatik nicht wissen → Tap-Korrektur im Player.
+import { tr } from './i18n.js';
 import { decodeAudio } from './audio.js';
 
 const SR = 22050;
@@ -8,10 +9,10 @@ const HOP = 256;
 const FPS = SR / HOP;
 
 export async function analyzeBeat(blob, priorBpm) {
-  if (blob.size > 1.2e9) throw new Error('Datei zu groß für die Analyse');
+  if (blob.size > 1.2e9) throw new Error(tr('Datei zu groß für die Analyse'));
   const audio = await decodeAudio(blob, SR); // auf Handys ggf. per Mithören
   const env = onsetEnvelope(mixdown(audio));
-  if (env.length < FPS * 8) throw new Error('Audio zu kurz');
+  if (env.length < FPS * 8) throw new Error(tr('Audio zu kurz'));
 
   const coarse = coarseTempo(env, priorBpm);
   let { bpm, phase } = pickMetrical(env, coarse);

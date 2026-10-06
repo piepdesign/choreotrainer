@@ -5,6 +5,7 @@
 // Import: Choreos landen in ihrer Class, wenn es die schon gibt (gleiche ID oder gleiche Angaben). Sonst wird gefragt:
 // in eine bestehende Class einfügen oder aus den Angaben eine neue anlegen. Schon vorhandene Choreos (gleiche ID)
 // kommen als Kopie dazu, nichts wird überschrieben.
+import { tr, tn } from './i18n.js';
 import { db, uid, untracked } from './db.js';
 import { packFile, unpackFile } from './backup.js';
 import { h, isTouch, classTitle, classMeta, byClassOrder, PALETTE } from './util.js';
@@ -15,7 +16,7 @@ const KEYS = ['category', 'level', 'weekday', 'time', 'coach'];
 const norm = s => String(s || '').trim().toLowerCase();
 const slug = s => norm(s).normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'export';
 const label = c => [classTitle(c), classMeta(c)].filter(Boolean).join(' · ');
-const choreoName = c => c.title || c.song?.title || 'Ohne Song';
+const choreoName = c => c.title || c.song?.title || tr('Ohne Song');
 
 // ── Export ──
 async function collectChoreos(choreos, videos) {
@@ -67,23 +68,23 @@ export async function exportClassDialog(cls) {
   let mode = choreos.length ? 'all' : 'none', videos = true;
   const checks = choreos.map(c => h('input', { type: 'checkbox', checked: true, value: c.id }));
   const list = h('div.share-list', { hidden: true }, choreos.map((c, i) => h('label.share-item', checks[i], h('span', choreoName(c)))));
-  const modeSeg = seg([['all', 'Alle'], ['pick', 'Auswahl'], ['none', 'Ohne']].filter(([v]) => choreos.length || v === 'none'),
+  const modeSeg = seg([['all', tr('Alle')], ['pick', tr('Auswahl')], ['none', tr('Ohne')]].filter(([v]) => choreos.length || v === 'none'),
     () => mode, v => { mode = v; list.hidden = v !== 'pick'; });
-  const go = await dialog('CLASS EXPORTIEREN', [
+  const go = await dialog(tr('CLASS EXPORTIEREN'), [
     h('p.label', label(cls)),
     h('div.field', h('span', 'Choreos'), modeSeg), list,
-    toggle('Mit Videos und Songdateien', videos, v => { videos = v; }),
-  ], [['Exportieren', true, '.primary'], ['Abbrechen', null]]);
+    toggle(tr('Mit Videos und Songdateien'), videos, v => { videos = v; }),
+  ], [[tr('Exportieren'), true, '.primary'], [tr('Abbrechen'), null]]);
   if (!go) return null;
   const ids = mode === 'all' ? choreos.map(c => c.id) : mode === 'pick' ? checks.filter(x => x.checked).map(x => x.value) : [];
   return exportClass(cls, ids, { videos });
 }
 export async function exportChoreoDialog(choreo) {
   let videos = true;
-  const go = await dialog('CHOREO EXPORTIEREN', [
+  const go = await dialog(tr('CHOREO EXPORTIEREN'), [
     h('p.label', choreoName(choreo)),
-    toggle('Mit Videos und Songdateien', videos, v => { videos = v; }),
-  ], [['Exportieren', true, '.primary'], ['Abbrechen', null]]);
+    toggle(tr('Mit Videos und Songdateien'), videos, v => { videos = v; }),
+  ], [[tr('Exportieren'), true, '.primary'], [tr('Abbrechen'), null]]);
   return go ? exportChoreo(choreo, { videos }) : null;
 }
 
@@ -99,8 +100,8 @@ export function chooseFile() {
 }
 export async function readExport(file) {
   const head = await unpackFile(file);
-  if (head?.format === 'choreotrainer-sicherung') throw new Error('Das ist eine vollständige Sicherung. Bitte unter Einstellungen › Daten › Wiederherstellen einspielen.');
-  if (head?.format !== FORMAT || !head.data?.class) throw new Error('Bitte einen Export einer Class oder Choreo (.ctbackup) wählen.');
+  if (head?.format === 'choreotrainer-sicherung') throw new Error(tr('Das ist eine vollständige Sicherung. Bitte unter Einstellungen › Daten › Wiederherstellen einspielen.'));
+  if (head?.format !== FORMAT || !head.data?.class) throw new Error(tr('Bitte einen Export einer Class oder Choreo (.ctbackup) wählen.'));
   return head;
 }
 
@@ -117,10 +118,10 @@ async function targetClass(src, kind, contextClassId) {
   if (kind === 'class' || !classes.length) return fresh(); // ganze Class: so anlegen, wie sie exportiert wurde
   // Choreo, deren Class es hier nicht gibt: fragen
   const select = h('select', classes.map(c => h('option', { value: c.id, selected: c.id === contextClassId }, label(c))));
-  const choice = await dialog('CHOREO IMPORTIEREN', [
-    h('p', `Die Class „${label(src)}“ gibt es hier noch nicht.`),
-    h('label.field', h('span', 'In bestehende Class einfügen'), select),
-  ], [['Einfügen', () => select.value, '.primary'], ['Neue Class anlegen', 'new'], ['Abbrechen', null]]);
+  const choice = await dialog(tr('CHOREO IMPORTIEREN'), [
+    h('p', tr('Die Class „{name}“ gibt es hier noch nicht.', { name: label(src) })),
+    h('label.field', h('span', tr('In bestehende Class einfügen')), select),
+  ], [[tr('Einfügen'), () => select.value, '.primary'], [tr('Neue Class anlegen'), 'new'], [tr('Abbrechen'), null]]);
   if (!choice) return null;
   if (choice === 'new') return fresh();
   return { cls: classes.find(c => c.id === choice), created: false };
@@ -154,7 +155,7 @@ export async function importExport(file, { classId: contextClassId } = {}) {
 
 // Kurzmeldung zum Ergebnis
 export const importSummary = r => [
-  r.createdClass ? `Class „${r.className}“ angelegt` : `In „${r.className}“ eingefügt`,
-  r.choreos ? `${r.choreos} Choreo${r.choreos === 1 ? '' : 's'}${r.copies ? ` (${r.copies} als Kopie, gab es schon)` : ''}` : null,
-  r.choreos && !r.videos ? 'ohne Videos' : null,
+  r.createdClass ? tr('Class „{name}“ angelegt', { name: r.className }) : tr('In „{name}“ eingefügt', { name: r.className }),
+  r.choreos ? `${tn(r.choreos, 'Choreo', 'Choreos')}${r.copies ? ` ${tr('({n} als Kopie, gab es schon)', { n: r.copies })}` : ''}` : null,
+  r.choreos && !r.videos ? tr('ohne Videos') : null,
 ].filter(Boolean).join(', ');

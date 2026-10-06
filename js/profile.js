@@ -1,9 +1,10 @@
 // Profil: Name, ausführliche Auswertung (Heatmap, Übungszeit, Status, Choreos, Classes, Einheiten)
 // und Präferenzen. Diagramme als schlankes SVG: Mengen in Graustufen (eine Skala), Identität über
 // Class-Farben, Werte immer in Textfarbe, Tooltip auf jedem Datenpunkt.
+import { tr, tn, num, lang, locale, dayLabel } from './i18n.js';
 import { db, deleteAllData } from './db.js';
 import { h, tt, isTouch, fmt, fmtDuration, relDate, fmtRecDate, classTitle, stripe, byClassOrder, WEEKDAYS, textOn, plural } from './util.js';
-import { loadAll, dots, choreoCard, recTitle, nextClass, importInto, addRow, newClassDialog } from './hub.js';
+import { loadAll, dots, choreoCard, fitCardLabels, recTitle, nextClass, importInto, addRow, newClassDialog } from './hub.js';
 import { songLink } from './providers.js';
 import { baseStats, latestRating, choreoLength, weekStart, dayKey } from './stats.js';
 import { settings, saveSettings, applyTheme, resetSettings, BASE_STATS } from './settings.js';
@@ -73,7 +74,7 @@ function bars(items, { height = 120, unit = 'min' } = {}) {
     // bei vielen Balken nur jede dritte Beschriftung (die letzte immer), Rest per Tooltip
     h('div.xlabels', items.map((i, k) => h('span', { class: k === top && i.value ? 'peak' : null },
       items.length <= 8 || (items.length - 1 - k) % 3 === 0 ? i.label : ''))),
-    h('div.label.chart-note', items[top]?.value ? `Höchstwert: ${items[top].label} · ${u(items[top].value)}` : 'Noch keine Daten'));
+    h('div.label.chart-note', items[top]?.value ? tr('Höchstwert: {label} · {value}', { label: items[top].label, value: u(items[top].value) }) : tr('Noch keine Daten')));
 }
 
 // Waagrechte Balken mit Namen. items: [{ label, value, color, tip }]
@@ -102,7 +103,8 @@ function heatmap(sessions, choreoTitle, colorOf) {
   const gap = 3, left = 30, top = 22, target = 16; // Zielgröße einer Zelle
   const thisWeek = weekStart();
   const level = sec => (sec <= 0 ? 0 : sec < 600 ? 1 : sec < 1200 ? 2 : sec < 2400 ? 3 : 4);
-  const monthNames = ['JAN', 'FEB', 'MÄR', 'APR', 'MAI', 'JUN', 'JUL', 'AUG', 'SEP', 'OKT', 'NOV', 'DEZ'];
+  // Monatskürzel in der Sprache der App (ohne Punkt, groß)
+  const monthNames = Array.from({ length: 12 }, (_, i) => new Date(2000, i, 15).toLocaleDateString(locale, { month: 'short' }).replace('.', '').toUpperCase().slice(0, 4));
   // In echter Pixelbreite zeichnen, damit die Beschriftung klein und gleich groß bleibt (kein Mitskalieren)
   // Volle Breite: so viele Wochen, wie bei ~16 px Zellen hineinpassen (13 bis 53), Zellen genau auf Breite gestreckt.
   // Die betrachtete Woche (Start: diese Woche) steht in der Mitte, davor Vergangenheit, danach Zukunft.
@@ -132,13 +134,13 @@ function heatmap(sessions, choreoTitle, colorOf) {
         }
         const e = byDay.get(day);
         const sec = e?.sec || 0;
-        const date = new Date(day).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+        const date = new Date(day).toLocaleDateString(locale, { weekday: 'short', day: '2-digit', month: '2-digit' });
         const col = sec ? mainColor(e) : null;
         nodes.push(svg('rect', {
           x: left + w * step, y: top + d * vstep, width: cellW, height: cell, rx: 2,
           class: `hm l${level(sec)}${ws === thisWeek ? ' cur' : ''}`,
           style: col ? `fill:#${col}` : null,
-          'data-tip': sec ? `${date}: ${min(sec) || '<1'} min · ${[...e.choreos].join(', ')}` : `${date}: nicht geübt`,
+          'data-tip': sec ? `${date}: ${min(sec) || '<1'} min · ${[...e.choreos].join(', ')}` : `${date}: ${tr('nicht geübt')}`,
         }));
       }
     }
@@ -146,7 +148,7 @@ function heatmap(sessions, choreoTitle, colorOf) {
     const shown = months.filter((m, i) => i === months.length - 1 || months[i + 1].x - m.x >= 30);
     return svg('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, class: 'heatmap' },
       shown.map(m => svg('text', { x: m.x, y: 12, class: 'axis' }, monthNames[m.m])),
-      ['M', 'D', 'M', 'D', 'F', 'S', 'S'].map((d, k) => svg('text', { x: 0, y: top + k * vstep + cell / 2 + 4, class: 'axis' }, d)),
+      WEEKDAYS.map(code => dayLabel(code)[0]).map((d, k) => svg('text', { x: 0, y: top + k * vstep + cell / 2 + 4, class: 'axis' }, d)),
       // Rahmen um die aktuelle Woche (nur wenn sichtbar)
       curIdx >= 0 && curIdx < weeks ? svg('rect', { x: left + curIdx * step - 2, y: top - 2, width: cellW + 4, height: 7 * vstep + 1, rx: 3, class: 'curweek' }) : null,
       nodes);
@@ -165,17 +167,17 @@ function heatmap(sessions, choreoTitle, colorOf) {
   ro.observe(plot);
   // Navigation: Monat = 4 Wochen, Jahr = 52 Wochen
   const nav = (label, title, weeks) => h('button.ctl', { type: 'button', title, onclick: () => { shift += weeks; redraw(); } }, label);
-  const todayBtn = h('button.ctl', { type: 'button', title: 'Zurück zu heute', onclick: () => { shift = 0; redraw(); } }, 'Heute');
+  const todayBtn = h('button.ctl', { type: 'button', title: tr('Zurück zu heute'), onclick: () => { shift = 0; redraw(); } }, tr('Heute'));
   return h('div.chart.heat',
     h('div.heat-nav',
-      nav('«', 'Ein Jahr zurück', -52), nav('‹', 'Einen Monat zurück', -4), todayBtn, nav('›', 'Einen Monat vor', 4), nav('»', 'Ein Jahr vor', 52),
+      nav('«', tr('Ein Jahr zurück'), -52), nav('‹', tr('Einen Monat zurück'), -4), todayBtn, nav('›', tr('Einen Monat vor'), 4), nav('»', tr('Ein Jahr vor'), 52),
       rangeEl),
     plot,
     h('div.legend',
-      h('span.label', 'Weniger'),
-      h('span.hm-keys', [0, 1, 2, 3, 4].map(l => h(`i.hm-key.l${l}`, { title: ['nicht geübt', '1–9 min', '10–19 min', '20–39 min', 'ab 40 min'][l] }))),
-      h('span.label', 'Mehr'),
-      h('span.label.legend-sep', 'Minuten pro Tag: 1–9 · 10–19 · 20–39 · ab 40')));
+      h('span.label', tr('Weniger')),
+      h('span.hm-keys', [0, 1, 2, 3, 4].map(l => h(`i.hm-key.l${l}`, { title: [tr('nicht geübt'), '1–9 min', '10–19 min', '20–39 min', tr('ab 40 min')][l] }))),
+      h('span.label', tr('Mehr')),
+      h('span.label.legend-sep', tr('Minuten pro Tag: 1–9 · 10–19 · 20–39 · ab 40'))));
 }
 
 // Kleine Verlaufslinie der Status-Bewertungen
@@ -187,7 +189,7 @@ function sparkline(ratings) {
   const y = v => H - 3 - ((v - 1) / 4) * (H - 6);
   return svg('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: 'spark' },
     svg('polyline', { points: pts.map((r, i) => `${x(i)},${y(r.value)}`).join(' '), class: 'spark-line' }),
-    pts.map((r, i) => svg('circle', { cx: x(i), cy: y(r.value), r: 2.5, class: 'spark-dot', 'data-tip': `${fmtRecDate(r.ts)}: Status ${r.value}` })));
+    pts.map((r, i) => svg('circle', { cx: x(i), cy: y(r.value), r: 2.5, class: 'spark-dot', 'data-tip': `${fmtRecDate(r.ts)}: ${tr('Status {n}', { n: r.value })}` })));
 }
 
 // Sortierbare Tabelle: Klick auf eine Spaltenüberschrift sortiert, zweiter Klick dreht die Richtung
@@ -196,12 +198,12 @@ function sortTable(cols, rows, { sort = 0, cls = '', href = null, key = null } =
   let si = sort, sd = cols[sort].dir ?? 1;
   try { const saved = key && JSON.parse(localStorage.getItem(key)); if (saved && cols[saved.i]) { si = saved.i; sd = saved.d; } } catch { /* egal */ }
   const box = h(`div.p-table${cls}`);
-  const cmp = (x, y) => (typeof x === 'string' || typeof y === 'string' ? String(x ?? '').localeCompare(String(y ?? ''), 'de') : (x ?? -Infinity) - (y ?? -Infinity));
+  const cmp = (x, y) => (typeof x === 'string' || typeof y === 'string' ? String(x ?? '').localeCompare(String(y ?? ''), locale) : (x ?? -Infinity) - (y ?? -Infinity));
   function render() {
     const sorted = [...rows].sort((a, b) => cmp(cols[si].value(a), cols[si].value(b)) * sd);
     box.replaceChildren(
       h('div.p-row.head', cols.map((c, i) => h(`button.sort${i === si ? '.on' : ''}`, {
-        type: 'button', title: 'Sortieren',
+        type: 'button', title: tr('Sortieren'),
         onclick: () => {
           if (si === i) sd = -sd; else { si = i; sd = c.dir ?? 1; }
           try { if (key) localStorage.setItem(key, JSON.stringify({ i: si, d: sd })); } catch { /* egal */ }
@@ -211,7 +213,7 @@ function sortTable(cols, rows, { sort = 0, cls = '', href = null, key = null } =
       ...(sorted.length ? sorted.map(r => {
         const link = href?.(r);
         return h(link ? 'a.p-row' : 'div.p-row', { href: link || null }, cols.map(c => h('span', c.cell(r))));
-      }) : [h('p.empty', 'Keine Einträge.')]));
+      }) : [h('p.empty', tr('Keine Einträge.'))]));
   }
   render();
   return box;
@@ -221,7 +223,7 @@ export async function renderProfile(root, section) {
   const all = await loadAll();
   const s = settings();
   const now = Date.now();
-  const titleOf = c => c?.title || c?.song?.title || 'Ohne Song';
+  const titleOf = c => c?.title || c?.song?.title || tr('Ohne Song');
 
   // ── Filter nach Class: gilt für alle Auswertungen, Listen und Diagramme ──
   let filter = '';
@@ -250,14 +252,14 @@ export async function renderProfile(root, section) {
   // ── Kopf ──
   const since = Math.min(...[...all.choreos.map(c => c.created), ...all.sessions.map(x => x.start)].filter(Boolean), now);
   const head = h('section.p-head',
-    h('span.label', 'Profil'),
+    h('span.label', tr('Profil')),
     // Name nur zur Anzeige, geändert wird er in den Einstellungen unter Konto
-    h('h1.wide.p-name', (s.name || 'Dein Name').toUpperCase()),
-    h('p.label', all.choreos.length ? `Dabei seit ${new Date(since).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })} · ${plural(all.choreos.length, 'Choreo', 'Choreos')} · ${plural(all.classes.length, 'Class', 'Classes')}` : 'Noch keine Daten'));
+    h('h1.wide.p-name', (s.name || tr('Dein Name')).toUpperCase()),
+    h('p.label', all.choreos.length ? `${tr('Dabei seit {date}', { date: new Date(since).toLocaleDateString(locale, { month: 'long', year: 'numeric' }) })} · ${plural(all.choreos.length, 'Choreo', 'Choreos')} · ${plural(all.classes.length, 'Class', 'Classes')}` : tr('Noch keine Daten')));
 
   // Reiter: immer nur ein Bereich sichtbar. Alte Abschnittsadressen (z. B. aus Base-Kacheln) zeigen auf den passenden Reiter.
   // Einstellungen sind eine eigene Seite (#/settings, Zahnrad in der Kopfleiste)
-  const TABS = [['overview', 'Übersicht'], ['time', 'Übungszeit'], ['status', 'Status'], ['choreos', 'Choreos']];
+  const TABS = [['overview', tr('Übersicht')], ['time', tr('Übungszeit')], ['status', tr('Status')], ['choreos', 'Choreos']];
   const ALIAS = { classes: 'overview', sessions: 'time', prefs: 'settings', account: 'settings' };
   const settingsPage = (ALIAS[section] || section) === 'settings';
   let current = ALIAS[section] || (TABS.some(t => t[0] === section) ? section : 'overview');
@@ -272,7 +274,7 @@ export async function renderProfile(root, section) {
   };
   const filterRow = all.classes.length > 1 ? h('div.p-filter',
     h('span.label', 'Class'),
-    h('div.optgroup', [['', 'Alle', null], ...all.classes.sort(byClassOrder).map(c => [c.id, classTitle(c), c.color])].map(([id, label, color]) =>
+    h('div.optgroup', [['', tr('Alle'), null], ...all.classes.sort(byClassOrder).map(c => [c.id, classTitle(c), c.color])].map(([id, label, color]) =>
       h(`button.opt${id === filter ? '.on' : ''}`, { type: 'button', onclick: () => setFilter(id) },
         color ? h('i.swatch', { style: { background: `#${color}` } }) : h('i.dot'), label)))) : null;
 
@@ -283,26 +285,27 @@ export async function renderProfile(root, section) {
   const lastS = real.reduce((m, x) => (x.start > (m?.start || 0) ? x : m), null);
   const overview = sect('overview', null,
     h('div.stats',
-      tile('Zuletzt', values.last.value, lastS ? `${choreoTitle(lastS.choreoId)} · ${min(lastS.seconds)} min` : ''),
-      tile('Serie', values.streak.value, 'Tage in Folge'),
-      tile('Tage geübt', String(new Set(real.filter(x => x.start > now - 182 * DAY).map(x => dayKey(x.start))).size), 'in den letzten 26 Wochen'),
-      tile('Dauer gesamt', values.duration.value, values.duration.hint)),
+      tile(tr('Zuletzt'), values.last.value, lastS ? `${choreoTitle(lastS.choreoId)} · ${min(lastS.seconds)} min` : ''),
+      tile(tr('Serie'), values.streak.value, tr('Tage in Folge')),
+      tile(tr('Tage geübt'), String(new Set(real.filter(x => x.start > now - 182 * DAY).map(x => dayKey(x.start))).size), tr('in den letzten 26 Wochen')),
+      tile(tr('Dauer gesamt'), values.duration.value, values.duration.hint)),
     heatmap(real, choreoTitle, colorOf));
 
   // ── Übungszeit ──
   const ws = weekStart();
   const weeksBack = 12;
+  // Beschriftung kurz (3.8. bzw. 3/8), passt unter jeden Balken
   const perWeek = Array.from({ length: weeksBack }, (_, i) => {
     const a = ws - (weeksBack - 1 - i) * 7 * DAY, b = a + 7 * DAY;
     const list = real.filter(x => x.start >= a && x.start < b);
     const d = new Date(a);
-    return { label: `${d.getDate()}.${d.getMonth() + 1}.`, value: min(list.reduce((t, x) => t + x.seconds, 0)), parts: parts(list), now: i === weeksBack - 1, tip: `Woche ab ${d.toLocaleDateString('de-DE')}: ${min(list.reduce((t, x) => t + x.seconds, 0))} min` };
+    return { label: lang === 'de' ? `${d.getDate()}.${d.getMonth() + 1}.` : `${d.getDate()}/${d.getMonth() + 1}`, value: min(list.reduce((t, x) => t + x.seconds, 0)), parts: parts(list), now: i === weeksBack - 1, tip: tr('Woche ab {date}: {n} min', { date: d.toLocaleDateString(locale), n: min(list.reduce((t, x) => t + x.seconds, 0)) }) };
   });
   const perWeekday = WEEKDAYS.map((d, k) => {
     const list = real.filter(x => (new Date(x.start).getDay() + 6) % 7 === k);
-    return { label: d, value: min(list.reduce((t, x) => t + x.seconds, 0)), parts: parts(list) };
+    return { label: dayLabel(d), value: min(list.reduce((t, x) => t + x.seconds, 0)), parts: parts(list) };
   });
-  const slots = [['Morgen', 5, 12], ['Mittag', 12, 17], ['Abend', 17, 22], ['Nacht', 22, 29]];
+  const slots = [[tr('Morgen'), 5, 12], [tr('Mittag'), 12, 17], [tr('Abend'), 17, 22], [tr('Nacht'), 22, 29]];
   const perSlot = slots.map(([label, a, b]) => {
     const list = real.filter(x => { const hh = new Date(x.start).getHours(); const hx = hh < 5 ? hh + 24 : hh; return hx >= a && hx < b; });
     return { label, value: min(list.reduce((t, x) => t + x.seconds, 0)), parts: parts(list) };
@@ -316,38 +319,38 @@ export async function renderProfile(root, section) {
   const rates = real.filter(x => x.avgRate);
   const time = sect('time', null,
     h('div.stats',
-      tile('Diese Woche', values.week.value),
-      tile('30 Tage', fmtDuration(monthSec)),
-      tile('Gesamt', values.total.value),
-      tile('Ø pro Einheit', real.length ? fmtDuration(totalSec / real.length) : '—', plural(real.length, 'Einheit', 'Einheiten')),
-      tile('Ø Tempo', rates.length ? `${(rates.reduce((t, x) => t + x.avgRate, 0) / rates.length).toFixed(2).replace('.', ',')}×` : '—', 'Wiedergabetempo beim Üben')),
+      tile(tr('Diese Woche'), values.week.value),
+      tile(tr('30 Tage'), fmtDuration(monthSec)),
+      tile(tr('Gesamt'), values.total.value),
+      tile(tr('Ø pro Einheit'), real.length ? fmtDuration(totalSec / real.length) : '—', plural(real.length, 'Einheit', tr('Einheiten'))),
+      tile(tr('Ø Tempo'), rates.length ? `${num(rates.reduce((t, x) => t + x.avgRate, 0) / rates.length, 2)}×` : '—', tr('Wiedergabetempo beim Üben'))),
     h('div.p-grid',
-      h('div', h('h3.p-sub', 'Minuten pro Woche'), bars(perWeek)),
-      h('div', h('h3.p-sub', 'Nach Wochentag'), bars(perWeekday)),
-      h('div', h('h3.p-sub', 'Nach Tageszeit'), bars(perSlot)),
-      h('div.span-all', h('h3.p-sub', 'Nach Choreo'), perChoreo.length ? hbars(perChoreo) : h('p.empty', 'Noch keine Übungszeit.'))));
+      h('div', h('h3.p-sub', tr('Minuten pro Woche')), bars(perWeek)),
+      h('div', h('h3.p-sub', tr('Nach Wochentag')), bars(perWeekday)),
+      h('div', h('h3.p-sub', tr('Nach Tageszeit')), bars(perSlot)),
+      h('div.span-all', h('h3.p-sub', tr('Nach Choreo')), perChoreo.length ? hbars(perChoreo) : h('p.empty', tr('Noch keine Übungszeit.')))));
 
   // ── Status ──
   const rated = choreos.filter(c => latestRating(c));
   const dist = [1, 2, 3, 4, 5].map(v => {
     const list = rated.filter(c => latestRating(c) === v);
     return {
-      label: String(v), value: list.length, tip: `Status ${v}: ${plural(list.length, 'Choreo', 'Choreos')}`,
+      label: String(v), value: list.length, tip: `${tr('Status {n}', { n: v })}: ${plural(list.length, 'Choreo', 'Choreos')}`,
       parts: classes.map(c => ({ color: c.color, label: classTitle(c), value: list.filter(x => x.classId === c.id).length })),
     };
   });
   const statusOf = c => latestRating(c) || 0;
   const status = sect('status', null,
     h('div.p-grid',
-      h('div.p-big', h('b.wide', values.status.value), h('span.label', `aus ${plural(rated.length, 'bewerteten Choreo', 'bewerteten Choreos')}`), dots(rated.length ? Math.round(rated.reduce((t, c) => t + latestRating(c), 0) / rated.length) : 0)),
-      h('div', h('h3.p-sub', 'Verteilung'), bars(dist, { height: 90, unit: ['Choreo', 'Choreos'] }))),
+      h('div.p-big', h('b.wide', values.status.value), h('span.label', tr('aus {n}', { n: plural(rated.length, 'bewerteten Choreo', 'bewerteten Choreos') })), dots(rated.length ? Math.round(rated.reduce((t, c) => t + latestRating(c), 0) / rated.length) : 0)),
+      h('div', h('h3.p-sub', tr('Verteilung')), bars(dist, { height: 90, unit: ['Choreo', 'Choreos'] }))),
     sortTable([
       { label: 'Choreo', value: c => titleOf(c), cell: c => [h('i.swatch', { style: { background: `#${classById[c.classId]?.color || 'ccc'}` } }), titleOf(c)] },
-      { label: 'Status', value: statusOf, cell: c => dots(latestRating(c)) },
-      { label: 'Verlauf', value: c => c.ratings?.length || 0, cell: c => sparkline(c.ratings), dir: -1 },
-      { label: 'Zuletzt bewertet', value: c => c.ratings?.at(-1)?.ts || 0, cell: c => h('span.label', c.ratings?.length ? relDate(c.ratings.at(-1).ts) : 'nie'), dir: -1 },
+      { label: tr('Status'), value: statusOf, cell: c => dots(latestRating(c)) },
+      { label: tr('Verlauf'), value: c => c.ratings?.length || 0, cell: c => sparkline(c.ratings), dir: -1 },
+      { label: tr('Zuletzt bewertet'), value: c => c.ratings?.at(-1)?.ts || 0, cell: c => h('span.label', c.ratings?.length ? relDate(c.ratings.at(-1).ts) : tr('nie')), dir: -1 },
     ], choreos, { sort: 1, key: 'ct-sort-status', href: c => ((recsByChoreo[c.id] || []).length ? `#/train/${recsByChoreo[c.id].at(-1).id}` : null) }),
-    h('p.label', `Spaltenüberschrift ${tt('anklicken', 'antippen')} zum Sortieren. Standard: die wackligsten zuerst.`));
+    h('p.label', tt(tr('Spaltenüberschrift anklicken zum Sortieren. Standard: die wackligsten zuerst.'), tr('Spaltenüberschrift antippen zum Sortieren. Standard: die wackligsten zuerst.'))));
 
   // ── Choreos: Galerie / Liste ──
   let view = 'gallery', gsort = 'recent';
@@ -356,20 +359,20 @@ export async function renderProfile(root, section) {
   const secOf = c => real.filter(x => x.choreoId === c.id).reduce((t, x) => t + x.seconds, 0);
   const lenOf = c => choreoLength(recsByChoreo[c.id] || []) || 0;
   const GSORT = {
-    recent: ['Zuletzt geübt', (a, b) => (b.lastPracticed || b.created) - (a.lastPracticed || a.created)],
-    title: ['Titel', (a, b) => titleOf(a).localeCompare(titleOf(b), 'de')],
-    status: ['Status', (a, b) => statusOf(a) - statusOf(b)],
-    time: ['Übungszeit', (a, b) => secOf(b) - secOf(a)],
-    length: ['Länge', (a, b) => lenOf(b) - lenOf(a)],
+    recent: [tr('Zuletzt geübt'), (a, b) => (b.lastPracticed || b.created) - (a.lastPracticed || a.created)],
+    title: [tr('Titel'), (a, b) => titleOf(a).localeCompare(titleOf(b), locale)],
+    status: [tr('Status'), (a, b) => statusOf(a) - statusOf(b)],
+    time: [tr('Übungszeit'), (a, b) => secOf(b) - secOf(a)],
+    length: [tr('Länge'), (a, b) => lenOf(b) - lenOf(a)],
   };
   const sortSel = h('select.inline-select', Object.entries(GSORT).map(([k, [l]]) => h('option', { value: k, selected: k === gsort }, l)));
   sortSel.addEventListener('change', () => { gsort = sortSel.value; try { localStorage.setItem('ct-choreo-sort', gsort); } catch { /* egal */ } renderChoreos(); });
-  const sortWrap = h('label.inline-sort', h('span.label', 'Sortieren'), sortSel);
+  const sortWrap = h('label.inline-sort', h('span.label', tr('Sortieren')), sortSel);
   function renderChoreos() {
     sortWrap.hidden = view !== 'gallery';
     if (view === 'gallery') {
       const list = [...choreos].sort(GSORT[gsort]?.[1] || GSORT.recent[1]);
-      choreoBox.replaceChildren(list.length ? h('div.cards', list.map(c => choreoCard(c, classById[c.classId], recsByChoreo[c.id] || [], urls))) : h('p.empty', 'Noch keine Choreos.'));
+      choreoBox.replaceChildren(list.length ? fitCardLabels(h('div.cards', list.map(c => choreoCard(c, classById[c.classId], recsByChoreo[c.id] || [], urls)))) : h('p.empty', tr('Noch keine Choreos.')));
     } else {
       choreoBox.replaceChildren(sortTable([
         // klein und quadratisch: Song-Cover (Hover = Hörprobe) und Standbild des Videos (zu klein für eine Vorschau)
@@ -378,18 +381,18 @@ export async function renderProfile(root, section) {
           recsByChoreo[c.id]?.at(-1)?.thumb ? h('img.sq-thumb', { src: recsByChoreo[c.id].at(-1).thumb, alt: '' }) : h('i.sq-thumb.blank'),
           h('span.sq-title', titleOf(c))] },
         { label: 'Class', value: c => (classById[c.classId] ? classTitle(classById[c.classId]) : ''), cell: c => [h('i.swatch', { style: { background: `#${classById[c.classId]?.color || 'ccc'}` } }), classById[c.classId] ? classTitle(classById[c.classId]) : '—'] },
-        { label: 'Status', value: statusOf, cell: c => dots(latestRating(c)) },
-        { label: 'Länge', value: lenOf, cell: c => (lenOf(c) ? fmt(lenOf(c)) : '—'), dir: -1 },
-        { label: 'Geübt', value: secOf, cell: c => fmtDuration(secOf(c)), dir: -1 },
-        { label: 'Zuletzt', value: c => c.lastPracticed || 0, cell: c => h('span.label', relDate(c.lastPracticed)), dir: -1 },
+        { label: tr('Status'), value: statusOf, cell: c => dots(latestRating(c)) },
+        { label: tr('Länge'), value: lenOf, cell: c => (lenOf(c) ? fmt(lenOf(c)) : '—'), dir: -1 },
+        { label: tr('Geübt'), value: secOf, cell: c => fmtDuration(secOf(c)), dir: -1 },
+        { label: tr('Zuletzt'), value: c => c.lastPracticed || 0, cell: c => h('span.label', relDate(c.lastPracticed)), dir: -1 },
       ], choreos, { sort: 5, cls: '.wide6', key: 'ct-sort-choreos', href: c => ((recsByChoreo[c.id] || []).length ? `#/train/${recsByChoreo[c.id].at(-1).id}` : null) }));
     }
     viewSeg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === view));
   }
-  const viewSeg = h('div.seg', [['gallery', 'Galerie'], ['list', 'Liste']].map(([v, l]) => h('button.ctl', { type: 'button', 'data-v': v, onclick: () => { view = v; try { localStorage.setItem('ct-choreo-view', v); } catch { /* egal */ } renderChoreos(); } }, l)));
-  const choreoSec = sect('choreos', null, h('div.actions.p-tools', viewSeg, sortWrap, h('span.label', `${choreos.length} insgesamt`)), choreoBox,
+  const viewSeg = h('div.seg', [['gallery', tr('Galerie')], ['list', tr('Liste')]].map(([v, l]) => h('button.ctl', { type: 'button', 'data-v': v, onclick: () => { view = v; try { localStorage.setItem('ct-choreo-view', v); } catch { /* egal */ } renderChoreos(); } }, l)));
+  const choreoSec = sect('choreos', null, h('div.actions.p-tools', viewSeg, sortWrap, h('span.label', tr('{n} insgesamt', { n: choreos.length }))), choreoBox,
     // wie in Base und Class-Ansicht: unter der letzten Choreo neu anlegen oder importieren
-    addRow(h('a.btn.small', { href: '#/upload', onclick: () => { state.pendingFile = null; } }, 'Neue Choreo'), () => importInto()));
+    addRow(h('a.btn.small', { href: '#/upload', onclick: () => { state.pendingFile = null; } }, tr('Neue Choreo')), () => importInto()));
   renderChoreos();
 
   // ── Classes ──
@@ -401,27 +404,27 @@ export async function renderProfile(root, section) {
       const nc = nextClass(c)?.split(' · ').at(-1) || '';
       return stripe(c, [plural(mine.length, 'CHOREO', 'CHOREOS'), fmtDuration(sec).toUpperCase(), nc.toUpperCase()]);
     })),
-    addRow(h('button.btn.small', { type: 'button', onclick: newClassDialog }, 'Neue Class'), () => importInto()));
-  const manageSec = sect('manage', 'Classes verwalten', classManager(() => go('#/settings', { keep: true })));
+    addRow(h('button.btn.small', { type: 'button', onclick: newClassDialog }, tr('Neue Class')), () => importInto()));
+  const manageSec = sect('manage', tr('Classes verwalten'), classManager(() => go('#/settings', { keep: true })));
 
   // ── Einheiten ──
   const recent = [...real].sort((a, b) => b.start - a.start).slice(0, 50);
-  const sessionSec = sect('sessions', 'Einheiten',
+  const sessionSec = sect('sessions', tr('Einheiten'),
     recent.length ? sortTable([
-      { label: 'Wann', value: x => x.start, cell: x => new Date(x.start).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }), dir: -1 },
+      { label: tr('Wann'), value: x => x.start, cell: x => new Date(x.start).toLocaleString(locale, { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }), dir: -1 },
       { label: 'Choreo', value: x => choreoTitle(x.choreoId), cell: x => [h('i.swatch', { style: { background: `#${colorOf(x.choreoId) || 'ccc'}` } }), choreoTitle(x.choreoId)] },
-      { label: 'Dauer', value: x => x.seconds, cell: x => fmtDuration(x.seconds), dir: -1 },
-      { label: 'Tempo', value: x => x.avgRate || 0, cell: x => (x.avgRate ? `${x.avgRate.toFixed(2).replace('.', ',')}×` : '—'), dir: -1 },
+      { label: tr('Dauer'), value: x => x.seconds, cell: x => fmtDuration(x.seconds), dir: -1 },
+      { label: tr('Tempo'), value: x => x.avgRate || 0, cell: x => (x.avgRate ? `${num(x.avgRate, 2)}×` : '—'), dir: -1 },
       { label: 'Loops', value: x => x.loops ?? -1, cell: x => (x.loops != null ? String(x.loops) : '—'), dir: -1 },
-    ], recent, { sort: 0, cls: '.wide5', key: 'ct-sort-sessions' }) : h('p.empty', 'Noch keine Einheiten. Gezählt wird, sobald ein Video läuft.'),
-    recent.length ? h('p.label', recent.length === 1 ? 'Eine Einheit.' : `Die letzten ${recent.length} Einheiten.`) : null);
+    ], recent, { sort: 0, cls: '.wide5', key: 'ct-sort-sessions' }) : h('p.empty', tr('Noch keine Einheiten. Gezählt wird, sobald ein Video läuft.')),
+    recent.length ? h('p.label', recent.length === 1 ? tr('Eine Einheit.') : tr('Die letzten {n} Einheiten.', { n: recent.length })) : null);
 
   // ── Präferenzen und Konto ──
-  const prefs = sect('prefs', 'Präferenzen',
-    preferences(s, async patch => { if (patch.theme) applyTheme(patch.theme); await saveSettings(patch); }, baseStats(all)));
+  const prefs = sect('prefs', tr('Präferenzen'),
+    preferences(s, async patch => { if (patch.theme) applyTheme(patch.theme); await saveSettings(patch); }, baseStats(all), { language: true }));
 
-  const nameIn = h('input.caps', { type: 'text', value: (s.name || '').toUpperCase(), placeholder: 'DEIN NAME' });
-  const saveName = async () => { if (!nameIn.value.trim()) return; await saveSettings({ name: nameIn.value.trim().toUpperCase() }); toast('Name gespeichert'); go('#/settings', { keep: true }); };
+  const nameIn = h('input.caps', { type: 'text', value: (s.name || '').toUpperCase(), placeholder: tr('DEIN NAME') });
+  const saveName = async () => { if (!nameIn.value.trim()) return; await saveSettings({ name: nameIn.value.trim().toUpperCase() }); toast(tr('Name gespeichert')); go('#/settings', { keep: true }); };
   nameIn.addEventListener('keydown', e => { if (e.key === 'Enter') saveName(); });
   // Kacheln: Überschrift, Bedienelemente, Knopf. Keine Erklärtexte; was Zurücksetzen/Löschen bewirkt, sagt das Bestätigungsfenster.
   // Kachel als Spalte: Überschrift, ein Satz (bzw. Felder), Knopf. Der Inhalt füllt die Höhe, so sitzen alle Knöpfe einer Reihe auf gleicher Höhe.
@@ -430,45 +433,45 @@ export async function renderProfile(root, section) {
   // An/Aus-Einstellung als Knopf wie die übrigen: Beschriftung zeigt den Zustand, aktiviert = gefüllt
   const onOffBtn = key => {
     const b = h('button.btn.small', { type: 'button' });
-    const show = on => { b.textContent = on ? 'Aktiviert' : 'Deaktiviert'; b.classList.toggle('primary', on); };
+    const show = on => { b.textContent = on ? tr('Aktiviert') : tr('Deaktiviert'); b.classList.toggle('primary', on); };
     b.addEventListener('click', async () => { const on = !settings()[key]; await saveSettings({ [key]: on }); show(on); });
     show(!!settings()[key]);
     return b;
   };
   // Konto: Profil, Tutorial, Neustart, ganz zuletzt das endgültige Löschen
-  const account = sect('account', 'Konto',
+  const account = sect('account', tr('Konto'),
     h('div.acc',
       // Name + Helfer*in in einer Kachel; Helfer*in wirkt sofort (Knopf unten rechts für Bug-Meldungen und Ideen)
-      accRow('Name', [nameIn], h('button.btn.small', { type: 'button', onclick: saveName }, 'Speichern')),
+      accRow(tr('Name'), [nameIn], h('button.btn.small', { type: 'button', onclick: saveName }, tr('Speichern'))),
       // Helfer*in: Schalter statt Knopf, wirkt sofort (Knopf unten rechts für Bug-Meldungen und Ideen)
-      accRow('Helfer*in', [stateLine('Knopf für Bugs und Ideen.')], onOffBtn('tester')),
-      accRow('Tutorial', [stateLine('Zeigt beide Teile noch einmal.')],
+      accRow(tr('Helfer*in'), [stateLine(tr('Knopf für Bugs und Ideen.'))], onOffBtn('tester')),
+      accRow(tr('Tutorial'), [stateLine(tr('Zeigt beide Teile noch einmal.'))],
         h('button.btn.small', {
           type: 'button',
           onclick: async () => { await saveSettings({ tourDone: false, tourTrainDone: false }); go('#/'); },
-        }, 'Starten')),
-      accRow('Neustart', [stateLine('Setzt Präferenzen und Intro zurück.')],
+        }, tr('Starten'))),
+      accRow(tr('Neustart'), [stateLine(tr('Setzt Präferenzen und Intro zurück.'))],
         h('button.btn.small', {
           type: 'button',
           onclick: async () => {
-            if (!(await confirmDialog({ title: 'NEUSTART', text: 'Setzt Name, Präferenzen und Panel-Anordnung zurück, das Intro startet neu. Classes, Choreos, Videos und Statistiken bleiben.', ok: 'Zurücksetzen', danger: false }))) return;
+            if (!(await confirmDialog({ title: tr('NEUSTART'), text: tr('Setzt Name, Präferenzen und Panel-Anordnung zurück, das Intro startet neu. Classes, Choreos, Videos und Statistiken bleiben.'), ok: tr('Zurücksetzen'), danger: false }))) return;
             await resetSettings(); location.hash = '#/'; location.reload();
           },
-        }, 'Zurücksetzen')),
-      accRow('Werkseinstellungen', [stateLine('Löscht alles in diesem Browser.')],
+        }, tr('Zurücksetzen'))),
+      accRow(tr('Werkseinstellungen'), [stateLine(tr('Löscht alles in diesem Browser.'))],
         h('button.btn.small.danger', {
           type: 'button',
           onclick: async () => {
-            if (!(await confirmDialog({ title: 'ALLES LÖSCHEN', text: 'Löscht in diesem Browser alle Classes, Choreos, Videos, Songdateien, Einheiten und das Profil. Lässt sich nicht rückgängig machen.', ok: 'Alles löschen', typeToConfirm: settings().name || 'LÖSCHEN' }))) return;
+            if (!(await confirmDialog({ title: tr('ALLES LÖSCHEN'), text: tr('Löscht in diesem Browser alle Classes, Choreos, Videos, Songdateien, Einheiten und das Profil. Lässt sich nicht rückgängig machen.'), ok: tr('Alles löschen'), typeToConfirm: settings().name || tr('LÖSCHEN') }))) return;
             await deleteAllData();
             location.hash = '#/';
             location.reload();
           },
-        }, 'Löschen'))));
+        }, tr('Löschen')))));
 
   // ── Daten: erst Sichern/Einspielen, dann Zustand (Speicher, App), zuletzt Löschen ──
   const dataBox = h('div.acc');
-  const mb = b => (b >= 1e9 ? `${(b / 1e9).toFixed(1).replace('.', ',')} GB` : `${Math.max(1, Math.round(b / 1e6))} MB`);
+  const mb = b => (b >= 1e9 ? `${num(b / 1e9, 1)} GB` : `${Math.max(1, Math.round(b / 1e6))} MB`);
   const pick = (accept, multiple, onFiles) => {
     const input = h('input', { type: 'file', accept, multiple, hidden: true });
     input.addEventListener('change', () => { if (input.files.length) onFiles([...input.files]); input.remove(); });
@@ -482,22 +485,22 @@ export async function renderProfile(root, section) {
     // Gelöschte Videos gibt der Browser erst frei, wenn die Seite neu geladen wurde (vorher halten Verweise sie fest)
     const pending = (st.idb ?? st.usage ?? 0) - vBytes;
     const cards = [
-      accRow('Sicherung', [stateLine(`Speichert alles als Datei${last ? `, zuletzt ${relDate(last)}` : ''}.`)],
+      accRow(tr('Sicherung'), [stateLine(last ? tr('Speichert alles als Datei, zuletzt {when}.', { when: relDate(last) }) : tr('Speichert alles als Datei.'))],
         h('button.btn.small', {
           type: 'button',
           onclick: async () => {
             // Mit oder ohne Videos erst hier im Fenster wählen
-            if (!(await confirmDialog({ title: 'SICHERN', text: 'Speichert Classes, Choreos, Aufnahmen, Einheiten und Präferenzen als Datei.', ok: 'Sichern', danger: false,
-              extra: [toggle(`Mit Videos und Songdateien${vBytes ? ` (${mb(vBytes)})` : ''}`, withVideos, v => { withVideos = v; })] }))) return;
+            if (!(await confirmDialog({ title: tr('SICHERN'), text: tr('Speichert Classes, Choreos, Aufnahmen, Einheiten und Präferenzen als Datei.'), ok: tr('Sichern'), danger: false,
+              extra: [toggle(`${tr('Mit Videos und Songdateien')}${vBytes ? ` (${mb(vBytes)})` : ''}`, withVideos, v => { withVideos = v; })] }))) return;
             try {
               const r = await exportBackup({ videos: withVideos });
               await saveSettings({ lastBackup: Date.now() });
-              toast(`Gesichert: ${plural(r.counts.choreos, 'Choreo', 'Choreos')}, ${plural(r.counts.recordings, 'Aufnahme', 'Aufnahmen')}${r.videos ? `, ${plural(r.videos, 'Datei', 'Dateien')} (${mb(r.bytes)})` : ''}`, 4000);
+              toast(`${tr('Gesichert: {list}', { list: `${plural(r.counts.choreos, 'Choreo', 'Choreos')}, ${plural(r.counts.recordings, 'Aufnahme', 'Aufnahmen')}` })}${r.videos ? `, ${plural(r.videos, 'Datei', 'Dateien')} (${mb(r.bytes)})` : ''}`, 4000);
               renderData();
-            } catch (e) { console.error(e); toast(`Sichern fehlgeschlagen: ${e.message}`, 5000); }
+            } catch (e) { console.error(e); toast(tr('Sichern fehlgeschlagen: {msg}', { msg: e.message }), 5000); }
           },
-        }, 'Sichern')),
-      accRow('Wiederherstellen', [stateLine('Spielt eine Sicherung ein.')],
+        }, tr('Sichern'))),
+      accRow(tr('Wiederherstellen'), [stateLine(tr('Spielt eine Sicherung ein.'))],
         h('button.btn.small', {
           type: 'button',
           // nur .ctbackup; am Handy ohne Filter (iPhone graut unbekannte Endungen sonst aus), geprüft wird nach dem Wählen
@@ -505,42 +508,42 @@ export async function renderProfile(root, section) {
             try {
               const b = await readBackup(file);
               const n = b.data.choreos?.length || 0, r = b.data.recordings?.length || 0, v = b.videos.length;
-              if (!(await confirmDialog({ title: 'WIEDERHERSTELLEN', text: `Spielt die Sicherung vom ${new Date(b.exportedAt).toLocaleDateString('de-DE')} ein: ${plural(n, 'Choreo', 'Choreos')}, ${plural(r, 'Aufnahme', 'Aufnahmen')}, ${v ? plural(v, 'Video/Songdatei', 'Videos/Songdateien') : 'ohne Videos'}. Gleiche Einträge werden ersetzt, alles andere bleibt.`, ok: 'Einspielen', danger: false }))) return;
-              await restoreBackup(b, (i, all) => toast(`Stelle Videos wieder her … ${i} / ${all}`, 60000));
-              toast('Wiederhergestellt', 2500);
+              if (!(await confirmDialog({ title: tr('WIEDERHERSTELLEN'), text: tr('Spielt die Sicherung vom {date} ein: {list}. Gleiche Einträge werden ersetzt, alles andere bleibt.', { date: new Date(b.exportedAt).toLocaleDateString(locale), list: `${plural(n, 'Choreo', 'Choreos')}, ${plural(r, 'Aufnahme', 'Aufnahmen')}, ${v ? plural(v, 'Video/Songdatei', 'Videos/Songdateien') : tr('ohne Videos')}` }), ok: tr('Einspielen'), danger: false }))) return;
+              await restoreBackup(b, (i, all) => toast(tr('Stelle Videos wieder her … {i} / {n}', { i, n: all }), 60000));
+              toast(tr('Wiederhergestellt'), 2500);
               setTimeout(() => location.reload(), 600); // Einstellungen und Ansichten frisch laden
             } catch (e) { console.error(e); toast(e.message, 5000); }
           }),
-        }, 'Einspielen')),
-      accRow('Importieren', [stateLine('Übernimmt eine Class oder Choreo.')],
-        h('button.btn.small', { type: 'button', onclick: () => importInto() }, 'Importieren')),
+        }, tr('Einspielen'))),
+      accRow(tr('Importieren'), [stateLine(tr('Übernimmt eine Class oder Choreo.'))],
+        h('button.btn.small', { type: 'button', onclick: () => importInto() }, tr('Importieren'))),
     ];
-    if (missing.length) cards.push(accRow('Videos zuordnen', [stateLine(`${plural(missing.length, 'Aufnahme', 'Aufnahmen')} ohne Video.`)],
+    if (missing.length) cards.push(accRow(tr('Videos zuordnen'), [stateLine(tr('{recs} ohne Video.', { recs: plural(missing.length, 'Aufnahme', 'Aufnahmen') }))],
       h('button.btn.small', {
         type: 'button',
         onclick: () => pick('video/*', true, async files => {
-          toast('Ordne zu …', 1500);
+          toast(tr('Ordne zu …'), 1500);
           const r = await relinkVideos(files, missing);
-          toast(`${plural(r.matched, 'Video', 'Videos')} zugeordnet${r.unmatched.length ? `, nicht erkannt: ${r.unmatched.join(', ')}` : ''}`, 6000);
+          toast(`${tr('{videos} zugeordnet', { videos: plural(r.matched, 'Video', 'Videos') })}${r.unmatched.length ? `, ${tr('nicht erkannt: {names}', { names: r.unmatched.join(', ') })}` : ''}`, 6000);
           renderData();
         }),
-      }, 'Zuordnen')));
-    cards.push(accRow('Speicher', [
-        stateLine(pending > 20e6 ? `${mb(pending)} gelöscht, noch nicht freigegeben.` : `${st.usage != null ? `${mb(st.usage)} belegt, ` : ''}${st.persisted ? 'dauerhaft' : 'nicht dauerhaft'}.`)],
-      pending > 20e6 ? h('button.btn.small', { type: 'button', onclick: freeStorage }, 'Freigeben')
+      }, tr('Zuordnen'))));
+    cards.push(accRow(tr('Speicher'), [
+        stateLine(pending > 20e6 ? tr('{size} gelöscht, noch nicht freigegeben.', { size: mb(pending) }) : st.usage != null ? (st.persisted ? tr('{size} belegt, dauerhaft.', { size: mb(st.usage) }) : tr('{size} belegt, nicht dauerhaft.', { size: mb(st.usage) })) : `${st.persisted ? tr('dauerhaft') : tr('nicht dauerhaft')}.`)],
+      pending > 20e6 ? h('button.btn.small', { type: 'button', onclick: freeStorage }, tr('Freigeben'))
         : !st.persisted && st.supported ? h('button.btn.small', {
           type: 'button',
-          onclick: async () => { toast((await askPersist()) ? 'Speicher ist jetzt dauerhaft' : 'Der Browser lehnt ab. Als App installiert klappt es meist.', 4000); renderData(); },
-        }, 'Schützen') : null)); // bittet den Browser, die Daten nicht von sich aus zu räumen
-    cards.push(accRow('Aufnahmen löschen', [stateLine('Löscht Choreos und Videos, Classes bleiben.')],
+          onclick: async () => { toast((await askPersist()) ? tr('Speicher ist jetzt dauerhaft') : tr('Der Browser lehnt ab. Als App installiert klappt es meist.'), 4000); renderData(); },
+        }, tr('Schützen')) : null)); // bittet den Browser, die Daten nicht von sich aus zu räumen
+    cards.push(accRow(tr('Aufnahmen löschen'), [stateLine(tr('Löscht Choreos und Videos, Classes bleiben.'))],
       h('button.btn.small.danger', {
         type: 'button',
         onclick: async () => {
-          if (!(await confirmDialog({ title: 'AUFNAHMEN LÖSCHEN', text: `Löscht alle Choreos mit Aufnahmen, Videos und Songdateien (${mb(vBytes)}) sowie die Einheiten und gibt den Speicher frei. Classes, Profil und Präferenzen bleiben. Lässt sich nicht rückgängig machen.`, ok: 'Löschen' }))) return;
+          if (!(await confirmDialog({ title: tr('AUFNAHMEN LÖSCHEN'), text: tr('Löscht alle Choreos mit Aufnahmen, Videos und Songdateien ({size}) sowie die Einheiten und gibt den Speicher frei. Classes, Profil und Präferenzen bleiben. Lässt sich nicht rückgängig machen.', { size: mb(vBytes) }), ok: tr('Löschen') }))) return;
           await deleteRecordings();
           freeStorage();
         },
-      }, 'Löschen')));
+      }, tr('Löschen'))));
     dataBox.replaceChildren(...cards);
     // Freigabe läuft im Hintergrund: Kachel alle 5 s neu prüfen, bis der Speicher frei ist (höchstens 2 min)
     clearTimeout(recheck);
@@ -548,24 +551,24 @@ export async function renderProfile(root, section) {
   }
   let recheck = null, rechecks = 0;
   if (settingsPage) { renderData(); addEventListener('ct-install', renderData); }
-  const dataSec = sect('data', 'Daten', dataBox);
+  const dataSec = sect('data', tr('Daten'), dataBox);
 
   // ── App: installieren und weiterempfehlen ──
   const appBox = h('div.acc');
   function renderApp() {
     const installed = isInstalled();
     appBox.replaceChildren(
-      accRow('Installieren', [stateLine(installed ? 'Als App installiert.' : 'Startet wie eine eigene App, auch offline.')],
-        installed ? null : h('button.btn.small', { type: 'button', onclick: async () => { await installApp(); renderApp(); } }, 'Installieren')),
-      accRow('Empfehlen', [stateLine('Link zu ChoreoTrainer weitergeben.')],
+      accRow(tr('Installieren'), [stateLine(installed ? tr('Als App installiert.') : tr('Startet wie eine eigene App, auch offline.'))],
+        installed ? null : h('button.btn.small', { type: 'button', onclick: async () => { await installApp(); renderApp(); } }, tr('Installieren'))),
+      accRow(tr('Empfehlen'), [stateLine(tr('Link zu ChoreoTrainer weitergeben.'))],
         h('button.btn.small', {
           type: 'button',
           onclick: async () => {
             const r = await shareApp();
-            if (r === 'copied') toast('Link kopiert, zum Einfügen in Messenger oder Social Media.', 3500);
+            if (r === 'copied') toast(tr('Link kopiert, zum Einfügen in Messenger oder Social Media.'), 3500);
             if (r === 'failed') toast(`Link: ${SHARE_URL}`, 6000);
           },
-        }, 'Teilen')));
+        }, tr('Teilen'))));
   }
   if (settingsPage) { renderApp(); addEventListener('ct-install', renderApp); }
   const appSec = sect('app', 'App', appBox);
@@ -577,7 +580,7 @@ export async function renderProfile(root, section) {
     choreos: h('div.p-tab', choreoSec),
   };
   if (settingsPage) {
-    root.append(h('section.p-head', h('h1.wide.p-name', 'EINSTELLUNGEN')), h('div.p-tab.p-settings', prefs, manageSec, dataSec, appSec, account));
+    root.append(h('section.p-head', h('h1.wide.p-name', tr('EINSTELLUNGEN'))), h('div.p-tab.p-settings', prefs, manageSec, dataSec, appSec, account));
     return () => { urls.forEach(u => URL.revokeObjectURL(u)); removeEventListener('ct-install', renderData); removeEventListener('ct-install', renderApp); };
   }
   function showTab(id, user = false) {

@@ -1,4 +1,5 @@
 // Upload: Video + Class + Song + Recording-Datum + Notizen → Class › Choreo › Aufnahme
+import { tr, dayLabel } from './i18n.js';
 import { db, uid, requestPersist } from './db.js';
 import { h, fmt, parseTime, isoDate, classTitle, classMeta, PALETTE, textOn, WEEKDAYS, byClassOrder, CLASS_TITLES, CLASS_LEVELS } from './util.js';
 import { songPicker, songKeyOf, sameSong } from './song.js';
@@ -28,21 +29,21 @@ export async function renderUpload(root, kind, refId) {
     const mine = compressVideo(file, p => {
       if (job !== mine) return;
       packPct = Math.round(p * 100);
-      packInfo.replaceChildren(`Verkleinere … ${packPct} %`, ' ', keepBtn());
-      if (saving) saveBtn.textContent = `Verkleinere … ${packPct} %`;
+      packInfo.replaceChildren(tr('Verkleinere … {p} %', { p: packPct }), ' ', keepBtn());
+      if (saving) saveBtn.textContent = tr('Verkleinere … {p} %', { p: packPct });
     });
     job = mine;
-    packInfo.replaceChildren('Prüfe Video …', ' ', keepBtn());
+    packInfo.replaceChildren(tr('Prüfe Video …'), ' ', keepBtn());
     mine.promise.then(({ file: f, reason }) => {
       if (job !== mine) return;
       packing = false;
       packed = keepOriginal ? null : f;
-      packInfo.replaceChildren(packed ? `Verkleinert: ${mbOf(file.size)} → ${mbOf(packed.size)}` : `Original wird gespeichert${keepOriginal ? '' : ` (${reason})`}`);
+      packInfo.replaceChildren(packed ? tr('Verkleinert: {a} → {b}', { a: mbOf(file.size), b: mbOf(packed.size) }) : `${tr('Original wird gespeichert')}${keepOriginal ? '' : ` (${reason})`}`);
       if (saving) save();
     });
   }
   function useOriginal() { keepOriginal = true; job?.cancel(); }
-  const keepBtn = () => h('button.linkbtn', { type: 'button', onclick: useOriginal }, 'Original behalten');
+  const keepBtn = () => h('button.linkbtn', { type: 'button', onclick: useOriginal }, tr('Original behalten'));
   let saving = false;
 
   const classes = (await db.all('classes')).sort(byClassOrder);
@@ -57,7 +58,7 @@ export async function renderUpload(root, kind, refId) {
   // ── Class ──
   const f = {
     ...classPickers(classes, { styles: CLASS_TITLES, levels: CLASS_LEVELS }),
-    weekday: h('select', h('option', { value: '' }, '—'), WEEKDAYS.map(d => h('option', d))),
+    weekday: h('select', h('option', { value: '' }, '—'), WEEKDAYS.map(d => h('option', { value: d }, dayLabel(d)))),
     time: h('input', { type: 'time' }),
   };
   const fill = c => { for (const k of Object.keys(f)) f[k].value = c?.[k] || ''; };
@@ -86,29 +87,29 @@ export async function renderUpload(root, kind, refId) {
   const songFileIn = h('input', { type: 'file', accept: 'audio/*,audio/flac,audio/x-flac,.mp3,.m4a,.aac,.wav,.flac,.aiff', hidden: true });
   const songStep = h('div.song-step', { hidden: !preChoreo?.song });
   function renderSongStep(msg = '') {
-    songStep.replaceChildren(songFileIn, h('span.label.step-label', 'Songdatei (optional)'), songFile
+    songStep.replaceChildren(songFileIn, h('span.label.step-label', tr('Songdatei (optional)')), songFile
       ? h('div.actions',
         h('span.label', `♪ ${songFile.name}`),
-        h('button.linkbtn', { type: 'button', onclick: () => songFileIn.click() }, 'Ersetzen'),
-        h('button.linkbtn', { type: 'button', onclick: () => { songFile = null; renderSongStep(); } }, 'Entfernen'))
-      : h('div.actions', h('button.btn.small', { type: 'button', onclick: () => songFileIn.click() }, 'Songdatei laden')),
-    h('div.label', { style: { marginTop: '6px' } }, msg || 'Zum Trainieren auf den Song.'));
+        h('button.linkbtn', { type: 'button', onclick: () => songFileIn.click() }, tr('Ersetzen')),
+        h('button.linkbtn', { type: 'button', onclick: () => { songFile = null; renderSongStep(); } }, tr('Entfernen')))
+      : h('div.actions', h('button.btn.small', { type: 'button', onclick: () => songFileIn.click() }, tr('Songdatei laden'))),
+    h('div.label', { style: { marginTop: '6px' } }, msg || tr('Zum Trainieren auf den Song.')));
   }
   songFileIn.addEventListener('change', async () => {
     const f = songFileIn.files[0];
     songFileIn.value = '';
     if (!f) return;
-    if (!/^audio\//.test(f.type) && !/\.(mp3|m4a|aac|wav|flac|aiff?)$/i.test(f.name)) { toast('Bitte eine Audiodatei wählen'); return; }
-    renderSongStep('Prüfe Songdatei …');
+    if (!/^audio\//.test(f.type) && !/\.(mp3|m4a|aac|wav|flac|aiff?)$/i.test(f.name)) { toast(tr('Bitte eine Audiodatei wählen')); return; }
+    renderSongStep(tr('Prüfe Songdatei …'));
     const problem = await checkAudio(f);
     if (problem) { toast(problem, 8000); renderSongStep(); return; }
     // Ist es wirklich der gewählte Song? (kurz bei Shazam nachfragen; scheitert das, ohne Prüfung weiter)
     const chosen = picker.get();
     if (chosen?.title) {
-      renderSongStep('Prüfe, welcher Song in der Datei ist …');
+      renderSongStep(tr('Prüfe, welcher Song in der Datei ist …'));
       const found = await identifyAudio(f).catch(() => null);
       if (found && !sameSong(found, chosen)
-        && !(await confirmDialog({ title: 'ANDERER SONG?', text: `Die Datei klingt nach „${[found.artist, found.title].filter(Boolean).join(' — ')}“, gewählt ist aber „${chosen.title}“.`, ok: 'Trotzdem verwenden', danger: false }))) {
+        && !(await confirmDialog({ title: tr('ANDERER SONG?'), text: tr('Die Datei klingt nach „{found}“, gewählt ist aber „{chosen}“.', { found: [found.artist, found.title].filter(Boolean).join(' — '), chosen: chosen.title }), ok: tr('Trotzdem verwenden'), danger: false }))) {
         renderSongStep();
         return;
       }
@@ -122,8 +123,8 @@ export async function renderUpload(root, kind, refId) {
 
   // ── Recording + Notizen ──
   const dateIn = h('input', { type: 'date', value: isoDate(Date.now()), oninput: e => { e.target.dataset.touched = '1'; } });
-  const notesIn = h('textarea', { placeholder: '5, 6, 7, 8 Anmerkungen …' });
-  const saveBtn = h('button.btn.primary', { onclick: save }, 'Speichern');
+  const notesIn = h('textarea', { placeholder: tr('5, 6, 7, 8 Anmerkungen …') });
+  const saveBtn = h('button.btn.primary', { onclick: save }, tr('Speichern'));
 
   // ── linke Spalte: Video ──
   const left = h('div');
@@ -139,7 +140,7 @@ export async function renderUpload(root, kind, refId) {
         h('video', { src: previewUrl, controls: true, playsinline: true, preload: 'metadata' }),
         h('div.actions', { style: { marginTop: '8px', justifyContent: 'space-between' } },
           h('span.label', `${file.name} · ${(file.size / 1e6).toFixed(0)} MB`),
-          h('button.linkbtn', { onclick: () => { file = null; renderLeft(); } }, 'Anderes Video')),
+          h('button.linkbtn', { onclick: () => { file = null; renderLeft(); } }, tr('Anderes Video'))),
         packInfo);
       startPack();
       if (!dateIn.dataset.touched && file.lastModified) dateIn.value = isoDate(file.lastModified);
@@ -152,19 +153,19 @@ export async function renderUpload(root, kind, refId) {
 
   root.append(
     h('div.section-head', { style: { marginTop: '18px' } },
-      h('h2.wide', preChoreo ? 'NEUE AUFNAHME' : 'UPLOAD'),
-      preChoreo ? h('span.label', `zu ${preChoreo.song?.title || 'Choreo'}`) : null),
+      h('h2.wide', preChoreo ? tr('NEUE AUFNAHME') : tr('UPLOAD')),
+      preChoreo ? h('span.label', tr('zu {title}', { title: preChoreo.song?.title || 'Choreo' })) : null),
     h('div.upload-grid',
       left,
       h('div',
         h('div.fieldset', h('span.label', 'Class'),
           classes.length ? chips : null,
           h('div.row', field('Style', f.category), field('Level', f.level)),
-          h('div.row', { style: { marginTop: '12px' } }, field('Wochentag', f.weekday), field('Uhrzeit', f.time), field('Coach', f.coach))),
-        h('div.fieldset', h('span.label', 'Song'),
+          h('div.row', { style: { marginTop: '12px' } }, field(tr('Wochentag'), f.weekday), field(tr('Uhrzeit'), f.time), field('Coach', f.coach))),
+        h('div.fieldset', h('span.label', tr('Song')),
           picker.el, songStep),
-        h('div.fieldset', h('span.label', 'Recording'), h('div.row', field('Aufgenommen am', dateIn))),
-        h('div.fieldset', h('span.label', 'Notizen'), notesIn),
+        h('div.fieldset', h('span.label', tr('Recording')), h('div.row', field(tr('Aufgenommen am'), dateIn))),
+        h('div.fieldset', h('span.label', tr('Notizen')), notesIn),
         h('div.actions', saveBtn))),
   );
   renderLeft();
@@ -174,17 +175,17 @@ export async function renderUpload(root, kind, refId) {
     let song = picker.get();
     if (!song && picker.typed()) song = { source: 'manual', title: picker.typed(), artist: '' };
     const cls = Object.fromEntries(Object.entries(f).map(([k, el]) => [k, el.value.trim()]));
-    if (!cls.category) { toast('Bitte mindestens den Style der Class angeben'); f.category.focus(); return; }
+    if (!cls.category) { toast(tr('Bitte mindestens den Style der Class angeben')); f.category.focus(); return; }
 
     // Knopf zeigt den Stand (nicht ausgegraut wie „disabled“, sonst ist er am Handy kaum lesbar), weitere Klicks zählen nicht
     if (saving && packing) return;
     saveBtn.classList.add('busy');
     saveBtn.setAttribute('aria-busy', 'true');
     // noch am Verkleinern: warten (Fortschritt im Knopf), danach geht es von selbst weiter
-    if (packing && !keepOriginal) { saving = true; saveBtn.textContent = packPct == null ? 'Bereite vor …' : `Verkleinere … ${packPct} %`; return; }
+    if (packing && !keepOriginal) { saving = true; saveBtn.textContent = packPct == null ? tr('Bereite vor …') : tr('Verkleinere … {p} %', { p: packPct }); return; }
     saving = false;
     saveBtn.disabled = true;
-    saveBtn.textContent = 'Speichere …';
+    saveBtn.textContent = tr('Speichere …');
     try {
       // Class finden oder anlegen
       let klass = classes.find(c => ['category', 'level', 'weekday', 'time', 'coach'].every(k => norm(c[k]) === norm(cls[k])));
@@ -210,7 +211,7 @@ export async function renderUpload(root, kind, refId) {
       const rec = {
         id: uid(),
         choreoId: choreo.id,
-        title: `Aufnahme ${count + 1}`,
+        title: tr('Aufnahme {n}', { n: count + 1 }),
         recordedAt: dateIn.value ? new Date(dateIn.value + 'T12:00').getTime() : Date.now(),
         uploadedAt: Date.now(),
         notes: notesIn.value.trim(),
@@ -232,10 +233,10 @@ export async function renderUpload(root, kind, refId) {
       go(`#/train/${rec.id}`, { replace: true });
     } catch (e) {
       console.error(e);
-      toast(`Speichern fehlgeschlagen: ${e.message}`, 5000);
+      toast(tr('Speichern fehlgeschlagen: {msg}', { msg: e.message }), 5000);
       saveBtn.disabled = false;
       saveBtn.classList.remove('busy'); saveBtn.removeAttribute('aria-busy');
-      saveBtn.textContent = 'Speichern';
+      saveBtn.textContent = tr('Speichern');
     }
   }
 

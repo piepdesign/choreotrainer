@@ -1,3 +1,4 @@
+import { tr } from './i18n.js';
 // Songsuche über die freie Deezer-API (kein Key). Deezer sendet keine CORS-Header,
 // daher JSONP über ein Script-Tag.
 
@@ -7,10 +8,10 @@ function jsonp(url, timeout = 6000) {
   return new Promise((resolve, reject) => {
     const cb = `__dz${Date.now()}_${counter++}`;
     const script = document.createElement('script');
-    const timer = setTimeout(() => { cleanup(); reject(new Error('Deezer antwortet nicht')); }, timeout);
+    const timer = setTimeout(() => { cleanup(); reject(new Error(tr('Deezer antwortet nicht'))); }, timeout);
     function cleanup() { clearTimeout(timer); delete window[cb]; script.remove(); }
     window[cb] = data => { cleanup(); resolve(data); };
-    script.onerror = () => { cleanup(); reject(new Error('Deezer nicht erreichbar')); };
+    script.onerror = () => { cleanup(); reject(new Error(tr('Deezer nicht erreichbar'))); };
     script.src = `${url}${url.includes('?') ? '&' : '?'}output=jsonp&callback=${cb}`;
     document.head.append(script);
   });

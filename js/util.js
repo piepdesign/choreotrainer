@@ -1,4 +1,5 @@
 // Kleine Helfer: DOM, Zeitformate, Farben
+import { tr, tn, locale, dayLabel } from './i18n.js';
 
 // h('div.klasse', {attr}, kinder…)
 export function h(tag, attrs, ...children) {
@@ -99,7 +100,7 @@ export function fmtDuration(sec) {
 
 export function fmtDate(ts, opts = { day: '2-digit', month: '2-digit', year: '2-digit' }) {
   if (!ts) return '—';
-  return new Date(ts).toLocaleDateString('de-DE', opts);
+  return new Date(ts).toLocaleDateString(locale, opts);
 }
 
 export function relDate(ts) {
@@ -107,9 +108,9 @@ export function relDate(ts) {
   const day = 86400000;
   const start = d => new Date(d).setHours(0, 0, 0, 0);
   const diff = Math.round((start(Date.now()) - start(ts)) / day);
-  if (diff === 0) return 'Heute';
-  if (diff === 1) return 'Gestern';
-  if (diff < 7) return `Vor ${diff} Tagen`;
+  if (diff === 0) return tr('Heute');
+  if (diff === 1) return tr('Gestern');
+  if (diff < 7) return tr('Vor {n} Tagen', { n: diff });
   return fmtDate(ts);
 }
 
@@ -128,17 +129,18 @@ export function textOn(hex) {
   return (L + 0.05) / 0.05 >= 1.05 / (L + 0.05) ? '#000' : '#fff';
 }
 
+// gespeicherte Kürzel (immer deutsch), Anzeige über dayLabel() aus i18n.js
 export const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 
-// Zahl mit Einzahl/Mehrzahl: plural(1, 'Choreo', 'Choreos') → „1 Choreo“, plural(2, …) → „2 Choreos“
-export const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+// Zahl mit Einzahl/Mehrzahl: plural(1, 'Choreo', 'Choreos') → „1 Choreo“, plural(2, …) → „2 Choreos“ (übersetzt)
+export const plural = tn;
 
 // Keine vorgegebenen Styles/Level: die Auswahllisten zeigen nur, was in eigenen Classes vorkommt
 export const CLASS_TITLES = [];
 export const CLASS_LEVELS = [];
 
 // Aufnahmedatum mit Wochentag: (Fr) 26.09.26
-export const fmtRecDate = ts => (ts ? `(${WEEKDAYS[(new Date(ts).getDay() + 6) % 7]}) ${fmtDate(ts)}` : '—');
+export const fmtRecDate = ts => (ts ? `(${dayLabel(WEEKDAYS[(new Date(ts).getDay() + 6) % 7])}) ${fmtDate(ts)}` : '—');
 
 // Eigene Reihenfolge (Drag & Drop im Hub), sonst nach Wochentag und Uhrzeit
 export const byClassOrder = (a, b) =>
@@ -151,11 +153,11 @@ export function classTitle(c) {
 }
 
 export function classMeta(c) {
-  return [c.weekday, c.time, c.coach].filter(Boolean).join(' · ');
+  return [dayLabel(c.weekday), c.time, c.coach].filter(Boolean).join(' · ');
 }
 
 export function songTitle(s) {
-  if (!s) return 'Ohne Song';
+  if (!s) return tr('Ohne Song');
   return s.artist ? `${s.artist} — ${s.title}` : s.title;
 }
 
@@ -174,7 +176,7 @@ export function fitInput(input) {
 }
 
 export function inlineEdit(text, onSave, { href = null, clickToEdit = !href, placeholder = '' } = {}) {
-  const view = h(href ? 'a' : 'span.editable', { href, title: clickToEdit ? 'Klicken zum Umbenennen' : null }, text);
+  const view = h(href ? 'a' : 'span.editable', { href, title: clickToEdit ? tr('Klicken zum Umbenennen') : null }, text);
   const wrap = h('span.inline-edit', view);
   wrap.startEdit = () => {
     const input = h('input.inline-input', { type: 'text', value: text, placeholder });
@@ -211,7 +213,7 @@ export function inlineEdit(text, onSave, { href = null, clickToEdit = !href, pla
 export function classCells(c) {
   return [
     h('span.cc-title', classTitle(c).toUpperCase()),
-    ...[c.weekday, c.time, c.coach].map(v => h('span.cc-meta', v ? String(v).toUpperCase() : '')),
+    ...[dayLabel(c.weekday), c.time, c.coach].map(v => h('span.cc-meta', v ? String(v).toUpperCase() : '')),
     h('span.cc-gap'), // dehnbarer Abstand, danach die rechten Angaben
   ];
 }

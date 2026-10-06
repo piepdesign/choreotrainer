@@ -1,4 +1,5 @@
 // Base (Übersicht) und Class-Ansicht
+import { tr, tn, dayLabel } from './i18n.js';
 import { db, deleteChoreo, deleteClass, deleteRecording } from './db.js';
 import { h, isTouch, onHold, holdGate, tt, fmt, fmtRecDate, fmtDuration, relDate, classTitle, classMeta, stripe, inlineEdit, PALETTE, textOn, WEEKDAYS, byClassOrder, CLASS_TITLES, CLASS_LEVELS } from './util.js';
 import { state, go, toast } from './app.js';
@@ -22,7 +23,7 @@ export async function loadAll() {
 export const latestRating = c => c.ratings?.length ? c.ratings[c.ratings.length - 1].value : null;
 
 export function dots(value, max = 5) {
-  return h('span.dots', { title: value ? `${value}/5` : 'noch nicht bewertet' },
+  return h('span.dots', { title: value ? `${value}/5` : tr('noch nicht bewertet') },
     Array.from({ length: max }, (_, i) => h(`i${value && i < value ? '.on' : ''}`)));
 }
 
@@ -30,14 +31,14 @@ export function dropzone(onFile) {
   const input = h('input', { type: 'file', accept: 'video/*' });
   const zone = h('label.dropzone',
     input,
-    h('strong', 'NEUE CHOREO'),
-    h('span.label', tt('(Video ablegen oder klicken zum Auswählen)', '(Tippen, um ein Video auszuwählen)')),
+    h('strong', tr('NEUE CHOREO')),
+    h('span.label', tt(tr('(Video ablegen oder klicken zum Auswählen)'), tr('(Tippen, um ein Video auszuwählen)'))),
     // eigener Knopf im Feld: öffnet nicht die Videoauswahl, sondern den Import (Class/Choreo aus einem Export)
-    h('button.linkbtn.small-link.dz-import', { type: 'button', onclick: e => { e.preventDefault(); e.stopPropagation(); importInto(); } }, 'importieren'));
+    h('button.linkbtn.small-link.dz-import', { type: 'button', onclick: e => { e.preventDefault(); e.stopPropagation(); importInto(); } }, tr('importieren')));
   const take = f => {
     if (!f) return;
     if (/\.ctbackup$/i.test(f.name)) { importInto(undefined, f); return; } // Export einer Class/Choreo abgelegt
-    if (!f.type.startsWith('video/') && !/\.(mov|mp4|m4v|webm)$/i.test(f.name)) return toast('Bitte eine Videodatei wählen');
+    if (!f.type.startsWith('video/') && !/\.(mov|mp4|m4v|webm)$/i.test(f.name)) return toast(tr('Bitte eine Videodatei wählen'));
     onFile(f);
   };
   input.addEventListener('change', () => take(input.files[0]));
@@ -47,7 +48,12 @@ export function dropzone(onFile) {
   return zone;
 }
 
-export const recTitle = (r, i) => r.title || `Aufnahme ${i + 1}`;
+// Standardname „Aufnahme 3“ in der aktuellen Sprache, auch wenn er früher in einer anderen gespeichert wurde
+const DEFAULT_REC = /^(?:Aufnahme|Recording|Enregistrement|Grabación|Registrazione) (\d+)$/;
+export const recTitle = (r, i) => {
+  const m = r.title?.match(DEFAULT_REC);
+  return m ? tr('Aufnahme {n}', { n: m[1] }) : r.title || tr('Aufnahme {n}', { n: i + 1 });
+};
 
 // Mittlere Helligkeit (0–255) aus RGBA-Pixeln
 export function luminance(d) {
@@ -200,8 +206,8 @@ export async function renderHub(root) {
 
   const urls = [];
   // Letzte Choreos: eine Zeile, waagrecht scrollbar, max. 5. Mehr → „>“ zur Gesamtübersicht im Profil
-  const cardsRow = h('div.cards.hscroll', recent.map(c => choreoCard(c, classById[c.classId], recsByChoreo[c.id] || [], urls)),
-    choreos.length > 5 ? h('a.more', { href: '#/profile/choreos', title: `Alle ${choreos.length} Choreos` }, '>') : null);
+  const cardsRow = fitCardLabels(h('div.cards.hscroll', recent.map(c => choreoCard(c, classById[c.classId], recsByChoreo[c.id] || [], urls)),
+    choreos.length > 5 ? h('a.more', { href: '#/profile/choreos', title: tr('Alle {n} Choreos', { n: choreos.length }) }, '>') : null));
   // Letzte Songs: so hoch wie die Choreo-Zeile, darüber hinaus senkrecht scrollbar
   const songList = h('ul.songlist.vscroll', songs.map(c => h('li',
     songLink(cover(c.song), c.song),
@@ -215,16 +221,16 @@ export async function renderHub(root) {
     h('div.stats', chosen.map(id => stat(label(id), values[id].value, values[id].hint, `#/profile/${STAT_TARGET[id] || 'overview'}`))),
     h('div.columns',
       h('div.col-choreos',
-        h('div.section-head', h('h2.wide', 'LETZTE CHOREOS')),
-        recent.length ? cardsRow : h('p.empty', 'Noch keine Choreo. Leg oben das erste Video ab.')),
+        h('div.section-head', h('h2.wide', tr('LETZTE CHOREOS'))),
+        recent.length ? cardsRow : h('p.empty', tr('Noch keine Choreo. Leg oben das erste Video ab.'))),
       h('div.col-songs',
-        h('div.section-head', h('h2.wide', 'LETZTE SONGS')),
-        songs.length ? songList : h('p.empty', 'Noch keine Songs.'))),
+        h('div.section-head', h('h2.wide', tr('LETZTE SONGS'))),
+        songs.length ? songList : h('p.empty', tr('Noch keine Songs.')))),
     h('div.section-head', h('h2.wide', 'CLASSES'), classes.length ? h('span.label', '# Choreos') : null),
     classes.length
       ? sortableStripes(classes.sort(byClassOrder), c => stripe(c, String(choreos.filter(x => x.classId === c.id).length)))
-      : h('p.empty', 'Noch keine Class.'),
-    addRow(h('button.btn.small', { type: 'button', onclick: newClassDialog }, 'Neue Class'), () => importInto()),
+      : h('p.empty', tr('Noch keine Class.')),
+    addRow(h('button.btn.small', { type: 'button', onclick: newClassDialog }, tr('Neue Class')), () => importInto()),
   );
 
   // Songliste an die Höhe der Choreo-Zeile koppeln
@@ -250,7 +256,7 @@ function sortableStripes(classes, render) {
 
   els.forEach(el => {
     el.prepend(h('i.grip', { 'aria-hidden': 'true', html: icon('grip') }));
-    el.title = 'Klicken zum Öffnen · ziehen zum Umsortieren';
+    el.title = tr('Klicken zum Öffnen · ziehen zum Umsortieren');
     el.addEventListener('dragstart', e => e.preventDefault()); // native Link-Drag aus
     el.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
@@ -325,9 +331,11 @@ export function nextClass(cls, now = new Date()) {
   if (add === 0 && t <= now) add = 7; // heute schon vorbei → nächste Woche
   t.setDate(t.getDate() + add);
   const mins = Math.round((t - now) / 60000);
-  const when = add === 0 ? 'heute' : add === 1 ? 'morgen' : cls.weekday;
+  const when = add === 0 ? tr('heute') : add === 1 ? tr('morgen') : dayLabel(cls.weekday);
   const at = cls.time ? ` ${cls.time}` : '';
-  const rel = mins < 60 ? `in ${mins} min` : mins < 24 * 60 ? `in ${Math.floor(mins / 60)} h${mins % 60 ? ` ${mins % 60} min` : ''}` : `in ${Math.round(mins / 1440)} Tagen`;
+  // ab einer Stunde nur volle Stunden („in 19 h“): kurz genug für eine Kachelzeile, auf die Minute kommt es nicht an
+  const dur = mins < 60 ? `${mins} min` : mins < 24 * 60 ? `${Math.round(mins / 60)} h` : null;
+  const rel = dur ? tr('in {t}', { t: dur }) : tr('in {n} Tagen', { n: Math.round(mins / 1440) });
   return `${when}${at} · ${rel}`;
 }
 
@@ -335,7 +343,22 @@ export function nextClass(cls, now = new Date()) {
 const STAT_TARGET = { last: 'overview', streak: 'overview', duration: 'choreos', week: 'time', total: 'time', sessions: 'sessions', status: 'status', choreos: 'choreos', recordings: 'choreos', classes: 'classes' };
 
 function stat(label, value, hint, href) {
-  return h(href ? 'a.stat.stat-link' : 'div.stat', { href, title: hint ? `${hint} · Details im Profil` : href ? 'Details im Profil' : null }, h('span.label', label), h('b', value));
+  return h(href ? 'a.stat.stat-link' : 'div.stat', { href, title: hint ? `${hint} · ${tr('Details im Profil')}` : href ? tr('Details im Profil') : null }, h('span.label', label), h('b', value));
+}
+
+// Kachel-Angaben: einzeilig, solange alles passt; sonst die ganze Reihe zweizeilig (Klasse wrap2), auch nach Größenänderung
+export function fitCardLabels(box) {
+  let lastW = -1;
+  const check = () => {
+    if (!box.isConnected) { if (lastW >= 0) ro.disconnect(); return; }
+    if (box.clientWidth === lastW) return; // nur bei neuer Breite (das Umbrechen selbst ändert die Höhe)
+    lastW = box.clientWidth;
+    box.classList.remove('wrap2');
+    if ([...box.querySelectorAll('.card > .label')].some(l => l.scrollWidth > l.clientWidth + 1)) box.classList.add('wrap2');
+  };
+  const ro = new ResizeObserver(check);
+  ro.observe(box);
+  return box;
 }
 
 export function choreoCard(c, cls, recs, urls) {
@@ -347,12 +370,12 @@ export function choreoCard(c, cls, recs, urls) {
   if (c.song?.cover) thumb.append(songLink(h('img.card-cover', { src: c.song.cover, alt: '' }), c.song));
   return h('a.card', { href: latest ? `#/train/${latest.id}` : `#/class/${c.classId}` },
     thumb,
-    h('h3', c.title || c.song?.title || 'Ohne Song'),
+    h('h3', c.title || c.song?.title || tr('Ohne Song')),
     h('div.label', `${cls ? classTitle(cls) : ''} · ${relDate(c.lastPracticed || c.created)}`),
     // kurz und einzeilig: nur „in 4 Tagen“, Tag und Uhrzeit im Tooltip. Zeile bleibt auch ohne Angabe stehen,
     // damit gleiche Infos in allen Kacheln auf derselben Höhe sitzen
-    h('div.label.next-class', { title: cls && nextClass(cls) ? `Nächste Class ${nextClass(cls)}` : null }, cls && nextClass(cls) ? `Nächste Class ${nextClass(cls).split(' · ').at(-1)}` : '\u00a0'),
-    h('div', { style: { marginTop: '4px' } }, dots(latestRating(c)), h('span.label', `  ${recs.length} Aufn.`)));
+    h('div.label.next-class', { title: cls && nextClass(cls) ? tr('Nächste Class {when}', { when: nextClass(cls) }) : null }, cls && nextClass(cls) ? tr('Nächste Class {when}', { when: nextClass(cls).split(' · ').at(-1) }) : '\u00a0'),
+    h('div', { style: { marginTop: '4px' } }, dots(latestRating(c)), h('span.label', `  ${recs.length} ${tr('Aufn.')}`)));
 }
 
 // ── Class-Ansicht ─────────────────────────────
@@ -370,27 +393,27 @@ export async function renderClass(root, id) {
     h('div.stripes', { style: { marginTop: '8px' } }, header),
     // direkt unter der Leiste nur die Class selbst: Bearbeiten, Exportieren, Löschen
     h('div.actions', { style: { margin: '14px 0 28px' } },
-      h('button.linkbtn', { onclick: () => { if (editBox.hidden) { editBox.replaceChildren(classEditor(cls, header, () => { editBox.hidden = true; }, classes)); editBox.hidden = false; } else editBox.hidden = true; } }, 'Bearbeiten'),
+      h('button.linkbtn', { onclick: () => { if (editBox.hidden) { editBox.replaceChildren(classEditor(cls, header, () => { editBox.hidden = true; }, classes)); editBox.hidden = false; } else editBox.hidden = true; } }, tr('Bearbeiten')),
       h('button.linkbtn', {
         type: 'button',
         onclick: async () => {
-          try { const r = await exportClassDialog(cls); if (r) toast(`Exportiert: ${r.choreos} Choreo${r.choreos === 1 ? '' : 's'}${r.files ? `, ${r.files} Dateien (${Math.round(r.bytes / 1e6)} MB)` : ''}`, 3500); }
-          catch (e) { console.error(e); toast(`Export fehlgeschlagen: ${e.message}`, 5000); }
+          try { const r = await exportClassDialog(cls); if (r) toast(`${tr('Exportiert: {choreos}', { choreos: tn(r.choreos, 'Choreo', 'Choreos') })}${r.files ? `, ${tr('{n} Dateien ({mb} MB)', { n: r.files, mb: Math.round(r.bytes / 1e6) })}` : ''}`, 3500); }
+          catch (e) { console.error(e); toast(tr('Export fehlgeschlagen: {msg}', { msg: e.message }), 5000); }
         },
-      }, 'Exportieren'),
+      }, tr('Exportieren')),
       h('button.linkbtn', {
         type: 'button',
         onclick: async () => {
-          if (!(await confirmDialog({ title: 'CLASS LÖSCHEN', text: `Löscht „${classTitle(cls)}“ mit ${mine.length === 1 ? 'einer Choreo' : `${mine.length} Choreos`} samt Videos.`, ok: 'Löschen' }))) return;
+          if (!(await confirmDialog({ title: tr('CLASS LÖSCHEN'), text: tr('Löscht „{name}“ mit {choreos} samt Videos.', { name: classTitle(cls), choreos: tn(mine.length, 'Choreo', 'Choreos') }), ok: tr('Löschen') }))) return;
           await deleteClass(id);
-          toast('Class gelöscht');
+          toast(tr('Class gelöscht'));
           go('#/');
         },
-      }, 'Löschen')),
+      }, tr('Löschen'))),
     editBox,
-    ...(mine.length ? mine.map(c => choreoBlock(c, recsByChoreo[c.id] || [], sessions, urls)) : [h('p.empty', 'Keine Choreos in dieser Class.')]),
+    ...(mine.length ? mine.map(c => choreoBlock(c, recsByChoreo[c.id] || [], sessions, urls)) : [h('p.empty', tr('Keine Choreos in dieser Class.'))]),
     // unter der letzten Choreo: neue Choreo (Video hochladen), daneben kleiner: aus einem Export übernehmen
-    addRow(h('a.btn.small', { href: `#/upload?class=${id}`, onclick: () => { state.pendingFile = null; } }, 'Neue Choreo'), () => importInto(id)),
+    addRow(h('a.btn.small', { href: `#/upload?class=${id}`, onclick: () => { state.pendingFile = null; } }, tr('Neue Choreo')), () => importInto(id)),
   );
   return () => urls.forEach(u => URL.revokeObjectURL(u));
 }
@@ -399,13 +422,13 @@ export async function renderClass(root, id) {
 function appHint() {
   if (isInstalled() || !settings().appHint) return null;
   const bar = h('div.app-hint',
-    h('span', 'Als App installieren: startet wie eine eigene App, auch offline.'),
+    h('span', tr('Als App installieren: startet wie eine eigene App, auch offline.')),
     h('span.app-hint-actions',
-      h('button.btn.small', { type: 'button', onclick: async () => { if (await installApp()) go('#/', { replace: true }); } }, 'Installieren'),
+      h('button.btn.small', { type: 'button', onclick: async () => { if (await installApp()) go('#/', { replace: true }); } }, tr('Installieren')),
       h('button.linkbtn.small-link', {
         type: 'button',
         onclick: async () => { await saveSettings({ appHint: false }); bar.remove(); },
-      }, 'Ausblenden')));
+      }, tr('Ausblenden'))));
   return bar;
 }
 
@@ -416,14 +439,14 @@ export function newClassDialog() {
   const close = () => { box.remove(); if (added) go(location.hash || '#/', { replace: true }); };
   const form = classForm(() => { added = true; }, { heading: false, done: close, more: true });
   const box = h('div.modal', { onclick: e => { if (e.target === box) close(); } },
-    h('div.modal-card.class-card', h('h2.wide', 'NEUE CLASS'), form, h('button.linkbtn', { type: 'button', onclick: close, style: { justifySelf: 'start' } }, 'Abbrechen')));
+    h('div.modal-card.class-card', h('h2.wide', tr('NEUE CLASS')), form, h('button.linkbtn', { type: 'button', onclick: close, style: { justifySelf: 'start' } }, tr('Abbrechen'))));
   document.body.append(box);
   form.querySelector('input, select')?.focus();
 }
 
 // „Neu …“ als Knopf, daneben klein „importieren“ (unter der letzten Choreo bzw. Class)
 export function addRow(main, onImport) {
-  return h('div.actions.add-row', main, h('button.linkbtn.small-link', { type: 'button', onclick: onImport }, 'importieren'));
+  return h('div.actions.add-row', main, h('button.linkbtn.small-link', { type: 'button', onclick: onImport }, tr('importieren')));
 }
 
 // Import aus Class-Übersicht, Class-Formular und Einstellungen: Datei wählen, einspielen, zur Class springen
@@ -453,40 +476,40 @@ function classEditor(cls, header, close, allClasses = []) {
     header.style.color = textOn(color);
     swatches.querySelectorAll('.chip').forEach(x => x.classList.toggle('sel', x.dataset.hex === color));
     custom.classList.toggle('sel', !PALETTE.includes(color));
-    customLabel.textContent = PALETTE.includes(color) ? 'Eigene' : color;
+    customLabel.textContent = PALETTE.includes(color) ? tr('Eigene') : color;
     custom.style.background = PALETTE.includes(color) ? '' : `#${color}`;
     custom.style.color = PALETTE.includes(color) ? '' : textOn(color);
   };
   const picker = h('input', { type: 'color', value: `#${color}` });
   picker.addEventListener('input', () => preview(picker.value));
-  const customLabel = h('span', 'Eigene');
-  const custom = h('label.chip.custom', { title: 'Eigene Farbe wählen' }, customLabel, picker);
+  const customLabel = h('span', tr('Eigene'));
+  const custom = h('label.chip.custom', { title: tr('Eigene Farbe wählen') }, customLabel, picker);
   const swatches = h('div.chips', PALETTE.map(p => h('button.chip', {
     type: 'button', 'data-hex': p, style: { background: `#${p}`, color: textOn(p) },
-    onclick: () => preview(p), title: 'Farbe', 'aria-label': 'Farbe',
+    onclick: () => preview(p), title: tr('Farbe'), 'aria-label': tr('Farbe'),
   })), custom);
   preview(color);
   return h('div.fieldset',
     h('div.row',
       field('category', 'Style', pick.category),
       field('level', 'Level', pick.level),
-      field('weekday', 'Wochentag', h('select', h('option', { value: '' }, '—'), WEEKDAYS.map(d => h('option', { selected: d === cls.weekday }, d)))),
-      field('time', 'Uhrzeit', h('input', { type: 'time', value: cls.time || '' })),
+      field('weekday', tr('Wochentag'), h('select', h('option', { value: '' }, '—'), WEEKDAYS.map(d => h('option', { value: d, selected: d === cls.weekday }, dayLabel(d))))),
+      field('time', tr('Uhrzeit'), h('input', { type: 'time', value: cls.time || '' })),
       field('coach', 'Coach', pick.coach)),
-    h('div', { style: { marginTop: '14px' } }, h('span.label.color-label', 'Farbe'), swatches),
+    h('div', { style: { marginTop: '14px' } }, h('span.label.color-label', tr('Farbe')), swatches),
     h('div.actions',
       h('button.btn.primary', {
         onclick: async () => {
           for (const k of Object.keys(f)) cls[k] = f[k].value.trim();
           cls.color = color;
           await db.put('classes', cls);
-          toast('Gespeichert');
+          toast(tr('Gespeichert'));
           go(location.hash);
         },
-      }, 'Speichern'),
+      }, tr('Speichern')),
       h('button.btn', {
         onclick: () => { preview(original); close(); },
-      }, 'Abbrechen')));
+      }, tr('Abbrechen'))));
 }
 
 function choreoBlock(c, recs, sessions, urls) {
@@ -494,8 +517,8 @@ function choreoBlock(c, recs, sessions, urls) {
   return h('div.choreo-block',
     c.song?.cover ? songLink(h('img', { src: c.song.cover, alt: '' }), c.song) : h('div.nocover'),
     h('div',
-      h('h2.wide', { style: { fontSize: '20px', margin: '0 0 6px' } }, h('a', { href: recs.length ? `#/train/${recs[recs.length - 1].id}` : null }, (c.title || c.song?.title || 'Ohne Song').toUpperCase())),
-      h('div.label', `${c.song?.artist || ''}${c.song?.artist ? ' · ' : ''}geübt ${fmtDuration(practiced)} · zuletzt ${relDate(c.lastPracticed)}  `, dots(latestRating(c))),
+      h('h2.wide', { style: { fontSize: '20px', margin: '0 0 6px' } }, h('a', { href: recs.length ? `#/train/${recs[recs.length - 1].id}` : null }, (c.title || c.song?.title || tr('Ohne Song')).toUpperCase())),
+      h('div.label', `${c.song?.artist || ''}${c.song?.artist ? ' · ' : ''}${tr('geübt {t} · zuletzt {when}', { t: fmtDuration(practiced), when: relDate(c.lastPracticed) })}  `, dots(latestRating(c))),
       h('ul.reclist', recs.map((r, i) => {
         const title = inlineEdit(recTitle(r, i), async v => { r.title = v; await db.put('recordings', r); }, { href: `#/train/${r.id}` });
         return h('li',
@@ -504,32 +527,32 @@ function choreoBlock(c, recs, sessions, urls) {
         h('span', fmtRecDate(r.recordedAt)),
         h('span.muted', r.duration ? fmt(r.duration) : ''),
         h('span.muted', { style: { flex: 1, minWidth: '120px' } }, (r.notes || '').slice(0, 80)),
-        h('button.linkbtn', { onclick: () => title.startEdit() }, 'Umbenennen'),
+        h('button.linkbtn', { onclick: () => title.startEdit() }, tr('Umbenennen')),
         h('button.linkbtn', {
           onclick: async () => {
-            if (!(await confirmDialog({ title: 'AUFNAHME LÖSCHEN', text: 'Löscht diese Aufnahme samt Video.', ok: 'Löschen' }))) return;
+            if (!(await confirmDialog({ title: tr('AUFNAHME LÖSCHEN'), text: tr('Löscht diese Aufnahme samt Video.'), ok: tr('Löschen') }))) return;
             await deleteRecording(r.id);
             if (recs.length === 1) await deleteChoreo(c.id);
             go(location.hash);
           },
-        }, 'Löschen'));
+        }, tr('Löschen')));
       })),
       h('div.actions', { style: { marginTop: '10px' } },
-        h('a.linkbtn', { href: `#/upload?choreo=${c.id}`, onclick: () => { state.pendingFile = null; } }, '+ Aufnahme hinzufügen'),
+        h('a.linkbtn', { href: `#/upload?choreo=${c.id}`, onclick: () => { state.pendingFile = null; } }, tr('+ Aufnahme hinzufügen')),
         h('button.linkbtn', {
           type: 'button',
           onclick: async () => {
-            try { const r = await exportChoreoDialog(c); if (r) toast(`Choreo exportiert${r.files ? `: ${r.files} Dateien (${Math.round(r.bytes / 1e6)} MB)` : ', ohne Videos'}`, 3500); }
-            catch (e) { console.error(e); toast(`Export fehlgeschlagen: ${e.message}`, 5000); }
+            try { const r = await exportChoreoDialog(c); if (r) toast(r.files ? tr('Choreo exportiert: {n} Dateien ({mb} MB)', { n: r.files, mb: Math.round(r.bytes / 1e6) }) : tr('Choreo exportiert, ohne Videos'), 3500); }
+            catch (e) { console.error(e); toast(tr('Export fehlgeschlagen: {msg}', { msg: e.message }), 5000); }
           },
-        }, 'Exportieren'),
+        }, tr('Exportieren')),
         h('button.linkbtn', {
           onclick: async () => {
-            const name = c.title || c.song?.title || 'Ohne Song';
-            if (!(await confirmDialog({ title: 'CHOREO LÖSCHEN', text: `Löscht „${name}“ mit ${recs.length} Aufnahme${recs.length === 1 ? '' : 'n'} samt Videos.`, ok: 'Löschen' }))) return;
+            const name = c.title || c.song?.title || tr('Ohne Song');
+            if (!(await confirmDialog({ title: tr('CHOREO LÖSCHEN'), text: tr('Löscht „{name}“ mit {recs} samt Videos.', { name, recs: tn(recs.length, 'Aufnahme', 'Aufnahmen') }), ok: tr('Löschen') }))) return;
             await deleteChoreo(c.id);
-            toast('Choreo gelöscht');
+            toast(tr('Choreo gelöscht'));
             go(location.hash);
           },
-        }, 'Choreo löschen'))));
+        }, tr('Choreo löschen')))));
 }

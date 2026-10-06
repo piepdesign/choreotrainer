@@ -4,6 +4,7 @@ WebApp zum Nachlernen von Tanz-Choreografien anhand eigener Kursvideos.
 
 - **Hub:** letzte Choreos (Vorschau beim Hovern), Songs, Classes (per Drag & Drop sortierbar), Übungsstatistik
 - **Upload:** Video ablegen, Class, Song (Suche über Deezer oder automatische Erkennung), Aufnahmedatum, Notizen
+- **Sprachen:** Deutsch, Englisch, Französisch, Spanisch, Italienisch (Wahl im Intro und in den Einstellungen; Texte über `tr()` in `js/i18n.js`, Wörterbücher in `js/lang/`, Prüfung mit `python3 tools/i18n-check.py --check`)
 - **Training:** Spiegeln, Tempo (ohne Tonhöhenänderung), Lautstärke, Helligkeit/Kontrast, In/Out-Loop, 8er-Count (automatisch erkanntes Tempo, Tap-Korrektur, Halbe „+“), Marker, Song-Zeitleiste mit erkanntem Startpunkt, Vollbild, Tastaturkürzel
 
 Alle Videos und Daten bleiben **lokal im Browser** (IndexedDB). Es gibt keinen Server, kein Konto und kein Hochladen.

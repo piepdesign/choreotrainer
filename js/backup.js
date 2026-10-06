@@ -2,6 +2,7 @@
 // Die Sicherung enthält alle Eingaben (Classes, Choreos, Aufnahmen samt Markern/Notizen/Status, Einheiten, Profil)
 // und wahlweise die Videos und Songdateien. Ohne Videos werden sie nach dem Wiederherstellen über Dateiname, Größe
 // und Länge wieder ihren Aufnahmen zugeordnet.
+import { tr } from './i18n.js';
 import { db, untracked, deleteChoreo, releaseUndoVideos } from './db.js';
 
 const STORES = ['classes', 'choreos', 'recordings', 'sessions'];
@@ -52,7 +53,7 @@ export async function promptInstall() {
 export async function installApp() {
   if (canPromptInstall()) return promptInstall();
   const { guideDialog } = await import('./ui.js');
-  await guideDialog({ title: 'ANLEITUNG', ...installGuide() });
+  await guideDialog({ title: tr('ANLEITUNG'), ...installGuide() });
   return true;
 }
 
@@ -64,20 +65,20 @@ export function installGuide() {
   const edge = /Edg\//.test(ua) || /Microsoft Edge/.test(brands);
   const chromium = edge || /Chromium|Google Chrome|Opera|Brave/.test(brands) || /Chrome\//.test(ua);
   // iPhone/iPad: alle Browser dort nutzen dasselbe Teilen-Menü (in neueren Versionen teils hinter „···“)
-  if (isIOS()) return { steps: [['share', 'Teilen öffnen (ggf. über „···“)'], ['addHome', '„Zum Home-Bildschirm“ wählen'], ['phone', 'App vom Home-Bildschirm öffnen']], note: 'Die App hat einen eigenen Speicher. Daten per Sicherung mitnehmen.' };
+  if (isIOS()) return { steps: [['share', tr('Teilen öffnen (ggf. über „···“)')], ['addHome', tr('„Zum Home-Bildschirm“ wählen')], ['phone', tr('App vom Home-Bildschirm öffnen')]], note: tr('Die App hat einen eigenen Speicher. Daten per Sicherung mitnehmen.') };
   // Android: Chrome, Samsung Internet, Firefox u. a. installieren über ihr Menü (⋮ oder ≡)
-  if (/Android/.test(ua)) return { steps: [['phoneMenu', 'Browser-Menü öffnen (⋮ oder ≡)'], ['addHome', '„App installieren“ oder „Zum Startbildschirm“ wählen'], ['phone', 'App vom Startbildschirm öffnen']] };
+  if (/Android/.test(ua)) return { steps: [['phoneMenu', tr('Browser-Menü öffnen (⋮ oder ≡)')], ['addHome', tr('„App installieren“ oder „Zum Startbildschirm“ wählen')], ['phone', tr('App vom Startbildschirm öffnen')]] };
   // Rechner, Chrome/Edge ohne Angebot: meist schon installiert (dann öffnet das Symbol die App)
-  if (chromium) return { steps: [['addressBar', 'App-Symbol in der Adressleiste: öffnet oder installiert'], [edge ? 'menuH' : 'menu', `Sonst: Browser-Menü ${edge ? '(···) › Apps' : '(⋮)'} › „… als App installieren“`]] };
-  if (/Firefox\//.test(ua)) return { steps: [['browsers', 'In Chrome, Edge oder Safari öffnen']], note: 'Firefox am Rechner kann keine Web-Apps installieren.' };
-  if (/Safari\//.test(ua) && /Macintosh/.test(ua)) return { steps: [['menuBar', 'Menü „Ablage“ öffnen'], ['dock', '„Zum Dock hinzufügen“ wählen']] };
-  return { steps: [['menu', 'Browser-Menü öffnen'], ['addHome', '„App installieren“ wählen']] };
+  if (chromium) return { steps: [['addressBar', tr('App-Symbol in der Adressleiste: öffnet oder installiert')], [edge ? 'menuH' : 'menu', tr('Sonst: Browser-Menü {menu} › „… als App installieren“', { menu: edge ? tr('(···) › Apps') : '(⋮)' })]] };
+  if (/Firefox\//.test(ua)) return { steps: [['browsers', tr('In Chrome, Edge oder Safari öffnen')]], note: tr('Firefox am Rechner kann keine Web-Apps installieren.') };
+  if (/Safari\//.test(ua) && /Macintosh/.test(ua)) return { steps: [['menuBar', tr('Menü „Ablage“ öffnen')], ['dock', tr('„Zum Dock hinzufügen“ wählen')]] };
+  return { steps: [['menu', tr('Browser-Menü öffnen')], ['addHome', tr('„App installieren“ wählen')]] };
 }
 
 // Empfehlen: Teilen-Menü des Geräts (Messenger, Social Media, Mail …), sonst Link kopieren
 export const SHARE_URL = 'https://tinyurl.com/choreotrainer';
 export async function shareApp() {
-  const data = { title: 'CHOREO—TRAINER', text: 'Choreos aus dem Tanzkurs nachlernen: Spiegeln, Tempo, Loop und 8er-Count.', url: SHARE_URL };
+  const data = { title: 'CHOREO—TRAINER', text: tr('Choreos aus dem Tanzkurs nachlernen: Spiegeln, Tempo, Loop und 8er-Count.'), url: SHARE_URL };
   if (navigator.share) {
     try { await navigator.share(data); return 'shared'; } catch (e) { if (e?.name === 'AbortError') return 'aborted'; }
   }
@@ -154,14 +155,14 @@ export async function exportBackup({ videos = true } = {}) {
   const date = new Date().toISOString().slice(0, 10);
   const counts = Object.fromEntries(STORES.map(s => [s, data[s].length]));
   const blobs = videos ? await videoBlobs() : []; // „Ohne Videos“: gleiche Datei, nur ohne angehängte Dateien
-  const r = packFile({ format: FORMAT, version: 2, exportedAt: Date.now(), data }, blobs, `choreotrainer-sicherung-${date}.ctbackup`);
+  const r = packFile({ format: FORMAT, version: 2, exportedAt: Date.now(), data }, blobs, `${tr('choreotrainer-sicherung')}-${date}.ctbackup`);
   return { counts, videos: r.files, bytes: r.bytes };
 }
 
 export async function readBackup(file) {
   const head = await unpackFile(file);
-  if (head?.format === 'choreotrainer-export') throw new Error('Das ist ein Export einer Class bzw. Choreo. Bitte unter „Importieren“ einspielen.');
-  if (head?.format !== FORMAT) throw new Error('Bitte eine ChoreoTrainer-Sicherung (.ctbackup) wählen.');
+  if (head?.format === 'choreotrainer-export') throw new Error(tr('Das ist ein Export einer Class bzw. Choreo. Bitte unter „Importieren“ einspielen.'));
+  if (head?.format !== FORMAT) throw new Error(tr('Bitte eine ChoreoTrainer-Sicherung (.ctbackup) wählen.'));
   return head;
 }
 

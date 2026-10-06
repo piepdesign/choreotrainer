@@ -5,6 +5,7 @@
 // Pop/Hip-Hop wiederholt das Schlagzeug alle 4 Takte, erst Stimme und Melodie machen die Stelle eindeutig.
 // Suche grob über den ganzen Song (~46 ms), dann fein um die besten Kandidaten (~11,6 ms).
 // Grenze: Spielt der Kurs den Song verlangsamt, passt nichts zusammen.
+import { tr } from './i18n.js';
 import { decodeAudio } from './audio.js';
 
 const SR = 11025;
@@ -44,14 +45,14 @@ export async function checkAudio(file) {
   const head = new Uint8Array(await file.slice(0, 512).arrayBuffer());
   const text = new TextDecoder().decode(head).trimStart().toLowerCase();
   if (text.startsWith('<!doctype') || text.startsWith('<html') || text.startsWith('<?xml') || text.startsWith('{')) {
-    return `„${file.name}“ ist keine Audiodatei, sondern eine Webseite (${Math.round(file.size / 1024)} KB). Vermutlich ist der Download fehlgeschlagen.`;
+    return tr('„{name}“ ist keine Audiodatei, sondern eine Webseite ({kb} KB). Vermutlich ist der Download fehlgeschlagen.', { name: file.name, kb: Math.round(file.size / 1024) });
   }
   try {
     const audio = await new OfflineAudioContext(1, 1, SR).decodeAudioData(await file.arrayBuffer());
-    if (audio.duration < 5) return `„${file.name}“ ist nur ${audio.duration.toFixed(1)} s lang, das ist kein ganzer Song.`;
+    if (audio.duration < 5) return tr('„{name}“ ist nur {s} s lang, das ist kein ganzer Song.', { name: file.name, s: audio.duration.toFixed(1) });
     return null;
   } catch {
-    return `„${file.name}“ kann der Browser nicht lesen. Möglich: Apple Lossless (ALAC), AIFF, kopiergeschützt (.m4p) oder beschädigt. Bitte als mp3, m4a (AAC), wav oder flac laden.`;
+    return tr('„{name}“ kann der Browser nicht lesen. Möglich: Apple Lossless (ALAC), AIFF, kopiergeschützt (.m4p) oder beschädigt. Bitte als mp3, m4a (AAC), wav oder flac laden.', { name: file.name });
   }
 }
 
@@ -60,8 +61,8 @@ async function decode(blob, label) {
     return await decodeAudio(blob, SR);
   } catch {
     throw new Error(label === 'song'
-      ? 'Die Songdatei lässt sich nicht lesen. Bitte unter SONG ersetzen (mp3, m4a, wav oder flac).'
-      : 'Die Tonspur des Videos lässt sich nicht lesen.');
+      ? tr('Die Songdatei lässt sich nicht lesen. Bitte unter SONG ersetzen (mp3, m4a, wav oder flac).')
+      : tr('Die Tonspur des Videos lässt sich nicht lesen.'));
   }
 }
 
@@ -127,9 +128,9 @@ function corr(V, S, L, minOverlap) {
 // passt (anderer Song) oder anders geschnitten ist (z. B. Musikvideo mit Intro). confidence = bester Wert gegen den
 // besten Wert anderswo (> 1 s entfernt); bei einer falschen Datei liegen beide nah beieinander.
 export async function alignToSong(videoBlob, songBlob, { prior = null, onProgress = () => {} } = {}) {
-  onProgress('Lese Tonspuren …');
+  onProgress(tr('Lese Tonspuren …'));
   const [v, s] = await Promise.all([features(videoBlob, 'video'), features(songBlob, 'song')]);
-  onProgress('Gleiche ab …');
+  onProgress(tr('Gleiche ab …'));
   const Vc = downsample(v.bands, COARSE), Sc = downsample(s.bands, COARSE);
   const lenV = Vc[0].length, lenS = Sc[0].length;
   const minOverlap = Math.min(lenV, lenS) * 0.5;

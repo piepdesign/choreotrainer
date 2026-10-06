@@ -1,5 +1,6 @@
 // Songerkennung aus der Tonspur: Fingerabdruck per vibra (WebAssembly, im Browser),
 // Abfrage über den lokalen Durchreicher /api/shazam (server.py). Inoffiziell, kann jederzeit brechen.
+import { tr } from './i18n.js';
 import { searchSongs, songDetails } from './deezer.js';
 import { decodeAudio } from './audio.js';
 
@@ -14,9 +15,9 @@ function loadVibra() {
     window.Module = { locateFile: p => `vendor/vibra/${p}`, onRuntimeInitialized: resolve };
     const s = document.createElement('script');
     s.src = 'vendor/vibra/vibra.js';
-    s.onerror = () => { runtime = null; reject(new Error('Erkennungsmodul fehlt')); };
+    s.onerror = () => { runtime = null; reject(new Error(tr('Erkennungsmodul fehlt'))); };
     document.head.append(s);
-    setTimeout(() => reject(new Error('Erkennungsmodul startet nicht')), 15000);
+    setTimeout(() => reject(new Error(tr('Erkennungsmodul startet nicht'))), 15000);
   });
   return runtime;
 }
@@ -66,9 +67,9 @@ async function ask(sig) {
     if (IS_LOCAL && !window.ctForceRemote) data = await askLocal(sig);
     data ??= await askRemote(sig);
   } catch {
-    throw new Error('Erkennungsdienst nicht erreichbar');
+    throw new Error(tr('Erkennungsdienst nicht erreichbar'));
   }
-  if (data.error) throw new Error('Shazam nicht erreichbar');
+  if (data.error) throw new Error(tr('Shazam nicht erreichbar'));
   return data;
 }
 
@@ -76,9 +77,9 @@ async function ask(sig) {
 // Songs mit Samples (z. B. Kingpin ↔ J Dilla „In The Night“) werden je nach Stelle als Original
 // oder als Sample-Quelle erkannt. → Treffer je Song sammeln, mit Zeitposition je Abschnitt.
 export async function scanTrack(blob, onProgress = () => {}) {
-  onProgress('Lade Erkennung …');
+  onProgress(tr('Lade Erkennung …'));
   await loadVibra();
-  onProgress('Lese Tonspur …');
+  onProgress(tr('Lese Tonspur …'));
   const audio = await decodeAudio(blob, SR, onProgress); // auf Handys ggf. per Mithören
   const pcm = audio.getChannelData(0);
   const dur = audio.duration;
@@ -94,10 +95,10 @@ export async function scanTrack(blob, onProgress = () => {}) {
     let data;
     try {
       data = await ask(signature(slice));
-      if (data.retryms) throw new Error('Shazam bremst');
+      if (data.retryms) throw new Error(tr('Shazam bremst'));
     } catch (e) { lastError = e; failed.push(start); return; }
     answered++;
-    onProgress(`Scanne Tonspur … ${++done}/${starts.length}`);
+    onProgress(tr('Scanne Tonspur … {i}/{n}', { i: ++done, n: starts.length }));
     const track = data.track;
     if (!track?.title) return;
     const key = String(track.key || `${track.subtitle}|${track.title}`);
@@ -127,7 +128,7 @@ export async function scanTrack(blob, onProgress = () => {}) {
   // mit wachsender Pause (2 s, 4 s, 8 s). Sonst zählen sie als „nicht erkannt“ und verzerren die Mehrheit.
   for (let round = 0; failed.length && round < 3 && !clearWinner(); round++) {
     const retry = failed.splice(0);
-    onProgress(`Shazam bremst kurz, frage erneut … (${round + 1}/3)`);
+    onProgress(tr('Shazam bremst kurz, frage erneut … ({i}/3)', { i: round + 1 }));
     await wait(2000 * 2 ** round);
     for (const start of retry) { await one(start); if (remote) await wait(900); }
   }

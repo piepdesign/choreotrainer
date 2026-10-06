@@ -1,4 +1,5 @@
 // Einstieg: Router, Theme, globale Helfer
+import { tr } from './i18n.js'; // zuerst: Sprache steht fest, bevor andere Module Texte bauen
 import { renderHub, renderClass } from './hub.js';
 import { renderUpload } from './upload.js';
 import { renderTrain } from './train.js';
@@ -15,6 +16,13 @@ import { registerServiceWorker, freedNotice } from './backup.js';
 export const state = { pendingFile: null };
 
 const view = document.getElementById('view');
+// feste Texte der Kopfleiste (stehen deutsch in index.html)
+document.querySelector('[data-nav="hub"]').textContent = tr('BASE');
+document.querySelector('[data-nav="profile"]').textContent = tr('PROFIL');
+for (const [sel, label] of [['.back-btn', tr('Zurück')], ['[data-nav="settings"]', tr('Einstellungen')], ['.theme-toggle', tr('Ansicht')]]) {
+  const el = document.querySelector(sel);
+  el.setAttribute('aria-label', label); el.title = label;
+}
 let cleanup = null;
 
 const routes = [
@@ -83,7 +91,7 @@ async function route() {
       cleanup = (await fn(m)) || null;
     } catch (e) {
       console.error(e);
-      view.replaceChildren(h('p.empty', `Fehler: ${e.message}`));
+      view.replaceChildren(h('p.empty', tr('Fehler: {msg}', { msg: e.message })));
     }
     window.scrollTo(0, y);
     maybeTour(current); // Tutorial, falls noch nicht gesehen (Teil 1 auf der Base, Teil 2 im Training)
@@ -105,22 +113,22 @@ export function go(hash, { replace = false, keep = false } = {}) {
 let toastTimer;
 export function toast(msg, ms = 2600) {
   document.querySelector('.toast')?.remove();
-  const t = h('div.toast', msg);
-  document.body.append(t);
+  const el = h('div.toast', msg);
+  document.body.append(el);
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.remove(), ms);
+  toastTimer = setTimeout(() => el.remove(), ms);
 }
 
 // Ansicht in der Kopfleiste: Icon zeigt die gewählte Einstellung (System/Hell/Dunkel wie in den Einstellungen),
 // Klick öffnet ein kleines Menü mit allen drei
 const themeBtn = document.querySelector('.theme-toggle');
 const darkMq = matchMedia('(prefers-color-scheme: dark)');
-const THEMES = [['light', 'Hell'], ['dark', 'Dunkel'], ['system', 'System']];
+const THEMES = [['light', tr('Hell')], ['dark', tr('Dunkel')], ['system', tr('System')]];
 const currentTheme = () => { try { return localStorage.getItem('ct-theme') || 'system'; } catch { return 'system'; } };
 function syncThemeIcon() {
-  const t = currentTheme();
-  themeBtn.innerHTML = themeIcon(t);
-  themeBtn.title = `Ansicht: ${THEMES.find(x => x[0] === t)[1]}`;
+  const th = currentTheme();
+  themeBtn.innerHTML = themeIcon(th);
+  themeBtn.title = tr('Ansicht: {name}', { name: THEMES.find(x => x[0] === th)[1] });
 }
 new MutationObserver(syncThemeIcon).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 darkMq.addEventListener('change', syncThemeIcon);
@@ -146,15 +154,15 @@ addEventListener('keydown', e => { if (e.key === 'Escape') closeThemeMenu(); });
 const FEEDBACK_TO = 'sagmal@piep.design';
 const mail = (subject, intro) => `mailto:${FEEDBACK_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(`${intro}\n\n• `)}`;
 const FEEDBACK = [
-  ['bug', 'Bug melden', mail('Bug Report: CHOREO–TRAINER©', 'Folgender Bug ist mir aufgefallen:')],
-  ['idea', 'Idee oder Wunsch', mail('Idee/Wunsch: CHOREO–TRAINER©', 'Folgende Idee oder Wunsch habe ich:')],
+  ['bug', tr('Bug melden'), mail('Bug Report: CHOREO–TRAINER©', tr('Folgender Bug ist mir aufgefallen:'))],
+  ['idea', tr('Idee oder Wunsch'), mail(tr('Idee/Wunsch: CHOREO–TRAINER©'), tr('Folgende Idee oder Wunsch habe ich:'))],
 ];
 let testerFab = null;
 function syncTester() {
   const on = !!settings().tester;
   if (!on) { testerFab?.remove(); testerFab = null; return; }
   if (testerFab) return;
-  const main = h('button.fab-main', { type: 'button', title: 'Bug melden oder Idee schicken', 'aria-label': 'Helfer-Menü', 'aria-expanded': 'false', html: toolIcon('clipboard') });
+  const main = h('button.fab-main', { type: 'button', title: tr('Bug melden oder Idee schicken'), 'aria-label': tr('Helfer-Menü'), 'aria-expanded': 'false', html: toolIcon('clipboard') });
   testerFab = h('div.tester-fab',
     ...FEEDBACK.map(([id, label, href], i) => h('a.fab-action', { href, title: label, 'aria-label': label, style: { '--i': i + 1 }, html: toolIcon(id), onclick: () => setTimeout(close, 300) })),
     main);
@@ -175,7 +183,7 @@ addEventListener('drop', e => e.preventDefault());
 addEventListener('hashchange', route);
 requestPersist();
 registerServiceWorker(); // installierbar + offline startbar
-if (freedNotice()) setTimeout(() => toast('Gelöschte Videos werden freigegeben, das dauert bis zu einer Minute.', 5000), 800);
+if (freedNotice()) setTimeout(() => toast(tr('Gelöschte Videos werden freigegeben, das dauert bis zu einer Minute.'), 5000), 800);
 
 // ⌘Z / Strg+Z rückgängig, ⌘⇧Z / Strg+⇧Z wiederherstellen. In Textfeldern gilt das eigene Rückgängig des Feldes.
 let undoBusy = false;
@@ -190,12 +198,12 @@ addEventListener('keydown', async e => {
     // dann zurückdrehen und neu aufbauen
     if (cleanup) { const c = cleanup; cleanup = null; await c(); }
     const done = await (e.shiftKey ? redo() : undo());
-    toast(done ? (e.shiftKey ? 'Wiederhergestellt' : 'Rückgängig gemacht') : (e.shiftKey ? 'Nichts zum Wiederherstellen' : 'Nichts zum Rückgängigmachen'), 1600);
+    toast(done ? (e.shiftKey ? tr('Wiederhergestellt') : tr('Rückgängig gemacht')) : (e.shiftKey ? tr('Nichts zum Wiederherstellen') : tr('Nichts zum Rückgängigmachen')), 1600);
     keepScroll = true;
     await route();
   } catch (err) {
     console.error(err);
-    toast(`Rückgängig fehlgeschlagen: ${err.message}`);
+    toast(tr('Rückgängig fehlgeschlagen: {msg}', { msg: err.message }));
   } finally {
     undoBusy = false;
   }

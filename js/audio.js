@@ -1,3 +1,4 @@
+import { tr } from './i18n.js';
 // Tonspur eines Videos (oder einer Songdatei) als Samples in gewünschter Abtastrate.
 // Weg 1: decodeAudioData (schnell, liest die ganze Datei). Klappt auf Handys oft nicht: Safari/iOS kann
 // .mov-Videos so nicht entschlüsseln, und große Videos sprengen dort den Speicher.
@@ -84,13 +85,13 @@ export async function capture(blob, sampleRate, onProgress = () => {}) {
   try {
     if (!(v.readyState >= 1)) await new Promise((resolve, reject) => {
       v.onloadedmetadata = resolve;
-      v.onerror = () => reject(new Error('Die Tonspur des Videos lässt sich nicht lesen.'));
+      v.onerror = () => reject(new Error(tr('Die Tonspur des Videos lässt sich nicht lesen.')));
     });
     v.currentTime = 0;
     const dur = v.duration;
     ctx ||= new (window.AudioContext || window.webkitAudioContext)();
     await ctx.resume();
-    if (ctx.state !== 'running') throw new Error('Ton blockiert: bitte auf den Knopf tippen, dann startet das Mithören.');
+    if (ctx.state !== 'running') throw new Error(tr('Ton blockiert: bitte auf den Knopf tippen, dann startet das Mithören.'));
     const src = own?.src || ctx.createMediaElementSource(v);
     const proc = ctx.createScriptProcessor(4096, 1, 1);
     const chunks = [];
@@ -108,13 +109,13 @@ export async function capture(blob, sampleRate, onProgress = () => {}) {
     v.playbackRate = speed;
     v.muted = false;
     v.volume = 1;
-    const tick = setInterval(() => onProgress(`Höre Tonspur ab … ${Math.round((v.currentTime / dur) * 100)} %`), 500);
+    const tick = setInterval(() => onProgress(tr('Höre Tonspur ab … {p} %', { p: Math.round((v.currentTime / dur) * 100) })), 500);
     try {
-      try { await v.play(); } catch { throw new Error('Ton blockiert: bitte auf den Knopf tippen, dann startet das Mithören.'); }
+      try { await v.play(); } catch { throw new Error(tr('Ton blockiert: bitte auf den Knopf tippen, dann startet das Mithören.')); }
       await new Promise((resolve, reject) => {
         v.onended = resolve;
-        v.onerror = () => reject(new Error('Wiedergabe abgebrochen'));
-        setTimeout(() => reject(new Error('Mithören dauert zu lange')), (dur / speed + 30) * 1000);
+        v.onerror = () => reject(new Error(tr('Wiedergabe abgebrochen')));
+        setTimeout(() => reject(new Error(tr('Mithören dauert zu lange'))), (dur / speed + 30) * 1000);
         // hängt die Wiedergabe (z. B. vom Handy angehalten), nicht ewig warten. Lädt das Video noch (readyState < 3,
         // am iPhone bei großen Dateien mehrere Sekunden) oder hat iOS es pausiert, erst nachladen bzw. weiterspielen,
         // abgebrochen wird nach 20 s ohne Fortschritt (vorher 4 s, das reichte am iPhone oft nicht)
@@ -122,7 +123,7 @@ export async function capture(blob, sampleRate, onProgress = () => {}) {
         const watch = setInterval(() => {
           if (v.ended) { clearInterval(watch); return; }
           if (v.paused) v.play().catch(() => {});
-          if (v.currentTime === last) { if (++still >= 40) { clearInterval(watch); reject(new Error('Mithören hängt. Bitte erneut auf den Knopf tippen.')); } } else { still = 0; last = v.currentTime; }
+          if (v.currentTime === last) { if (++still >= 40) { clearInterval(watch); reject(new Error(tr('Mithören hängt. Bitte erneut auf den Knopf tippen.'))); } } else { still = 0; last = v.currentTime; }
         }, 500);
         v.addEventListener('ended', () => clearInterval(watch), { once: true });
       });
@@ -137,7 +138,7 @@ export async function capture(blob, sampleRate, onProgress = () => {}) {
     // Kam überhaupt Ton an? (Manche Handy-Browser leiten den Ton eines Videos nicht in Web Audio weiter)
     let e = 0;
     for (let i = 0; i < raw.length; i += 97) e += raw[i] * raw[i];
-    if (!raw.length || Math.sqrt(e / Math.ceil(raw.length / 97)) < 1e-4) throw new Error('Beim Mithören kam kein Ton an. Bitte Lautlos-Schalter prüfen oder am Rechner erkennen.');
+    if (!raw.length || Math.sqrt(e / Math.ceil(raw.length / 97)) < 1e-4) throw new Error(tr('Beim Mithören kam kein Ton an. Bitte Lautlos-Schalter prüfen oder am Rechner erkennen.'));
     const effRate = ctx.sampleRate / speed;
     heard.set(blob, { raw, rate: effRate });
     return resample(raw, effRate, sampleRate);

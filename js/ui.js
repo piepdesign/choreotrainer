@@ -1,4 +1,5 @@
 // Gemeinsame Bedienelemente: Auswahlliste mit „+ Neu …“, Präferenzen, Icons
+import { tr, lang, LANGS, setLang } from './i18n.js';
 import { h, holdGate, tt } from './util.js';
 import { PROVIDERS } from './providers.js';
 import { BASE_STATS } from './settings.js';
@@ -33,7 +34,7 @@ export const themeIcon = (id, size = 18) => svg26(THEME_PATHS[id], size);
 
 // Auswahlliste wie beim Wochentag, mit zusätzlicher Option, einen eigenen Wert hinzuzufügen.
 // Liefert ein Element mit .value (lesen/setzen) und .focus(), passt also überall, wo vorher ein Input stand.
-export function pickSelect(options, { value = '', empty = '—', addLabel = '+ Neu …', placeholder = '' } = {}) {
+export function pickSelect(options, { value = '', empty = '—', addLabel = tr('+ Neu …'), placeholder = '' } = {}) {
   const opts = [...new Set(options.filter(Boolean))];
   const select = h('select');
   const input = h('input', { type: 'text', placeholder, hidden: true });
@@ -80,9 +81,9 @@ export function pickSelect(options, { value = '', empty = '—', addLabel = '+ N
 export function classPickers(classes, { styles = [], levels = [] } = {}) {
   const from = k => classes.map(c => c[k]).filter(Boolean);
   return {
-    category: pickSelect([...styles, ...from('category')], { addLabel: '+ Neuer Style …', placeholder: 'Style' }),
-    level: pickSelect([...levels, ...from('level')], { addLabel: '+ Neues Level …', placeholder: 'Level' }),
-    coach: pickSelect(from('coach'), { addLabel: '+ Neuer Coach …', placeholder: 'Name' }),
+    category: pickSelect([...styles, ...from('category')], { addLabel: tr('+ Neuer Style …'), placeholder: 'Style' }),
+    level: pickSelect([...levels, ...from('level')], { addLabel: tr('+ Neues Level …'), placeholder: 'Level' }),
+    coach: pickSelect(from('coach'), { addLabel: tr('+ Neuer Coach …'), placeholder: tr('Name') }),
   };
 }
 
@@ -144,7 +145,7 @@ export function toggle(label, on, onChange) {
 }
 
 // Bestätigung vor Zurücksetzen/Löschen: erklärt kurz, was passiert. typeToConfirm: Wort, das eingetippt werden muss.
-export function confirmDialog({ title, text, ok = 'Bestätigen', danger = true, typeToConfirm = null, cancel = true, extra = [] }) {
+export function confirmDialog({ title, text, ok = tr('Bestätigen'), danger = true, typeToConfirm = null, cancel = true, extra = [] }) {
   return new Promise(resolve => {
     const close = v => { box.remove(); removeEventListener('keydown', onKey, true); resolve(v); };
     const okBtn = h(`button.btn.small${danger ? '.danger' : '.primary'}`, { type: 'button', onclick: () => close(true) }, ok);
@@ -156,8 +157,8 @@ export function confirmDialog({ title, text, ok = 'Bestätigen', danger = true, 
     const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(false); } };
     const box = h('div.modal', { onclick: e => { if (e.target === box) close(false); } },
       h('div.modal-card.confirm-card', h('h2.wide', title), h('p', text), ...extra, // extra: z. B. ein Schalter vor dem Bestätigen
-        input ? h('label.field', h('span', `Zur Bestätigung „${typeToConfirm}“ eintippen`), input) : null,
-        h('div.actions', okBtn, cancel ? h('button.linkbtn', { type: 'button', onclick: () => close(false) }, 'Abbrechen') : null)));
+        input ? h('label.field', h('span', tr('Zur Bestätigung „{word}“ eintippen', { word: typeToConfirm })), input) : null,
+        h('div.actions', okBtn, cancel ? h('button.linkbtn', { type: 'button', onclick: () => close(false) }, tr('Abbrechen')) : null)));
     addEventListener('keydown', onKey, true);
     document.body.append(box);
     (input || okBtn).focus();
@@ -190,16 +191,17 @@ export function guideDialog({ title, steps, note = null, ok = 'OK' }) {
   });
 }
 
-export function preferences(values, onChange, statValues = null, { baseLabel = true, tester = false, hints = false } = {}) {
+// language: Block „Sprache“ (nur Einstellungen; im Intro steht die Wahl beim Namen). Wahl lädt die Seite neu.
+export function preferences(values, onChange, statValues = null, { baseLabel = true, tester = false, hints = false, language = false } = {}) {
   // hints: im Intro ein Satz unter jedem Titel, was die Einstellung bewirkt
   const HINTS = {
-    'Musikprovider': 'Hier öffnen sich erkannte Songs: in der App, wenn sie installiert ist, sonst im Browser.',
-    'Song-Cover Hörprobe': tt('Fährst du mit der Maus über ein Song-Cover, spielt eine 30-Sekunden-Hörprobe in dieser Lautstärke.', 'Hältst du ein Song-Cover gedrückt, spielt eine 30-Sekunden-Hörprobe in dieser Lautstärke.'),
-    'Helfer*in': 'Blendet unten rechts einen Knopf ein, über den du Bugs und Ideen direkt per Mail meldest.',
-    'Statistiken': tt('Diese Kennzahlen siehst du in deiner „Base“. Klicke oder ziehe Kacheln hinein oder heraus.', 'Diese Kennzahlen siehst du in deiner „Base“. Tippe Kacheln an oder halte und ziehe sie hinein oder heraus.'),
-    'Ansicht': 'Hell, dunkel oder automatisch passend zu deinem System.',
+    'Musikprovider': tr('Hier öffnen sich erkannte Songs: in der App, wenn sie installiert ist, sonst im Browser.'),
+    'Song-Cover Hörprobe': tt(tr('Fährst du mit der Maus über ein Song-Cover, spielt eine 30-Sekunden-Hörprobe in dieser Lautstärke.'), tr('Hältst du ein Song-Cover gedrückt, spielt eine 30-Sekunden-Hörprobe in dieser Lautstärke.')),
+    'Helfer*in': tr('Blendet unten rechts einen Knopf ein, über den du Bugs und Ideen direkt per Mail meldest.'),
+    'Statistiken': tt(tr('Diese Kennzahlen siehst du in deiner „Base“. Klicke oder ziehe Kacheln hinein oder heraus.'), tr('Diese Kennzahlen siehst du in deiner „Base“. Tippe Kacheln an oder halte und ziehe sie hinein oder heraus.')),
+    'Ansicht': tr('Hell, dunkel oder automatisch passend zu deinem System.'),
   };
-  const block = (title, control) => h('div.pref-block', h('h3.p-sub', title), hints ? h('p.pref-hint', HINTS[title]) : null, control);
+  const block = (title, control) => h('div.pref-block', h('h3.p-sub', tr(title)), hints ? h('p.pref-hint', HINTS[title]) : null, control);
   // Einzelauswahl; render(neu) setzt die Markierung
   // Einzelauswahl als Kacheln (Musikprovider, Ansicht); key = Name der Einstellung
   const single = (key, options, value, content) => {
@@ -217,21 +219,24 @@ export function preferences(values, onChange, statValues = null, { baseLabel = t
     block('Musikprovider', single('provider', PROVIDERS, values.provider,
       ([id, name]) => [h('i.brand', { html: brandSvg(id) }), h('span', name)])),
     // An/Aus und Lautstärke in einem: Aus · Leise · Mittel · Laut
-    block('Song-Cover Hörprobe', single('hoverPreview', [['off', 'Aus'], ['low', 'Leise'], ['mid', 'Mittel'], ['high', 'Laut']],
+    block('Song-Cover Hörprobe', single('hoverPreview', [['off', tr('Aus')], ['low', tr('Leise')], ['mid', tr('Mittel')], ['high', tr('Laut')]],
       values.hoverPreview === 'on' || !values.hoverPreview ? 'mid' : values.hoverPreview,
       ([id, label]) => [h('i.brand', { html: svg26(SOUND_PATHS[id]) }), h('span', label)])),
     // Helfer*in wie in den Einstellungen: ein Knopf, Beschriftung zeigt den Zustand, aktiviert = gefüllt
     tester ? block('Helfer*in', (() => {
       let on = !!values.tester;
       const b = h('button.btn.small', { type: 'button' });
-      const show = () => { b.textContent = on ? 'Aktiviert' : 'Deaktiviert'; b.classList.toggle('primary', on); };
+      const show = () => { b.textContent = on ? tr('Aktiviert') : tr('Deaktiviert'); b.classList.toggle('primary', on); };
       b.addEventListener('click', () => { on = !on; show(); onChange({ tester: on }); });
       show();
       return h('div.pref-onoff', b); // Erklärung steht schon unter der Überschrift
     })()) : null,
     block('Statistiken', chips),
-    block('Ansicht', single('theme', [['light', 'Hell'], ['dark', 'Dunkel'], ['system', 'System']], values.theme,
-      ([id, label]) => [h('i.brand', { html: THEME_ICONS[id] }), h('span', label)])));
+    block('Ansicht', single('theme', [['light', tr('Hell')], ['dark', tr('Dunkel')], ['system', tr('System')]], values.theme,
+      ([id, label]) => [h('i.brand', { html: THEME_ICONS[id] }), h('span', label)])),
+    language ? block('Sprache', h('div.provider-tiles.lang-tiles', { role: 'radiogroup' }, LANGS.map(([id, name]) => h(`button${id === lang ? '.on' : ''}`, {
+      type: 'button', role: 'radio', 'aria-checked': String(id === lang), lang: id, onclick: () => { if (id !== lang) setLang(id); },
+    }, h('b.lang-code', id.toUpperCase()), h('span', name))))) : null);
 }
 
 // Statistik-Kacheln wie in der Base. Oben die gezeigten, unten die übrigen.
@@ -243,8 +248,8 @@ export function statPicker(selected, values, onChange, { baseLabel = true } = {}
   const tile = id => h('div.stat.pick-tile', { 'data-id': id }, h('span.label', label(id)), h('b', vals[id]?.value ?? '—'));
   const shown = h('div.stats.stat-zone.zone-in');
   const rest = h('div.stats.stat-zone.zone-out');
-  const hintIn = h('p.zone-empty', tt('Hierher ziehen oder unten anklicken', 'Hierher ziehen oder unten antippen'));
-  const hintOut = h('p.zone-empty', 'Alle Statistiken sind in deiner Base');
+  const hintIn = h('p.zone-empty', tt(tr('Hierher ziehen oder unten anklicken'), tr('Hierher ziehen oder unten antippen')));
+  const hintOut = h('p.zone-empty', tr('Alle Statistiken sind in deiner Base'));
   let sel = selected.filter(id => BASE_STATS.some(x => x[0] === id));
   function render() {
     shown.replaceChildren(...sel.map(tile), hintIn);
@@ -260,7 +265,7 @@ export function statPicker(selected, values, onChange, { baseLabel = true } = {}
     const r = t.getBoundingClientRect();
     return y < r.top || (y <= r.bottom && x < r.left + r.width / 2);
   }) || zone.querySelector('.zone-empty');
-  const box = h('div.stat-picker', baseLabel ? h('span.label.zone-label', 'In deiner Base') : null, shown, h('span.label.zone-label', 'Weitere'), rest);
+  const box = h('div.stat-picker', baseLabel ? h('span.label.zone-label', tr('In deiner Base')) : null, shown, h('span.label.zone-label', tr('Weitere')), rest);
   const gate = holdGate(); // Touch: erst halten, dann ziehen (Wischen scrollt)
   box.addEventListener('pointerdown', e => {
     const t = e.target.closest('.pick-tile');

@@ -1,6 +1,7 @@
 // Song im bevorzugten Musikprovider öffnen. Ohne Schlüssel: exakt bei Deezer (Track-ID) und
 // Apple Music (freie iTunes-Suche), sonst die Suche im Provider. Eine Anmeldung übernimmt der
 // Provider selbst (Browser bzw. App), die App speichert nur die Wahl.
+import { tr } from './i18n.js';
 import { h, isTouch, onHold } from './util.js';
 import { brandIcon } from './brand-icons.js';
 import { searchSongs, songDetails } from './deezer.js';
@@ -136,14 +137,14 @@ export function askProvider() {
     const close = val => { box.remove(); resolve(val); };
     const box = h('div.modal', { onclick: e => { if (e.target === box) close(null); } },
       h('div.modal-card.provider-card',
-        h('h2.wide', 'WO HÖRST DU MUSIK?'),
-        h('p', 'Songs öffnen sich dort, in der App oder im Browser.'),
+        h('h2.wide', tr('WO HÖRST DU MUSIK?')),
+        h('p', tr('Songs öffnen sich dort, in der App oder im Browser.')),
         h('div.provider-tiles', { role: 'radiogroup' }, PROVIDERS.map(([id, name]) => h('button', {
           type: 'button', role: 'radio', 'aria-checked': 'false',
           onclick: async () => { await saveSettings({ provider: id }); close(id); },
         }, h('i.brand', { html: brandIcon(id, 26) }), h('span', name)))),
-        h('p.label', 'Änderbar unter Einstellungen › Präferenzen'),
-        h('div.actions', h('button.linkbtn', { type: 'button', onclick: () => close(null) }, 'Abbrechen'))));
+        h('p.label', tr('Änderbar unter Einstellungen › Präferenzen')),
+        h('div.actions', h('button.linkbtn', { type: 'button', onclick: () => close(null) }, tr('Abbrechen')))));
     document.body.append(box);
   });
 }
@@ -152,7 +153,7 @@ export function askProvider() {
 export function songLink(el, song) {
   if (!song?.title) return el;
   el.classList.add('song-link');
-  el.title = 'Im Musikprovider öffnen';
+  el.title = tr('Im Musikprovider öffnen');
   el.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); stopPreview(); openSong(song); });
   if (el.tagName !== 'IMG') return el;
   // Cover in eine Hülle, damit der Rahmen beim Abspielen als Negativ über dem Bild liegen kann
@@ -245,7 +246,7 @@ function previewOnHover(el, song) {
         el.classList.remove('preview-wait');
         // Browser spielen Ton erst, nachdem einmal auf die Seite geklickt/getippt wurde (Überfahren zählt nicht).
         // Darum blieb das erste Cover nach dem Laden stumm, und nach einem Klick ging es überall. Einmal darauf hinweisen.
-        if (e?.name === 'NotAllowedError' && !hinted) { hinted = true; toast('Hörprobe: Einmal irgendwo auf die Seite klicken, dann spielt sie beim Darüberfahren.', 4500); }
+        if (e?.name === 'NotAllowedError' && !hinted) { hinted = true; toast(tr('Hörprobe: Einmal irgendwo auf die Seite klicken, dann spielt sie beim Darüberfahren.'), 4500); }
       }
     }, delay);
   };

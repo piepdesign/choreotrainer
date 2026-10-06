@@ -1,4 +1,5 @@
 // Classes ohne Video anlegen, bearbeiten, löschen. Genutzt im Intro und im Profil.
+import { tr, tn, dayLabel } from './i18n.js';
 import { db, uid, deleteClass } from './db.js';
 import { classPickers, confirmDialog, icon } from './ui.js';
 import { chooseFile, importExport, importSummary } from './share.js';
@@ -19,7 +20,7 @@ export function classManager(onChange, { withImport = true } = {}) {
   form.preview.remove();
   form.hidden = true;
   const msg = h('span.label');
-  const moreBtn = h('button.btn.small', { type: 'button', onclick: () => openForm() }, 'Weitere Class');
+  const moreBtn = h('button.btn.small', { type: 'button', onclick: () => openForm() }, tr('Weitere Class'));
   // Class (oder Choreo) aus einer Export-Datei übernehmen
   const importBtn = withImport ? h('button.linkbtn.small-link', {
     type: 'button',
@@ -34,7 +35,7 @@ export function classManager(onChange, { withImport = true } = {}) {
         onChange?.();
       } catch (e) { msg.textContent = e.message; }
     },
-  }, 'importieren') : null;
+  }, tr('importieren')) : null;
   const addRow = h('div.actions.add-row', moreBtn, importBtn, msg);
 
   function placePreview() {
@@ -63,14 +64,14 @@ export function classManager(onChange, { withImport = true } = {}) {
         ...classCells(c),
         // Bearbeiten/Löschen als Icons wie bei den Markern
         h('span.cm-actions',
-          h('button.mk-act', { type: 'button', title: 'Bearbeiten', 'aria-label': 'Bearbeiten', html: icon('rename'), onclick: () => openForm(c) }),
+          h('button.mk-act', { type: 'button', title: tr('Bearbeiten'), 'aria-label': tr('Bearbeiten'), html: icon('rename'), onclick: () => openForm(c) }),
           h('button.mk-act', {
-            type: 'button', title: 'Löschen', 'aria-label': 'Löschen', html: icon('trash'),
+            type: 'button', title: tr('Löschen'), 'aria-label': tr('Löschen'), html: icon('trash'),
             onclick: async () => {
               const ok = await confirmDialog({
-                title: 'CLASS LÖSCHEN',
-                text: n ? `„${classTitle(c)}“ und ${n} Choreo${n === 1 ? '' : 's'} samt Videos werden gelöscht.` : `„${classTitle(c)}“ wird gelöscht.`,
-                ok: 'Löschen',
+                title: tr('CLASS LÖSCHEN'),
+                text: n ? tr('„{name}“ und {choreos} samt Videos werden gelöscht.', { name: classTitle(c), choreos: tn(n, 'Choreo', 'Choreos') }) : tr('„{name}“ wird gelöscht.', { name: classTitle(c) }),
+                ok: tr('Löschen'),
               });
               if (!ok) return;
               await deleteClass(c.id);
@@ -81,7 +82,7 @@ export function classManager(onChange, { withImport = true } = {}) {
           })));
     }));
     placePreview();
-    moreBtn.textContent = classes.length ? 'Weitere Class' : 'Neue Class';
+    moreBtn.textContent = classes.length ? tr('Weitere Class') : tr('Neue Class');
     if (first) { first = false; if (!classes.length) openForm(); }
     return classes;
   }
@@ -100,7 +101,7 @@ export function classManager(onChange, { withImport = true } = {}) {
 export function classForm(onSaved, { heading = true, done = null, more = false, cancel = false } = {}) {
   const f = {
     ...classPickers([], { styles: CLASS_TITLES, levels: CLASS_LEVELS }),
-    weekday: h('select', h('option', { value: '' }, '—'), WEEKDAYS.map(d => h('option', d))),
+    weekday: h('select', h('option', { value: '' }, '—'), WEEKDAYS.map(d => h('option', { value: d }, dayLabel(d)))),
     time: h('input', { type: 'time' }),
   };
   // eigene Styles/Levels/Coaches aus gespeicherten Classes nachladen
@@ -108,10 +109,10 @@ export function classForm(onSaved, { heading = true, done = null, more = false, 
   let color = null, editing = null, nextColor = PALETTE[0];
   const swatches = h('div.chips', PALETTE.map(p => h('button.chip', {
     type: 'button', 'data-hex': p, style: { background: `#${p}`, color: textOn(p) },
-    onclick: () => pick(p), title: 'Farbe', 'aria-label': 'Farbe',
+    onclick: () => pick(p), title: tr('Farbe'), 'aria-label': tr('Farbe'),
   })));
   const picker = h('input', { type: 'color', value: '#7a2cff' });
-  const custom = h('label.chip.custom', { title: 'Eigene Farbe' }, h('span', 'Eigene'), picker);
+  const custom = h('label.chip.custom', { title: tr('Eigene Farbe') }, h('span', tr('Eigene')), picker);
   picker.addEventListener('input', () => pick(picker.value.replace('#', '').toUpperCase()));
   swatches.append(custom);
   function pick(hex) {
@@ -131,33 +132,33 @@ export function classForm(onSaved, { heading = true, done = null, more = false, 
     const part = (val, ph) => (val ? String(val).toUpperCase() : h('span.ph', ph));
     preview.replaceChildren(
       h('span.cc-title', part(v.category, 'STYLE'), ' ', part(v.level, '#')),
-      ...[[v.weekday, 'TAG'], [v.time, 'HH:MM'], [v.coach, 'COACH']].map(([val, ph]) => h('span.cc-meta', part(val, ph))),
+      ...[[dayLabel(v.weekday), tr('TAG')], [v.time, 'HH:MM'], [v.coach, 'COACH']].map(([val, ph]) => h('span.cc-meta', part(val, ph))),
       h('span.cc-gap'));
   }
-  const title = h('span.label', 'Neue Class');
+  const title = h('span.label', tr('Neue Class'));
   const msg = h('span.label');
   const field = (label, input) => h('label.field', h('span', label), input);
   const clear = () => {
     for (const el of Object.values(f)) el.value = '';
     editing = null;
     pick(null);
-    title.textContent = 'Neue Class';
+    title.textContent = tr('Neue Class');
     draw();
   };
   // quiet: Doppel ohne Meldung übergehen (Weiter/Fertig: die Class gibt es dann ja schon)
   async function save({ quiet = false } = {}) {
       const vals = values();
-      if (!vals.category) { if (!quiet) { msg.textContent = 'Bitte mindestens den Style angeben'; f.category.focus(); } return null; }
+      if (!vals.category) { if (!quiet) { msg.textContent = tr('Bitte mindestens den Style angeben'); f.category.focus(); } return null; }
       const all = (await db.all('classes')).sort(byClassOrder);
-      if (all.some(c => c.id !== editing?.id && KEYS.every(k => norm(c[k]) === norm(vals[k])))) { if (quiet) clear(); else msg.textContent = 'Diese Class gibt es schon'; return null; }
+      if (all.some(c => c.id !== editing?.id && KEYS.every(k => norm(c[k]) === norm(vals[k])))) { if (quiet) clear(); else msg.textContent = tr('Diese Class gibt es schon'); return null; }
       let klass;
       if (editing) {
         klass = { ...editing, ...vals, color: color || editing.color };
-        msg.textContent = `${classTitle(klass)} gespeichert`;
+        msg.textContent = tr('{name} gespeichert', { name: classTitle(klass) });
       } else {
         klass = { id: uid(), ...vals, color: color || PALETTE[all.length % PALETTE.length], order: all.length, created: Date.now() };
         nextColor = PALETTE[(all.length + 1) % PALETTE.length];
-        msg.textContent = `${classTitle(klass)} angelegt`;
+        msg.textContent = tr('{name} angelegt', { name: classTitle(klass) });
       }
       await db.put('classes', klass);
       clear();
@@ -165,15 +166,15 @@ export function classForm(onSaved, { heading = true, done = null, more = false, 
       return klass;
   }
   // Fertig: eingetragene Class übernehmen (gibt es sie schon, bleibt das Formular mit Meldung offen), dann done()
-  const doneBtn = done ? h('button.btn.small.primary', { type: 'button', onclick: async () => { if (values().category && !(await save())) return; done(); } }, 'Fertig') : null;
-  const saveBtn = !done || more ? h(`button.btn.small${done ? '' : '.primary'}`, { type: 'button', onclick: () => save() }, done ? 'Weitere Class' : 'Class hinzufügen') : null;
-  const cancelBtn = cancel ? h('button.linkbtn', { type: 'button', onclick: () => { clear(); msg.textContent = ''; done?.(); } }, 'Abbrechen') : null;
+  const doneBtn = done ? h('button.btn.small.primary', { type: 'button', onclick: async () => { if (values().category && !(await save())) return; done(); } }, tr('Fertig')) : null;
+  const saveBtn = !done || more ? h(`button.btn.small${done ? '' : '.primary'}`, { type: 'button', onclick: () => save() }, done ? tr('Weitere Class') : tr('Class hinzufügen')) : null;
+  const cancelBtn = cancel ? h('button.linkbtn', { type: 'button', onclick: () => { clear(); msg.textContent = ''; done?.(); } }, tr('Abbrechen')) : null;
   const actions = h('div.actions', doneBtn, saveBtn, cancelBtn, msg);
   const el = h('div.classform',
     heading ? title : null,
     preview,
-    h('div.row', field('Style', f.category), field('Level', f.level), field('Wochentag', f.weekday), field('Uhrzeit', f.time), field('Coach', f.coach)),
-    h('div', { style: { marginTop: '14px' } }, h('span.label.color-label', 'Farbe'), swatches),
+    h('div.row', field('Style', f.category), field('Level', f.level), field(tr('Wochentag'), f.weekday), field(tr('Uhrzeit'), f.time), field('Coach', f.coach)),
+    h('div', { style: { marginTop: '14px' } }, h('span.label.color-label', tr('Farbe')), swatches),
     actions);
   el.preview = preview;
   el.addEventListener('input', draw);
@@ -183,7 +184,7 @@ export function classForm(onSaved, { heading = true, done = null, more = false, 
     editing = cls;
     for (const k of KEYS) f[k].value = cls[k] || '';
     pick(cls.color);
-    title.textContent = `${classTitle(cls)} bearbeiten`;
+    title.textContent = tr('{name} bearbeiten', { name: classTitle(cls) });
     msg.textContent = '';
     draw();
     f.category.focus();
