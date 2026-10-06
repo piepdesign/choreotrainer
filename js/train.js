@@ -352,10 +352,16 @@ export async function renderTrain(root, recId) {
     fit = v;
     bFitW.classList.toggle('on', v === 'width');
     bFitA.classList.toggle('on', v === 'all');
+    // Wechsel gleitet: Fläche und Video ändern Größe und Lage gemeinsam (vorher sprang das Video, weil es zwischen
+    // zwei Positionierungen wechselte und nur die Verschiebung animiert war)
+    stage.classList.add('fit-anim');
+    clearTimeout(fitAnimTimer);
+    fitAnimTimer = setTimeout(() => stage.classList.remove('fit-anim'), 400);
     stage.classList.toggle('fill', v === 'width');
     saveSettings({ videoFit: v });
     fitStage();
   };
+  let fitAnimTimer = 0;
   bFitW.addEventListener('click', () => setFit('width'));
   bFitA.addEventListener('click', () => setFit('all'));
   bFitW.classList.toggle('on', fit === 'width');
@@ -363,9 +369,11 @@ export async function renderTrain(root, recId) {
   stage.classList.toggle('fill', fit === 'width');
   // Breite füllen: Ausschnitt in der Höhe per Ziehen verschieben (je Aufnahme gemerkt). Kurzer Klick bleibt Play/Pause.
   // Überstand = wie viel Bild oben/unten abgeschnitten ist (Video in Breite der Fläche)
+  // Zielmaße aus fitStage (während des Übergangs liefern clientWidth/-Height Zwischenwerte)
+  let stageW = 0, stageH = 0;
   const overflow = () => {
     const vw = video.videoWidth, vh = video.videoHeight;
-    return vw && vh ? Math.max(0, (stage.clientWidth / vw) * vh - stage.clientHeight) : 0;
+    return vw && vh ? Math.max(0, ((stageW || stage.clientWidth) / vw) * vh - (stageH || stage.clientHeight)) : 0;
   };
   // fitY 0 = oberer Rand sichtbar, 100 = unterer; das Video steht mittig, verschoben wird um den halben Überstand
   const applyPan = () => {
@@ -780,7 +788,7 @@ export async function renderTrain(root, recId) {
     ratingHint.textContent = cur ? `${cur}/5 · ${RATING_HINT[cur]}` : '1 = noch gar nicht · 5 = sitzt';
   }
 
-  // Klick auf einen Marker öffnet ein kleines Menü: Umbenennen · Hierhin · Löschen
+  // Klick auf einen Marker blendet rechts in seiner Zeile Icons ein: Umbenennen · Hierhin · Auf jetzt setzen · Löschen
   const markerList = h('ul.markers');
   let menuFor = null, renaming = false;
   function renderMarkers() {
@@ -817,19 +825,12 @@ export async function renderTrain(root, recId) {
         kind.textContent = m.text || MARKER_TYPES[m.type].label;
       }
       if (menuFor === m.id && !renaming) {
+        const act = (name, label, fn) => h('button.mk-act', { type: 'button', title: label, 'aria-label': label, html: icon(name), onclick: fn });
         li.append(h('div.menu',
-          small('Umbenennen', () => { renaming = true; renderMarkers(); }),
-          small('Hierhin', () => { video.currentTime = m.t; menuFor = null; renderMarkers(); }),
-          small('Auf jetzt setzen', () => { m.t = video.currentTime; rec.markers.sort((a, b) => a.t - b.t); menuFor = null; update(); renderMarkers(); }),
-          small('Löschen', () => { rec.markers = rec.markers.filter(x => x !== m); menuFor = null; update(); renderMarkers(); }),
-          // Art wechseln, z. B. einen als Notiz angelegten „Ende“-Marker zum echten Ende machen (zählt dann für den Loop)
-          h('span.label.menu-sep', 'Art:'),
-          ...Object.entries(MARKER_TYPES).filter(([t]) => t !== m.type).map(([t, def]) => small(def.label.charAt(0) + def.label.slice(1).toLowerCase(), () => {
-            if (t === 'start' || t === 'end') rec.markers = rec.markers.filter(x => x === m || x.type !== t); // Start/Ende gibt es je einmal
-            m.type = t;
-            menuFor = null;
-            update(); renderMarkers(); renderStatic();
-          }))));
+          act('rename', 'Umbenennen', () => { renaming = true; renderMarkers(); }),
+          act('jump', 'Hierhin springen', () => { video.currentTime = m.t; menuFor = null; renderMarkers(); }),
+          act('setNow', 'Auf jetzt setzen', () => { m.t = video.currentTime; rec.markers.sort((a, b) => a.t - b.t); menuFor = null; update(); renderMarkers(); }),
+          act('trash', 'Löschen', () => { rec.markers = rec.markers.filter(x => x !== m); menuFor = null; update(); renderMarkers(); })));
       }
       return li;
     }) : [h('li.muted', { style: { display: 'block' } }, tt('Noch keine Marker. Taste S/E/N/H oder Fähnchen in der Leiste.', 'Noch keine Marker. Über das Fähnchen in der Leiste setzen.'))]));
@@ -1113,9 +1114,15 @@ export async function renderTrain(root, recId) {
       // „cover“ bei Querformat links/rechts ab und es gab nichts zu verschieben.
       hgt = Math.min(hgt, avail);
     }
-    stage.style.height = `${Math.round(hgt)}px`;
+    stageH = Math.round(hgt);
     // Fläche so breit wie das Video, mittig (keine schwarzen Seitenbalken, wenn die Höhe begrenzt)
-    stage.style.width = fit === 'width' ? `${w}px` : `${Math.min(w, Math.round(hgt * ratio))}px`;
+    stageW = fit === 'width' ? w : Math.min(w, Math.round(hgt * ratio));
+    stage.style.height = `${stageH}px`;
+    stage.style.width = `${stageW}px`;
+    // Video immer mittig in der Fläche, Größe in px: „Breite füllen“ = volle Breite in eigener Höhe (oben/unten
+    // beschnitten), „Ganzes Bild“ = so groß wie die Fläche. So lässt sich der Wechsel stufenlos animieren.
+    video.style.setProperty('--vw', `${stageW}px`);
+    video.style.setProperty('--vh', `${fit === 'width' ? Math.round(stageW / ratio) : stageH}px`);
     stage.classList.toggle('can-pan', fit === 'width' && w / ratio - hgt > 2);
     applyPan();
     // Panel schließt unten mit der Bedienleiste ab

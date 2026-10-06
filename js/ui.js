@@ -116,6 +116,14 @@ const ICONS = {
   vol2: '<path d="M2.5 7v4h3l4 3.3V3.7l-4 3.3z"/><path d="M12.5 6.5a3.4 3.4 0 0 1 0 5M15 4a7 7 0 0 1 0 10"/>',
   // Ton vom Song statt vom Video: Doppelnote
   note: '<path d="M7.5 14V3.8l9-1.8v10"/><ellipse cx="5.5" cy="14" rx="2" ry="1.6" fill="currentColor"/><ellipse cx="14.5" cy="12" rx="2" ry="1.6" fill="currentColor"/>',
+  // Tutorial-Teile: Teil 1 = Base (Kacheln), Teil 2 = Trainingsansicht (Video mit Zeitleiste)
+  part1: '<rect x="2" y="2.5" width="7" height="5.5" rx="1"/><rect x="11" y="2.5" width="7" height="5.5" rx="1"/><rect x="2" y="10" width="16" height="5.5" rx="1"/>',
+  part2: '<rect x="1.5" y="1.5" width="17" height="11" rx="1.5"/><path d="M8.5 4.8v4.4l3.6-2.2z" stroke-linejoin="round"/><path d="M1.5 16h17M7 14.5v3"/>',
+  // Marker-Optionen: Umbenennen (Stift), Hierhin (Pfeil an die Linie), Auf jetzt setzen (Fadenkreuz), Löschen (Eimer)
+  rename: '<path d="M4 15l.8-3.4 7.7-7.7 2.6 2.6-7.7 7.7z" stroke-linejoin="round"/><path d="M11 5.4l2.6 2.6"/>',
+  jump: '<path d="M3 9h9.5M9 5.5 12.5 9 9 12.5"/><path d="M16 3v12"/>',
+  setNow: '<circle cx="10" cy="9" r="5.5"/><circle cx="10" cy="9" r="1.3" fill="currentColor"/><path d="M10 1v2.5M10 14.5V17M2 9h2.5M15.5 9H18"/>',
+  trash: '<path d="M4 5h12M8 5V3h4v2M5.5 5l.8 10.5h7.4L14.5 5M8.5 8v5M11.5 8v5" stroke-linejoin="round"/>',
   grip: '<circle cx="7" cy="5" r="1.2"/><circle cx="13" cy="5" r="1.2"/><circle cx="7" cy="9" r="1.2"/><circle cx="13" cy="9" r="1.2"/><circle cx="7" cy="13" r="1.2"/><circle cx="13" cy="13" r="1.2"/>',
 };
 export function icon(name) {

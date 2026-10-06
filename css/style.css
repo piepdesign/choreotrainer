@@ -264,18 +264,18 @@ main:has(.train) { padding-bottom: 0; }
 .crumbs h1 { font-size: clamp(18px, 2vw, 24px); margin: 0; flex-basis: 100%; text-transform: uppercase; }
 
 .stage { position: relative; background: #000; display: grid; place-items: center; overflow: hidden; }
-.stage video { width: 100%; height: 100%; object-fit: contain; display: block; transition: transform .2s; }
+/* Video immer absolut mittig, Größe (--vw/--vh) aus fitStage. Breite füllen: volle Breite in eigener Höhe, was
+   übersteht, schneidet die Fläche ab. Verschoben wird per transform (object-position zeichnete Brave bei pausiertem
+   HDR-Video nicht neu). fit-anim: beim Wechsel Breite/Ganzes Bild gleiten Fläche und Video gemeinsam. */
+.stage video { position: absolute; left: 50%; top: 50%; width: var(--vw, 100%); height: var(--vh, 100%); object-fit: contain; display: block; transform: translate(-50%, calc(-50% + var(--pan, 0px))); transition: transform .2s; }
 .stage:fullscreen { height: 100vh !important; }
-.stage video.mirror { transform: scaleX(-1); }
-/* Breite füllen: Video in voller Breite und eigener Höhe, mittig; was übersteht, schneidet die Fläche ab.
-   Verschoben wird per transform (object-position zeichnete Brave bei pausiertem HDR-Video nicht neu) */
-.stage.fill video { position: absolute; left: 0; top: 50%; height: auto; transform: translateY(calc(-50% + var(--pan, 0px))); }
-.stage.fill video.mirror { transform: translateY(calc(-50% + var(--pan, 0px))) scaleX(-1); }
-.stage.fill.panning video { transition: none; }
+.stage video.mirror { transform: translate(-50%, calc(-50% + var(--pan, 0px))) scaleX(-1); }
+.stage.fit-anim, .stage.fit-anim video { transition: width .3s cubic-bezier(.3, 0, .2, 1), height .3s cubic-bezier(.3, 0, .2, 1), transform .3s cubic-bezier(.3, 0, .2, 1); }
+.stage.panning video { transition: none; }
 .stage.can-pan video { cursor: ns-resize; touch-action: none; }
 .stage.fill.panning, .stage.fill.panning video { cursor: grabbing; }
-.stage.fill:fullscreen video { position: static; height: 100%; transform: none; }
-.stage.fill:fullscreen video.mirror { transform: scaleX(-1); }
+.stage:fullscreen video { position: static; width: 100%; height: 100%; transform: none; }
+.stage:fullscreen video.mirror { transform: scaleX(-1); }
 .count {
   will-change: transform; /* eigene Ebene: Zahlwechsel zeichnet das Video nicht neu */
   position: absolute; top: 14px; right: 16px; text-align: right; color: #fff; pointer-events: none;
@@ -409,11 +409,14 @@ main:has(.train) { padding-bottom: 0; }
 .rating button { flex: 1; padding: 8px 0; border: 1px solid var(--line); font-size: 12px; }
 .rating button.on { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 .markers { list-style: none; margin: 0; padding: 0; }
-.markers li { display: grid; grid-template-columns: 54px 1fr; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--rule); font-size: 12px; }
+.markers li { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--rule); font-size: 12px; }
 .markers .name { display: flex; gap: 6px; align-items: center; text-align: left; min-width: 0; }
 .markers .name > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .markers .name:hover > span:last-child { text-decoration: underline; text-underline-offset: 3px; }
-.markers .menu { grid-column: 1 / -1; display: flex; gap: 4px; flex-wrap: wrap; }
+.markers .menu { display: flex; gap: 2px; justify-self: end; } /* Icons rechtsbündig in der Zeile des Markers */
+.markers .mk-act { display: grid; place-items: center; width: 28px; height: 24px; color: var(--muted); }
+.markers .mk-act:hover { color: var(--fg); background: var(--hover-fill); }
+.markers .mk-act svg { width: 16px; height: 15px; }
 .markers .t { font-variant-numeric: tabular-nums; text-decoration: underline; text-underline-offset: 3px; text-align: left; }
 .markers .kind { font-size: 10px; letter-spacing: .08em; padding: 1px 5px; color: #000; text-transform: uppercase; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .markers .name:hover .kind { outline: 1px solid var(--fg); outline-offset: 1px; }
@@ -569,8 +572,7 @@ a.p-row:hover { background: var(--surface-2); }
 .class-manager { display: grid; gap: 28px; }
 .class-manager > .add-row { margin-top: -14px; } /* Knöpfe direkt unter dem Formular */
 .cm-list > .cm-row[hidden] { display: none; } /* wird gerade bearbeitet, die Vorschau steht an ihrer Stelle */
-.cm-draft .cm-actions { opacity: .7; }
-.cm-draft.empty .cc-title { opacity: .5; } /* Platzhalter, solange kein Style gewählt ist */
+.cm-draft .ph { opacity: .5; } /* Platzhalter für noch leere Angaben */
 .classform > .cm-draft { margin-bottom: 14px; }
 .cm-list { display: grid; gap: 3px; }
 .cm-row { display: flex; gap: 0 16px; align-items: center; padding: 10px 14px; font-size: 14px; letter-spacing: .02em; white-space: nowrap; }
@@ -770,7 +772,6 @@ body.intro-open .tester-fab { display: none; }
 .cover-wrap > .sq-cover { margin-right: 0; }
 /* Marker beim Umbenennen neutral (Hintergrund/Vordergrund), Textauswahl invertiert ist so auf jeder Farbe sichtbar */
 .markers .kind.editing { background: var(--bg) !important; color: var(--fg) !important; outline: 1px solid var(--fg); }
-.markers .menu .menu-sep { align-self: center; margin-left: 6px; }
 
 /* ── Tutorial: Rest abgedunkelt, markierte Stelle frei, Textkarte daneben ── */
 .tour { position: fixed; inset: 0; z-index: 90; pointer-events: none; }
@@ -792,12 +793,13 @@ body.intro-open .tester-fab { display: none; }
 .tour-ico svg { display: block; }
 .tour-list .tour-note { grid-column: 1 / -1; color: var(--muted); }
 .tour-list .tour-say { grid-column: 1 / -1; }
-.tour-list:has(.tour-say + .tour-say) .tour-say { position: relative; padding-left: 14px; } /* mehrere Sätze: je einer mit Strich davor */
-.tour-list:has(.tour-say + .tour-say) .tour-say::before { content: '–'; position: absolute; left: 0; color: var(--muted); }
+.tour-list:has(.tour-say + .tour-say) .tour-say { position: relative; padding-left: 14px; } /* mehrere Sätze: Aufzählung mit „>“ */
+.tour-list:has(.tour-say + .tour-say) .tour-say::before { content: '>'; position: absolute; left: 0; color: var(--muted); }
 .tour-hint { margin: 4px 0 0; }
 body.touring .tester-fab { display: none; }
 .tour-done { z-index: 95; }
 .tour-done .modal-card p { margin: 0; font-size: 13px; line-height: 1.55; }
+.tour-done .modal-card > .tour-ico { justify-self: start; } /* Symbol des Teils über dem Titel */
 
 /* ── Handy (schmale Bildschirme) ── */
 html, body { overflow-x: clip; } /* nichts darf seitlich herausragen und die Seite verschiebbar machen */

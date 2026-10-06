@@ -75,15 +75,20 @@ export async function runIntro() {
       },
       canGo: () => !!state.name,
     },
+    // Classes: Weiter erscheint, sobald eine Class angelegt oder mindestens der Style eingetragen ist. Weiter bzw.
+    // „Fertig“ übernimmt die eingetragene Class, „Später“ nicht. Import gibt es hier nicht (später in Base/Profil).
     {
       render() {
-        const manager = classManager(() => refreshNav());
+        classMgr = classManager(() => refreshNav(), { withImport: false, done: () => go(1) });
+        classMgr.addEventListener('input', () => refreshNav());
+        classMgr.addEventListener('change', () => refreshNav());
         return h('div.intro-step',
           h('h1.wide', `WILLKOMMEN, ${state.name.toUpperCase()}.`),
-          h('p.intro-lead', 'Welche Classes besuchst du regelmäßig?'),
-          manager);
+          h('p.intro-lead', 'Welche Class(es) besuchst du regelmäßig?'),
+          classMgr);
       },
-      canGo: async () => (await db.all('classes')).length > 0,
+      canGo: async () => !!classMgr?.form.hasDraft() || (await db.all('classes')).length > 0,
+      leave: () => classMgr?.form.commit(),
       skippable: true,
     },
     {
@@ -132,7 +137,7 @@ export async function runIntro() {
     }]),
   ];
 
-  let index = 0, skipPrefs = false;
+  let index = 0, skipPrefs = false, classMgr = null, skipping = false;
   let resolveDone;
   const done = new Promise(r => { resolveDone = r; });
 
@@ -147,7 +152,8 @@ export async function runIntro() {
     if (index === 0) await saveSettings({ name: state.name });
     if (index === 2 && !skipPrefs) await saveSettings({ provider: state.provider, theme: state.theme, baseStats: state.baseStats, hoverPreview: state.hoverPreview, tester: state.tester });
     if (index === 3) await saveSettings({ appHint: state.appHint });
-    skipPrefs = false;
+    if (delta > 0 && !skipping) await steps[index].leave?.();
+    skipPrefs = skipping = false;
     index += delta;
     if (index >= steps.length) { resolveDone(); return; }
     await show(steps[index].render());
@@ -157,6 +163,7 @@ export async function runIntro() {
   next.addEventListener('click', () => go(1));
   later.addEventListener('click', () => {
     if (index === 2) skipPrefs = true; // Präferenzen überspringen: nichts speichern, weiter zum nächsten Schritt
+    skipping = true; // auch eine eingetragene, noch nicht hinzugefügte Class nicht übernehmen
     go(1);
   });
   await show(steps[0].render());

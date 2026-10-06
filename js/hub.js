@@ -409,10 +409,12 @@ function appHint() {
   return bar;
 }
 
-// Neue Class (Base, Profil): Class-Formular im Fenster, danach die aktuelle Seite neu aufbauen
+// Neue Class (Base, Profil): Class-Formular im Fenster. „Weitere Class“ legt an und leert das Formular,
+// „Fertig“ übernimmt die eingetragene und schließt. Danach die aktuelle Seite neu aufbauen, falls etwas dazukam.
 export function newClassDialog() {
-  const close = () => box.remove();
-  const form = classForm(() => { close(); go(location.hash || '#/', { replace: true }); }, { heading: false, withImport: false });
+  let added = false;
+  const close = () => { box.remove(); if (added) go(location.hash || '#/', { replace: true }); };
+  const form = classForm(() => { added = true; }, { heading: false, withImport: false, done: close });
   const box = h('div.modal', { onclick: e => { if (e.target === box) close(); } },
     h('div.modal-card.class-card', h('h2.wide', 'NEUE CLASS'), form, h('button.linkbtn', { type: 'button', onclick: close, style: { justifySelf: 'start' } }, 'Abbrechen')));
   document.body.append(box);

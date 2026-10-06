@@ -167,12 +167,12 @@ function tour(steps, { finish, onEnd, scope = null } = {}) {
 }
 
 // Kurzes Bestätigungsfenster am Ende
-function confirmBox({ title, text, button = 'Los geht’s', skip = false }) {
+function confirmBox({ title, text, icon: part = null, button = 'Los geht’s', skip = false }) {
   return new Promise(resolve => {
     const ok = h('button.btn.primary', { type: 'button' }, button);
     const no = skip ? h('button.linkbtn', { type: 'button' }, 'Überspringen') : null;
     const body = h('div.tour-text'); fill(body, text);
-    const box = h('div.modal.tour-done', h('div.modal-card', h('h2.wide', title), body, h('div.actions', ok, no)));
+    const box = h('div.modal.tour-done', h('div.modal-card', part ? ico(part) : null, h('h2.wide', title), body, h('div.actions', ok, no))); // Icon: welcher Teil
     const close = go => { box.remove(); resolve(go); };
     ok.addEventListener('click', () => close(true));
     no?.addEventListener('click', () => close(false));
@@ -196,49 +196,47 @@ const IO = 'In / Out';
 // Hinweis in der Begrüßung beider Teile
 const REPEAT = 'Das Tutorial kannst du jederzeit unter Einstellungen › Konto wiederholen.';
 
-// Grundsatz der Texte: beschreiben, was ein Element tut, nicht die Umstände drumherum. Jeder Punkt ein Satz.
+// Grundsatz der Texte: nur die Funktion, jeder Punkt ein Satz. Die Geste wird nur genannt, wenn die Funktion an ihr
+// hängt (Doppelklick = Vollbild, Ziehen = mehrere Achten), nicht fürs bloße Öffnen.
 export function mainTour() {
-  const tap = tt('Ein Klick', 'Tippen');
   return runTour([
     { route: /^#\/?$/, target: '.dropzone', block: true, title: 'Neue Choreo', text: [
-      tt('Ein Kursvideo hier ablegen oder anklicken legt eine neue Choreo an.', 'Tippen legt aus einem Kursvideo eine neue Choreo an.')] },
+      'Legt aus einem Kursvideo eine neue Choreo an.',
+      ...tt(['Videos lassen sich auch direkt hierher ziehen.'], [])] },
     { route: /^#\/?$/, target: '.stats', block: true, title: 'Statistiken', text: [
       'Die Kacheln zeigen Kennzahlen zu deinem Üben.',
-      `${tap} öffnet die passende Auswertung im Profil.`] },
+      'Jede Kachel führt zur passenden Auswertung im Profil.'] },
     { route: /^#\/?$/, target: '.stripes', block: true, when: () => !!document.querySelector('.stripes .stripe'), title: 'Classes', text: [
-      'Jeder Streifen ist eine Class in ihrer Farbe.',
-      `${tap} öffnet die Class mit allen Choreos.`,
+      'Jeder Streifen ist eine Class und führt zu ihren Choreos.',
       `${tt('Ziehen', 'Halten und Ziehen')} sortiert die Classes.`] },
-    { target: '[data-nav="profile"]', title: 'Profil', text: [`${tap} zeigt Übungszeit, Status und alle Choreos.`] },
-    { route: /^#\/profile/, target: '.p-nav', title: 'Reiter', text: [`${tap} wechselt zwischen Übersicht, Übungszeit, Status und Choreos.`] },
-    { target: '[data-nav="settings"]', title: 'Einstellungen', text: () => [[svgIco(document.querySelector('[data-nav="settings"] svg')?.outerHTML), 'Hier stellst du Musikprovider, Hörprobe, Base, Classes, Daten, App und Konto ein.']] },
+    { target: '[data-nav="profile"]', title: 'Profil', text: ['Zeigt Übungszeit, Status und alle Choreos.'] },
+    { route: /^#\/profile/, target: '.p-nav', title: 'Reiter', text: ['Wechseln zwischen Übersicht, Übungszeit, Status und Choreos.'] },
+    { target: '[data-nav="settings"]', title: 'Einstellungen', text: () => [[svgIco(document.querySelector('[data-nav="settings"] svg')?.outerHTML), 'Musikprovider, Hörprobe, Base, Classes, Daten, App und Konto.']] },
     { route: /^#\/settings/, target: '.theme-toggle', block: true, title: 'Ansicht', text: [
       [svgIco(themeIcon('light')), 'Hell'],
       [svgIco(themeIcon('dark')), 'Dunkel'],
       [svgIco(themeIcon('system')), 'System']] },
     // schmale Handys: „BASE“ ist ausgeblendet, dort führt die Wortmarke zurück
-    { target: () => [document.querySelector('[data-nav="hub"]'), document.querySelector('.wordmark')].find(visible), title: 'Base', text: [`${tap} führt zurück zur Startseite.`] },
+    { target: () => [document.querySelector('[data-nav="hub"]'), document.querySelector('.wordmark')].find(visible), title: 'Base', text: ['Führt zurück zur Startseite.'] },
   ], {
-    start: { title: 'TUTORIAL', text: [REPEAT] },
-    finish: { title: 'GESCHAFFT!', text: ['Teil 2 zeigt dir die Trainingsansicht, sobald du deine erste Choreo öffnest.'] },
+    start: { title: 'TUTORIAL', icon: 'part1', text: [REPEAT] },
+    finish: { title: 'GESCHAFFT!', text: [[ico('part2'), 'Teil 2 zeigt die Trainingsansicht, sobald du deine erste Choreo öffnest.']] },
     onEnd: () => saveSettings({ tourDone: true }),
   });
 }
 
 export function trainTour() {
-  const tap = tt('Ein Klick', 'Tippen');
   const sec = k => `.panel-sec[data-k="${k}"]`;
   return runTour([
     { target: '.stage', block: true, below: true, title: 'Video', text: [
-      `${tap} startet oder pausiert das Video.`,
-      `${tt('Ein Doppelklick', 'Doppelt tippen')} schaltet auf Vollbild.`] },
+      'Startet und pausiert das Video.',
+      `${tt('Doppelklick', 'Doppelt tippen')} schaltet auf Vollbild.`] },
     { target: '.timeline .tl-row:first-child .track', block: true, title: 'Zeitleiste', text: [
-      `${tt('Klicken', 'Tippen')} oder Ziehen springt an die Stelle.`,
+      'Springt an die gewählte Stelle.',
       'Die Striche zeigen Marker und Loop.'] },
     { target: '.track.eights', block: true, title: '8er-Count', text: [
-      'Jedes Feld ist eine Acht.',
-      `${tap} loopt diese Acht.`,
-      'Ziehen loopt mehrere Achten.'] },
+      'Jedes Feld loopt seine Acht.',
+      'Ziehen über mehrere Felder loopt mehrere Achten.'] },
     // Bedienleiste: je Gruppe ein Schritt, von links nach rechts
     { target: '.controls > .ctl-group:nth-child(1)', block: true, title: 'Wiedergabe', text: [
       [ico('play'), ['Startet und pausiert.', key('Leertaste')]],
@@ -253,7 +251,7 @@ export function trainTour() {
       [null, `Ohne ${IO} loopt er zwischen Start- und Ende-Marker.`]] },
     { target: '.controls > .ctl-group:nth-child(3)', block: true, title: 'Count', text: [
       [chip('8er'), 'Blendet den Zähler ein oder aus.'],
-      [chip('BPM'), 'Öffnet Tempo, Verschieben, Klick und Anzeige.'],
+      [chip('BPM'), 'Tempo, Verschieben, Klick und Anzeige.'],
       [chip('1'), ['Setzt den Anfangscount an die aktuelle Stelle.', key('1')]],
       [chip('Tap'), ['Tippt die BPM im Takt ein.', key('T')]]] },
     { target: '.controls > .ctl-group:nth-child(4)', block: true, title: 'Bild', text: [
@@ -275,21 +273,24 @@ export function trainTour() {
       'Der Startpunkt legt fest, wo im Song das Video beginnt.',
       'Eine Songdatei lässt sich als Tonquelle laden.'] },
     { target: sec('marker'), block: true, side: true, before: panelOpen, title: 'Marker', text: [
-      `${tt('Ein Klick auf die Zeit', 'Tippen auf die Zeit')} springt zum Marker.`,
-      'Über den Namen lässt er sich umbenennen, versetzen, ändern oder löschen.'] },
+      'Die Zeit springt zum Marker, der Name zeigt seine Optionen.',
+      [ico('rename'), 'Umbenennen'],
+      [ico('jump'), 'Hierhin springen'],
+      [ico('setNow'), 'Auf jetzt setzen'],
+      [ico('trash'), 'Löschen']] },
     { target: sec('notes'), block: true, side: true, before: panelOpen, title: 'Notizen', text: [
-      'Eigene Notizen zur Aufnahme speichern automatisch.'] },
+      'Eigene Notizen zur Aufnahme, speichern automatisch.'] },
     { target: sec('status'), block: true, side: true, before: panelOpen, title: 'Status', text: [
-      'Mit 1 bis 5 bewertest du, wie gut du die Choreo kannst.'] },
+      'Bewertet von 1 bis 5, wie gut du die Choreo kannst.'] },
     { target: sec('recs'), block: true, side: true, before: panelOpen, title: 'Aufnahmen', text: [
       'Die Liste wechselt zu einer anderen Aufnahme der Choreo.',
-      'Über den Namen benennst du die aktuelle Aufnahme um.',
+      'Der Name benennt die aktuelle Aufnahme um.',
       'Hinzufügen lädt ein weiteres Video zur Choreo, Löschen entfernt die aktuelle Aufnahme.'] },
     { target: sec('keys'), block: true, side: true, before: panelOpen, when: () => !!document.querySelector(sec('keys')), title: 'Tasten', text: [
-      'Die Liste zeigt alle Tastenkürzel.'] },
+      'Alle Tastenkürzel.'] },
   ], {
     scope: /^#\/train\//,
-    start: { title: 'TRAININGSANSICHT', text: [REPEAT] },
+    start: { title: 'TRAININGSANSICHT', icon: 'part2', text: [REPEAT] },
     finish: { title: 'VIEL SPASS BEIM ÜBEN!' },
     onEnd: () => saveSettings({ tourTrainDone: true }),
   });
