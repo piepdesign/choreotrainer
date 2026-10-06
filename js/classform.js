@@ -1,6 +1,6 @@
 // Classes ohne Video anlegen, bearbeiten, löschen. Genutzt im Intro und im Profil.
 import { db, uid, deleteClass } from './db.js';
-import { classPickers, confirmDialog } from './ui.js';
+import { classPickers, confirmDialog, icon } from './ui.js';
 import { chooseFile, importExport, importSummary } from './share.js';
 import { h, PALETTE, textOn, WEEKDAYS, CLASS_TITLES, CLASS_LEVELS, classTitle, classCells, byClassOrder } from './util.js';
 
@@ -61,10 +61,11 @@ export function classManager(onChange, { withImport = true } = {}) {
       const n = choreos.filter(x => x.classId === c.id).length;
       return h('div.cm-row', { 'data-id': c.id, style: { background: `#${c.color}`, color: textOn(c.color) } },
         ...classCells(c),
+        // Bearbeiten/Löschen als Icons wie bei den Markern
         h('span.cm-actions',
-          h('button.linkbtn', { type: 'button', onclick: () => openForm(c) }, 'Bearbeiten'),
-          h('button.linkbtn', {
-            type: 'button',
+          h('button.mk-act', { type: 'button', title: 'Bearbeiten', 'aria-label': 'Bearbeiten', html: icon('rename'), onclick: () => openForm(c) }),
+          h('button.mk-act', {
+            type: 'button', title: 'Löschen', 'aria-label': 'Löschen', html: icon('trash'),
             onclick: async () => {
               const ok = await confirmDialog({
                 title: 'CLASS LÖSCHEN',
@@ -77,7 +78,7 @@ export function classManager(onChange, { withImport = true } = {}) {
               await refresh();
               onChange?.();
             },
-          }, 'Löschen')));
+          })));
     }));
     placePreview();
     moreBtn.textContent = classes.length ? 'Weitere Class' : 'Neue Class';

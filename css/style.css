@@ -414,9 +414,13 @@ main:has(.train) { padding-bottom: 0; }
 .markers .name > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .markers .name:hover > span:last-child { text-decoration: underline; text-underline-offset: 3px; }
 .markers .menu { display: flex; gap: 2px; justify-self: end; } /* Icons rechtsbündig in der Zeile des Markers */
-.markers .mk-act { display: grid; place-items: center; width: 28px; height: 22px; color: var(--muted); }
-.markers .mk-act:hover { color: var(--fg); background: var(--hover-fill); }
-.markers .mk-act svg { width: 16px; height: 15px; }
+/* Icon-Knöpfe in Zeilen (Marker, Classes verwalten) */
+.mk-act { display: grid; place-items: center; width: 28px; height: 22px; color: var(--muted); }
+.mk-act:hover { color: var(--fg); background: var(--hover-fill); }
+.mk-act svg { width: 16px; height: 15px; }
+.cm-row .mk-act { color: inherit; opacity: .75; } /* auf der Class-Farbe: Schrift der Zeile */
+.cm-row .mk-act:hover { opacity: 1; background: color-mix(in srgb, currentColor 18%, transparent); }
+.cm-row .cm-actions { display: flex; gap: 2px; justify-content: flex-end; }
 .markers .t { font-variant-numeric: tabular-nums; text-decoration: underline; text-underline-offset: 3px; text-align: left; }
 .markers .kind { font-size: 10px; letter-spacing: .08em; padding: 1px 5px; color: #000; text-transform: uppercase; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .markers .name:hover .kind { outline: 1px solid var(--fg); outline-offset: 1px; }
@@ -811,8 +815,15 @@ html, body { overflow-x: clip; } /* nichts darf seitlich herausragen und die Sei
   .topbar nav { gap: 12px; font-size: 11px; }
   .topbar nav .icon-link { margin-right: -6px; }
   .tester-fab { right: 12px; bottom: 12px; }
-  /* Class-Zeilen: Knöpfe (Bearbeiten/Löschen) in eigene Zeile, damit nichts abgeschnitten wird */
-  .cm-list .cm-actions { grid-column: 1 / -1; justify-self: start; padding-top: 6px; }
+  /* Class-Zeilen: oben Titel und Icons (Bearbeiten/Löschen), darunter Tag · Uhrzeit · Coach */
+  .cm-list { grid-template-columns: minmax(0, 1fr); }
+  .cm-list > .cm-row { display: flex; flex-wrap: wrap; align-items: center; row-gap: 2px; padding-right: 8px; }
+  .cm-list > .cm-row .cc-title { flex: 1 1 calc(100% - 70px); min-width: 0; }
+  .cm-list > .cm-row .cm-actions { order: 1; }
+  .cm-list > .cm-row .cc-meta { order: 2; font-size: 12px; }
+  .cm-list > .cm-row .cc-meta:nth-child(2)::before, .cm-list > .cm-row .cc-meta:empty + .cc-meta::before { content: none; }
+  .cm-list > .cm-row .cc-gap { display: none; }
+  .cm-list > .cm-row .cc-meta:not(:empty) ~ .cc-meta:not(:empty)::before { content: '·'; }
   .cm-row { flex-wrap: wrap; }
   /* Kacheln füllen die Breite: eine allein über die volle Breite, mehrere je 75 % (Rest lädt zum Wischen ein) */
   .cards.hscroll > .card { flex: 1 0 75%; }

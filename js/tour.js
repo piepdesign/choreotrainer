@@ -108,13 +108,17 @@ function tour(steps, { finish, onEnd, scope = null } = {}) {
     setTimeout(() => { t.style.scrollMarginTop = ''; }, 1000);
   }
 
-  // Klicks außerhalb der markierten Stelle und der Karte sperren; Klick auf die Stelle führt weiter
+  // Klicks außerhalb der markierten Stelle und der Karte sperren; Klick auf die Stelle führt weiter.
+  // „Auf der Stelle“ auch nach Lage, nicht nur nach Element: Über der Zeitleiste liegen z. B. Abspielkopf und
+  // Marker-Striche, die laufend neu gezeichnet werden. Dann kam der Klick teils nicht an (Element ersetzt) oder
+  // galt als daneben. block-Schritte gehen deshalb schon beim Loslassen weiter.
+  const within = e => { if (!target || e.clientX == null || (!e.clientX && !e.clientY)) return false; const r = target.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; };
   const guard = e => {
     if (card.contains(e.target)) return;
-    if (target && target.contains(e.target)) {
+    if (target && (target.contains(e.target) || within(e))) {
       // block: auch Drücken/Ziehen nicht an die Seite weitergeben (z. B. keinen Loop über die Achten setzen)
       if (step.block) { e.preventDefault(); e.stopPropagation(); }
-      if (e.type === 'click') {
+      if (e.type === 'click' || (e.type === 'pointerup' && step.block)) {
         const done = resolveStep; resolveStep = null;
         setTimeout(() => done?.(), step.block ? 0 : 60);
       }
@@ -124,14 +128,14 @@ function tour(steps, { finish, onEnd, scope = null } = {}) {
     e.stopPropagation();
   };
   const onKey = e => { if (e.key === 'Escape') end(true); };
-  ['click', 'pointerdown', 'mousedown', 'dblclick'].forEach(t => addEventListener(t, guard, true));
+  ['click', 'pointerdown', 'pointerup', 'mousedown', 'dblclick'].forEach(t => addEventListener(t, guard, true));
   addEventListener('keydown', onKey, true);
   let stopped = false;
   function end() {
     if (stopped) return;
     stopped = true;
     cancelAnimationFrame(raf);
-    ['click', 'pointerdown', 'mousedown', 'dblclick'].forEach(t => removeEventListener(t, guard, true));
+    ['click', 'pointerdown', 'pointerup', 'mousedown', 'dblclick'].forEach(t => removeEventListener(t, guard, true));
     removeEventListener('keydown', onKey, true);
     removeEventListener('hashchange', onHash);
     root.remove();
@@ -184,7 +188,6 @@ function confirmBox({ title, text, button = 'Los geht’s', skip = false }) {
 
 // ── Inhalte ──
 const markerList = () => document.querySelector('.panel-sec[data-k="marker"] .markers');
-const hasMarkers = () => !!markerList()?.querySelector('li .name');
 const markerOptions = on => markerList()?.showOptions?.(on); // Optionen des ersten Markers ein-/ausblenden
 const narrow = () => matchMedia('(max-width: 1000px)').matches; // Panel liegt dann unter dem Video
 const panelOpen = () => {
@@ -275,23 +278,23 @@ export function trainTour() {
       `Das Cover öffnet den Song beim Musikprovider, ${tt('Darüberfahren', 'Halten')} spielt eine Hörprobe.`,
       'Der Startpunkt legt fest, wo im Song das Video beginnt.',
       'Eine Songdatei lässt sich als Tonquelle laden.'] },
-    // Optionen-Icons nur erklären, wenn sie zu sehen sind: beim ersten Marker eingeblendet. Ohne Marker nur die Liste.
-    { target: sec('marker'), block: true, side: true, before: () => { panelOpen(); markerOptions(true); }, title: 'Marker', text: () => hasMarkers() ? [
+    // Optionen-Icons am ersten Marker eingeblendet; gibt es noch keinen, nur für diesen Schritt ein Beispiel-Marker
+    { target: sec('marker'), block: true, side: true, before: () => { panelOpen(); markerOptions(true); }, title: 'Marker', text: [
       'Die Zeit springt zum Marker, der Name zeigt seine Optionen.',
       [ico('rename'), 'Umbenennen'],
       [ico('jump'), 'Hierhin springen'],
       [ico('setNow'), 'Auf jetzt setzen'],
-      [ico('trash'), 'Löschen']] : [
-      'Listet die gesetzten Marker, die Zeit springt zum Marker.',
-      'Der Name eines Markers zeigt Umbenennen, Hierhin springen, Auf jetzt setzen und Löschen.'] },
+      [ico('trash'), 'Löschen']] },
     { target: sec('notes'), block: true, side: true, before: () => { panelOpen(); markerOptions(false); }, title: 'Notizen', text: [
       'Eigene Notizen zur Aufnahme, speichern automatisch.'] },
     { target: sec('status'), block: true, side: true, before: panelOpen, title: 'Status', text: [
       'Bewertet von 1 bis 5, wie gut du die Choreo kannst.'] },
     { target: sec('recs'), block: true, side: true, before: panelOpen, title: 'Aufnahmen', text: [
-      'Die Liste wechselt zu einer anderen Aufnahme der Choreo.',
-      'Der Name benennt die aktuelle Aufnahme um.',
-      'Hinzufügen lädt ein weiteres Video zur Choreo, Löschen entfernt die aktuelle Aufnahme.'] },
+      'Chronik aller Aufnahmen der Choreo, nach Datum, zum Wechseln.',
+      'Der Name der aktuellen Aufnahme ist umbenennbar.',
+      'Hinzufügen lädt ein weiteres Video zur Choreo.',
+      'Löschen entfernt die aktuelle Aufnahme samt Video.',
+      'Exportieren speichert die Choreo als Datei zum Teilen oder Sichern.'] },
     { target: sec('keys'), block: true, side: true, before: panelOpen, when: () => !!document.querySelector(sec('keys')), title: 'Tasten', text: [
       'Alle Tastenkürzel.'] },
   ], {

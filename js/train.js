@@ -792,9 +792,18 @@ export async function renderTrain(root, recId) {
   const markerList = h('ul.markers');
   let menuFor = null, renaming = false;
   // fürs Tutorial: Optionen des ersten Markers zeigen bzw. wieder schließen
-  markerList.showOptions = on => { menuFor = on && rec.markers[0] ? rec.markers[0].id : null; renaming = false; renderMarkers(); };
+  // Gibt es noch keinen Marker, steht dafür nur in der Liste ein Beispiel (nicht in rec.markers, wird nie gespeichert)
+  let demo = null;
+  markerList.showOptions = on => {
+    demo = on && !rec.markers.length ? [{ id: 'tour-demo', t: video.currentTime || 0, type: 'highlight', text: 'Beispiel' }] : null;
+    menuFor = on ? (demo || rec.markers)[0]?.id ?? null : null;
+    renaming = false;
+    renderMarkers();
+  };
   function renderMarkers() {
-    markerList.replaceChildren(...(rec.markers.length ? rec.markers.map(m => {
+    if (demo && rec.markers.length) demo = null; // echter Marker dazugekommen: Beispiel weg
+    const list = demo || rec.markers;
+    markerList.replaceChildren(...(list.length ? list.map(m => {
       // Der Marker trägt seinen Namen selbst; ohne Namen steht dort der Typ
       const kind = h('span.kind', { style: { background: MARKER_TYPES[m.type].color, color: m.type === 'start' || m.type === 'end' ? 'var(--bg)' : '#000' } });
       const editing = menuFor === m.id && renaming;
