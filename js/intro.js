@@ -132,7 +132,7 @@ export async function runIntro() {
           isIOS() ? h('p.intro-lead', 'Am iPhone hat die installierte App einen eigenen Speicher. Am besten jetzt installieren und dort weitermachen.') : null,
           h('p.intro-lead', '(Jederzeit unter Einstellungen › App)'));
       },
-      canGo: () => true,
+      canGo: () => !!state.appChoice, // „>“ erst nach einer Wahl (abgebrochene Installation hebt sie wieder auf)
       skippable: true,
     }]),
   ];
