@@ -665,7 +665,7 @@ a.stat-link:hover { background: var(--surface-2); }
 .choice { position: relative; min-width: 0; }
 .choice-btn { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 42px; padding: 8px 12px; background: var(--surface); font-size: 12px; letter-spacing: .04em; text-align: left; color: var(--fg); transition: background .15s; }
 .choice-btn:hover, .choice.open .choice-btn { background: var(--surface-2); }
-.choice-btn.empty .choice-label { color: var(--muted); }
+.choice-btn.empty .choice-label, .choice-btn.empty .choice-ico { color: var(--muted); }
 .choice-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .choice-ico { display: grid; place-items: center; flex: none; width: 22px; }
 .choice-ico svg { display: block; }

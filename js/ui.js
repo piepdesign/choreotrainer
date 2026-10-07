@@ -27,6 +27,11 @@ export const TOOL_PATHS = {
   idea: '<path d="M9 17.5h6M9.8 20.5h4.4M12 3.5a5.8 5.8 0 0 0-3.3 10.6c.6.5.8 1.1.8 1.8v1.6h5v-1.6c0-.7.2-1.3.8-1.8A5.8 5.8 0 0 0 12 3.5z"/>',
 };
 export const toolIcon = (id, size = 22) => svg26(TOOL_PATHS[id], size);
+// Helfer*in-Auswahl: leeres Klemmbrett (noch nichts gewählt), mit Haken (aktiviert), mit Kreuz (deaktiviert)
+const CLIP = '<rect x="5.5" y="4.5" width="13" height="16.5" rx="1.5"/><rect x="9" y="3" width="6" height="3.2" rx=".8"/>';
+const CLIP_ICONS = { empty: CLIP, on: `${CLIP}<path d="M9 13.4l2.2 2.3 4-4.6" stroke-linejoin="round"/>`, off: `${CLIP}<path d="M9.6 10.6l4.8 4.8M14.4 10.6l-4.8 4.8"/>` };
+// Musikprovider noch nicht gewählt: allgemeine Doppelnote statt eines Anbieter-Logos
+const MUSIC_ICON = '<path d="M9 17.5V6.2l10-2.2v11.5"/><circle cx="6.8" cy="17.5" r="2.2"/><circle cx="16.8" cy="15.5" r="2.2"/>';
 // gleiche Icons klein für die Kopfleiste
 export const themeIcon = (id, size = 18) => svg26(THEME_PATHS[id], size);
 
@@ -216,7 +221,7 @@ export function preferences(values, onChange, statValues = null, { baseLabel = t
   const chips = cards ? null : statPicker(values.baseStats || [], statValues, list => onChange({ baseStats: list }), { baseLabel });
   return h(cards ? 'div.acc' : 'div.prefs',
     block('Musikprovider', choiceRow(PROVIDERS.map(([id, name]) => [id, name, brandIcon(id, 18)]), values.provider,
-      id => onChange({ provider: id }), { placeholder: tr('Auswählen …') })),
+      id => onChange({ provider: id }), { placeholder: tr('Auswählen …'), placeholderIcon: svg26(MUSIC_ICON, 18) })),
     // An/Aus und Lautstärke in einem: Aus · Leise · Mittel · Laut
     block('Song-Cover Hörprobe', choiceRow([['off', tr('Aus')], ['low', tr('Leise')], ['mid', tr('Mittel')], ['high', tr('Laut')]].map(([id, l]) => [id, l, svg26(SOUND_PATHS[id], 18)]),
       values.hoverPreview === 'on' || !values.hoverPreview ? 'mid' : values.hoverPreview, id => onChange({ hoverPreview: id }))),
@@ -224,7 +229,7 @@ export function preferences(values, onChange, statValues = null, { baseLabel = t
       values.theme || 'system', id => onChange({ theme: id }))),
     // Sprache: Wahl lädt die Seite neu (an derselben Stelle)
     language ? block('Sprache', choiceRow(LANGS.map(([id, name]) => [id, name, `<b class="choice-code">${id.toUpperCase()}</b>`]), lang, id => setLang(id))) : null,
-    tester ? block('Helfer*in', choiceRow([['on', tr('Aktiviert')], ['off', tr('Deaktiviert')]].map(([id, l]) => [id, l, svg26(TOOL_PATHS.clipboard, 18)]), values.tester ? 'on' : 'off', id => onChange({ tester: id === 'on' }))) : null,
+    tester ? block('Helfer*in', choiceRow([['on', tr('Aktiviert')], ['off', tr('Deaktiviert')]].map(([id, l]) => [id, l, svg26(CLIP_ICONS[id], 18)]), values.tester ? 'on' : 'off', id => onChange({ tester: id === 'on' }), { placeholderIcon: svg26(CLIP_ICONS.empty, 18) })) : null,
     cards ? null : block('Statistiken', chips, false));
 }
 
@@ -232,11 +237,12 @@ export function preferences(values, onChange, statValues = null, { baseLabel = t
 // alle Optionen aus (Gestaltung wie das Ansicht-Menü in der Kopfleiste), Wahl schließt wieder. Esc/daneben schließt.
 // options: [[id, Name, Symbol-HTML?]] · onPick(id) · el.set(id) setzt von außen
 const CHEV = '<svg viewBox="0 0 12 8" width="12" height="8" aria-hidden="true"><path d="M1 1.5 6 6.5l5-5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>';
-export function choiceRow(options, value, onPick, { placeholder = '—' } = {}) {
+// placeholderIcon: Symbol, solange nichts gewählt ist (ganz schmal steht dann nur das Symbol, gleich breit wie die anderen)
+export function choiceRow(options, value, onPick, { placeholder = '—', placeholderIcon = null } = {}) {
   let cur = value, menu = null;
   const wrap = h('div.choice');
   const btn = h('button.choice-btn', { type: 'button', 'aria-haspopup': 'listbox', 'aria-expanded': 'false' });
-  const face = o => [o?.[2] ? h('i.choice-ico', { html: o[2] }) : null, h('span.choice-label', o ? o[1] : placeholder)].filter(Boolean);
+  const face = o => [(o ? o[2] : placeholderIcon) ? h('i.choice-ico', { html: o ? o[2] : placeholderIcon }) : null, h('span.choice-label', o ? o[1] : placeholder)].filter(Boolean);
   const paint = () => {
     const o = options.find(x => x[0] === cur);
     btn.replaceChildren(...face(o), h('i.choice-chev', { html: CHEV }));
