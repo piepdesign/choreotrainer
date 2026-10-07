@@ -670,6 +670,7 @@ a.stat-link:hover { background: var(--surface-2); }
 .choice-ico { display: grid; place-items: center; flex: none; width: 22px; }
 .choice-ico svg { display: block; }
 .choice-code { font: 800 12px var(--wide); font-stretch: 125%; letter-spacing: .02em; }
+.choice-ico:has(.choice-code) { width: 24px !important; place-items: center start; } /* Sprachkürzel: feste Breite (breitestes „EN“), linksbündig: im Feld und in der Liste gleicher Abstand zum Namen, Namen untereinander */
 .choice-chev { display: grid; place-items: center; flex: none; color: var(--muted); transition: transform .15s; }
 .choice.open .choice-chev { transform: rotate(180deg); }
 .choice-menu { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 60; display: grid; padding: 4px; max-height: min(320px, 60vh); overflow-y: auto; background: var(--bg); border: 1px solid var(--fg); box-shadow: 0 10px 30px rgba(0, 0, 0, .2); }
@@ -682,7 +683,7 @@ a.stat-link:hover { background: var(--surface-2); }
 .acc-card .choice-btn:hover, .acc-card .choice.open .choice-btn { background: var(--hover-fill); }
 .acc-card .choice-label { text-align: center; }
 .acc-card .choice-ico + .choice-label { text-align: left; } /* mit Symbol linksbündig daneben */
-.acc-card .choice-btn { gap: 8px; }
+.acc-card .choice-btn { gap: 10px; } /* gleicher Abstand Symbol–Text wie in der aufgeklappten Liste */
 .acc-card .choice-btn .choice-ico { width: 18px; } /* Symbol der gewählten Option auch im Feld */
 /* so hoch wie die Knöpfe daneben (Symbol 16 px statt 18, Sprachkürzel ist niedriger) */
 .acc-card .choice-btn { min-height: 28px; }
