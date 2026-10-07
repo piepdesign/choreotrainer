@@ -702,7 +702,11 @@ a.stat-link:hover { background: var(--surface-2); }
 @media (max-width: 440px) {
   .acc-card { grid-template-columns: minmax(0, 1fr) var(--acc-btn, 168px) !important; }
   .acc-card .choice-btn:has(.choice-ico) .choice-label { display: none; }
-  .acc-card .choice-btn:has(.choice-ico) { justify-content: center; } /* Symbol und Pfeil mittig */
+  /* nur Symbol: Feld so schmal wie Symbol + Pfeil, rechtsbündig mit den Knöpfen darunter; Liste nach links, breit genug für die Namen */
+  .acc-card > .choice:has(.choice-ico) { justify-self: end; }
+  .acc-card:has(> .choice .choice-ico) { grid-template-columns: minmax(0, 1fr) auto !important; } /* Satz bekommt den frei gewordenen Platz */
+  .acc-card .choice-btn:has(.choice-ico) { width: auto; gap: 10px; padding-left: 12px; padding-right: 10px; }
+  .acc-card > .choice:has(.choice-ico) .choice-menu { left: auto; right: 0; min-width: 190px; }
 }
 .acc-card .acc-text { grid-area: text; }
 /* alle Knöpfe gleich breit (ganze Knopfspalte), Schalter am Spaltenanfang */
