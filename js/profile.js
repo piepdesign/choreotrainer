@@ -595,7 +595,8 @@ export async function renderProfile(root, section) {
 }
 
 // Titelspalte der Einstellungs-Zeilen so breit wie der längste Titel (110–230 px, längere brechen um): die Mitte
-// beginnt so nah wie möglich am Titel, bleibt aber in allen Abschnitten bündig. Misst neu, wenn Zeilen dazukommen.
+// beginnt so nah wie möglich am Titel, bleibt aber in allen Abschnitten bündig. Dazu die natürliche Breite des
+// längsten Wort-Knopfs (--acc-btn): ganz schmale Ansichten nutzen sie als Knopfspalte. Misst neu, wenn Zeilen dazukommen.
 function fitAccTitles(root) {
   let raf = 0;
   const fit = () => {
@@ -603,10 +604,15 @@ function fitAccTitles(root) {
     raf = requestAnimationFrame(() => {
       const titles = [...root.querySelectorAll('.acc-title')];
       if (!titles.length || !root.isConnected) return;
-      titles.forEach(t => t.classList.add('measure'));
+      // Wort-Knöpfe: Knöpfe und Auswahlfelder ohne Symbol (die mit Symbol zeigen schmal nur das Symbol)
+      const btns = [...root.querySelectorAll('.acc-card > .btn, .acc-card .choice-btn:not(:has(.choice-ico))')];
+      const all = [...titles, ...btns];
+      all.forEach(t => t.classList.add('measure'));
       const w = Math.max(...titles.map(t => t.getBoundingClientRect().width));
-      titles.forEach(t => t.classList.remove('measure'));
+      const bw = Math.max(0, ...btns.map(b => b.getBoundingClientRect().width));
+      all.forEach(t => t.classList.remove('measure'));
       root.style.setProperty('--acc-title', `${Math.round(Math.min(230, Math.max(110, w + 1)))}px`);
+      if (bw) root.style.setProperty('--acc-btn', `${Math.ceil(bw + 1)}px`);
     });
   };
   new MutationObserver(fit).observe(root, { childList: true, subtree: true });

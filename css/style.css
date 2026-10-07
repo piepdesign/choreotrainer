@@ -681,6 +681,9 @@ a.stat-link:hover { background: var(--surface-2); }
 .acc-card .choice-ico + .choice-label { text-align: left; } /* mit Symbol linksbündig daneben */
 .acc-card .choice-btn { gap: 8px; }
 .acc-card .choice-btn .choice-ico { width: 18px; } /* Symbol der gewählten Option auch im Feld */
+/* so hoch wie die Knöpfe daneben (Symbol 16 px statt 18, Sprachkürzel ist niedriger) */
+.acc-card .choice-btn { min-height: 28px; }
+.acc-card .choice-btn .choice-ico svg { width: 16px; height: 16px; }
 .acc-card .choice-menu button { text-transform: uppercase; font-size: 11px; letter-spacing: .08em; }
 /* Kacheln füllen jede Zeile (auch eine übrige letzte Kachel nimmt die volle Breite) */
 .provider-tiles { display: flex; flex-wrap: wrap; gap: var(--tile-gap); }
@@ -694,7 +697,13 @@ a.stat-link:hover { background: var(--surface-2); }
 .acc { display: grid; gap: var(--tile-gap); }
 .acc-card { display: grid; grid-template-columns: var(--acc-title, 180px) minmax(0, 1fr) 180px; grid-template-areas: 'title text btn'; align-items: center; gap: 8px 24px; background: var(--surface); padding: 14px 16px; }
 .acc-title { grid-area: title; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--fg); }
-.acc-title.measure { white-space: nowrap; width: max-content; } /* kurz zum Messen der natürlichen Breite */
+.acc-title.measure, .acc-card > .btn.measure, .acc-card .choice-btn.measure { white-space: nowrap; width: max-content; } /* kurz zum Messen der natürlichen Breite */
+/* Ganz schmal: Knopfspalte so breit wie der längste Wort-Knopf (fitAccTitles), Auswahlfelder mit Symbol zeigen nur das Symbol */
+@media (max-width: 440px) {
+  .acc-card { grid-template-columns: minmax(0, 1fr) var(--acc-btn, 168px) !important; }
+  .acc-card .choice-btn:has(.choice-ico) .choice-label { display: none; }
+  .acc-card .choice-btn:has(.choice-ico) { justify-content: center; } /* Symbol und Pfeil mittig */
+}
 .acc-card .acc-text { grid-area: text; }
 /* alle Knöpfe gleich breit (ganze Knopfspalte), Schalter am Spaltenanfang */
 .acc-card > .btn { grid-area: btn; width: 100%; justify-content: center; text-align: center; }
