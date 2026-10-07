@@ -5,7 +5,7 @@ import { tr, lang, LANGS, setLang } from './i18n.js';
 import { h, isTouch, tt } from './util.js';
 import { settings, saveSettings, applyTheme, BASE_STATS } from './settings.js';
 import { classManager } from './classform.js';
-import { preferences } from './ui.js';
+import { preferences, statPicker, fitAccTitles } from './ui.js';
 import { loadAll } from './hub.js';
 import { baseStats } from './stats.js';
 import { db } from './db.js';
@@ -119,11 +119,15 @@ export async function runIntro() {
     },
     {
       render() {
+        const onPatch = patch => { Object.assign(state, patch); if (patch.theme) applyTheme(patch.theme); refreshNav(); };
         return h('div.intro-step',
           h('h1.wide', tr('DEINE PRÄFERENZEN')),
           h('p.intro-lead', tr('(Alles später unter Einstellungen änderbar)')),
-          preferences(state, patch => { Object.assign(state, patch); if (patch.theme) applyTheme(patch.theme); refreshNav(); },
-            loadAll().then(baseStats), { baseLabel: false, tester: true, hints: true }));
+          // wie in den Einstellungen: jede Auswahl eine Zeile (Titel · Satz · Feld), Statistiken unter eigener Überschrift
+          fitAccTitles(h('div.intro-prefs',
+            preferences(state, onPatch, null, { tester: true, cards: true }),
+            h('h2.p-group', tr('Statistiken')),
+            statPicker(state.baseStats, loadAll().then(baseStats), list => onPatch({ baseStats: list })))));
       },
       canGo: () => !!state.provider,
       skippable: true,

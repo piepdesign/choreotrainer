@@ -347,3 +347,31 @@ export function statPicker(selected, values, onChange, { baseLabel = true } = {}
   if (values?.then) values.then(v => { vals = v || {}; render(); }).catch(() => {});
   return box;
 }
+
+// Titelspalte der Einstellungs-Zeilen (auch Intro › Präferenzen) so breit wie der längste Titel (110–230 px, längere brechen um): die Mitte
+// beginnt so nah wie möglich am Titel, bleibt aber in allen Abschnitten bündig. Dazu die natürliche Breite des
+// längsten Wort-Knopfs (--acc-btn): ganz schmale Ansichten nutzen sie als Knopfspalte. Misst neu, wenn Zeilen dazukommen.
+export function fitAccTitles(root) {
+  let raf = 0;
+  const fit = () => {
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      const titles = [...root.querySelectorAll('.acc-title')];
+      if (!titles.length || !root.isConnected) return;
+      // Wort-Knöpfe: Knöpfe und Auswahlfelder ohne Symbol (die mit Symbol zeigen schmal nur das Symbol)
+      const btns = [...root.querySelectorAll('.acc-card > .btn, .acc-card .choice-btn:not(:has(.choice-ico))')];
+      const all = [...titles, ...btns];
+      all.forEach(t => t.classList.add('measure'));
+      const w = Math.max(...titles.map(t => t.getBoundingClientRect().width));
+      const bw = Math.max(0, ...btns.map(b => b.getBoundingClientRect().width));
+      all.forEach(t => t.classList.remove('measure'));
+      root.style.setProperty('--acc-title', `${Math.round(Math.min(230, Math.max(110, w + 1)))}px`);
+      if (bw) root.style.setProperty('--acc-btn', `${Math.ceil(bw + 1)}px`);
+    });
+  };
+  new MutationObserver(fit).observe(root, { childList: true, subtree: true });
+  new ResizeObserver(fit).observe(root); // auch sobald der Bereich auf der Seite steht (Intro baut erst danach ein)
+  document.fonts?.ready.then(fit);
+  fit();
+  return root;
+}
