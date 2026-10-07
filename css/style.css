@@ -678,7 +678,9 @@ a.stat-link:hover { background: var(--surface-2); }
 .acc-card .choice-btn { min-height: 0; padding: 5px 9px; background: transparent; border: 1px solid var(--fg); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
 .acc-card .choice-btn:hover, .acc-card .choice.open .choice-btn { background: var(--hover-fill); }
 .acc-card .choice-label { text-align: center; }
-.acc-card .choice-btn .choice-ico { display: none; } /* Feld wie die Knöpfe daneben: nur Text, Symbole in der Liste */
+.acc-card .choice-ico + .choice-label { text-align: left; } /* mit Symbol linksbündig daneben */
+.acc-card .choice-btn { gap: 8px; }
+.acc-card .choice-btn .choice-ico { width: 18px; } /* Symbol der gewählten Option auch im Feld */
 .acc-card .choice-menu button { text-transform: uppercase; font-size: 11px; letter-spacing: .08em; }
 /* Kacheln füllen jede Zeile (auch eine übrige letzte Kachel nimmt die volle Breite) */
 .provider-tiles { display: flex; flex-wrap: wrap; gap: var(--tile-gap); }
@@ -690,7 +692,7 @@ a.stat-link:hover { background: var(--surface-2); }
 
 /* ── Daten/Konto: jeder Eintrag eine eigene Zeile. Spalten Überschrift · Satz · Knopf an festen Positionen ── */
 .acc { display: grid; gap: var(--tile-gap); }
-.acc-card { display: grid; grid-template-columns: var(--acc-title, 180px) minmax(0, 1fr) 160px; grid-template-areas: 'title text btn'; align-items: center; gap: 8px 24px; background: var(--surface); padding: 14px 16px; }
+.acc-card { display: grid; grid-template-columns: var(--acc-title, 180px) minmax(0, 1fr) 180px; grid-template-areas: 'title text btn'; align-items: center; gap: 8px 24px; background: var(--surface); padding: 14px 16px; }
 .acc-title { grid-area: title; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--fg); }
 .acc-title.measure { white-space: nowrap; width: max-content; } /* kurz zum Messen der natürlichen Breite */
 .acc-card .acc-text { grid-area: text; }
@@ -701,7 +703,7 @@ a.stat-link:hover { background: var(--surface-2); }
 .acc-text input[type=text] { max-width: 360px; }
 @media (max-width: 600px) {
   /* Handy: Überschrift und Satz links untereinander, Knopf rechts */
-  .acc-card { grid-template-columns: minmax(0, 1fr) 140px; grid-template-areas: 'title btn' 'text btn'; gap: 4px 12px; }
+  .acc-card { grid-template-columns: minmax(0, 1fr) 168px; grid-template-areas: 'title btn' 'text btn'; gap: 4px 12px; }
   .acc-card > .toggle { justify-self: end; }
 }
 .acc-text p { margin: 0; }
