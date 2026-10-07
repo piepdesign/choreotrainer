@@ -1,7 +1,7 @@
 // Base (Übersicht) und Class-Ansicht
 import { tr, tn, dayLabel } from './i18n.js';
 import { db, deleteChoreo, deleteClass, deleteRecording } from './db.js';
-import { h, isTouch, onHold, holdGate, tt, fmt, fmtRecDate, fmtDuration, relDate, classTitle, classMeta, stripe, inlineEdit, PALETTE, textOn, WEEKDAYS, byClassOrder, CLASS_TITLES, CLASS_LEVELS } from './util.js';
+import { h, balanceTiles, isTouch, onHold, holdGate, tt, fmt, fmtRecDate, fmtDuration, relDate, classTitle, classMeta, stripe, inlineEdit, PALETTE, textOn, WEEKDAYS, byClassOrder, CLASS_TITLES, CLASS_LEVELS } from './util.js';
 import { state, go, toast } from './app.js';
 import { baseStats } from './stats.js';
 import { settings, saveSettings, BASE_STATS } from './settings.js';
@@ -218,7 +218,7 @@ export async function renderHub(root) {
     h('div', { style: { height: '12px' } }),
     dropzone(f => { state.pendingFile = f; go('#/upload'); }),
     appHint() || '', // null würde als Text „null“ erscheinen
-    h('div.stats', chosen.map(id => stat(label(id), values[id].value, values[id].hint, `#/profile/${STAT_TARGET[id] || 'overview'}`))),
+    balanceTiles(h('div.stats', chosen.map(id => stat(label(id), values[id].value, values[id].hint, `#/profile/${STAT_TARGET[id] || 'overview'}`)))),
     h('div.columns',
       h('div.col-choreos',
         h('div.section-head', h('h2.wide', tr('LETZTE CHOREOS'))),

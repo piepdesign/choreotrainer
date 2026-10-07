@@ -3,14 +3,14 @@
 // Class-Farben, Werte immer in Textfarbe, Tooltip auf jedem Datenpunkt.
 import { tr, tn, num, lang, locale, dayLabel } from './i18n.js';
 import { db, deleteAllData } from './db.js';
-import { h, tt, isTouch, fmt, fmtDuration, relDate, fmtRecDate, classTitle, stripe, byClassOrder, WEEKDAYS, textOn, plural } from './util.js';
+import { h, balanceTiles, tt, isTouch, fmt, fmtDuration, relDate, fmtRecDate, classTitle, stripe, byClassOrder, WEEKDAYS, textOn, plural } from './util.js';
 import { loadAll, dots, choreoCard, fitCardLabels, recTitle, nextClass, importInto, addRow, newClassDialog } from './hub.js';
 import { songLink } from './providers.js';
 import { baseStats, latestRating, choreoLength, weekStart, dayKey } from './stats.js';
 import { settings, saveSettings, applyTheme, resetSettings, BASE_STATS } from './settings.js';
 import { classManager } from './classform.js';
 import { go, toast, replaceHash, state } from './app.js';
-import { preferences, toggle, confirmDialog } from './ui.js';
+import { preferences, toggle, confirmDialog, choiceRow } from './ui.js';
 import { storageState, askPersist, isInstalled, isIOS, canPromptInstall, promptInstall, exportBackup, readBackup, restoreBackup, missingVideos, relinkVideos, videoBytes, deleteRecordings, freeStorage, installApp, shareApp, SHARE_URL } from './backup.js';
 
 const DAY = 86400000;
@@ -284,11 +284,11 @@ export async function renderProfile(root, section) {
   // ── Übersicht: Kennzahlen + Heatmap ──
   const lastS = real.reduce((m, x) => (x.start > (m?.start || 0) ? x : m), null);
   const overview = sect('overview', null,
-    h('div.stats',
+    balanceTiles(h('div.stats',
       tile(tr('Zuletzt'), values.last.value, lastS ? `${choreoTitle(lastS.choreoId)} · ${min(lastS.seconds)} min` : ''),
       tile(tr('Serie'), values.streak.value, tr('Tage in Folge')),
       tile(tr('Tage geübt'), String(new Set(real.filter(x => x.start > now - 182 * DAY).map(x => dayKey(x.start))).size), tr('in den letzten 26 Wochen')),
-      tile(tr('Dauer gesamt'), values.duration.value, values.duration.hint)),
+      tile(tr('Dauer gesamt'), values.duration.value, values.duration.hint))),
     heatmap(real, choreoTitle, colorOf));
 
   // ── Übungszeit ──
@@ -318,12 +318,12 @@ export async function renderProfile(root, section) {
   const monthSec = real.filter(x => x.start > now - 30 * DAY).reduce((t, x) => t + x.seconds, 0);
   const rates = real.filter(x => x.avgRate);
   const time = sect('time', null,
-    h('div.stats',
+    balanceTiles(h('div.stats',
       tile(tr('Diese Woche'), values.week.value),
       tile(tr('30 Tage'), fmtDuration(monthSec)),
       tile(tr('Gesamt'), values.total.value),
-      tile(tr('Ø pro Einheit'), real.length ? fmtDuration(totalSec / real.length) : '—', plural(real.length, 'Einheit', tr('Einheiten'))),
-      tile(tr('Ø Tempo'), rates.length ? `${num(rates.reduce((t, x) => t + x.avgRate, 0) / rates.length, 2)}×` : '—', tr('Wiedergabetempo beim Üben'))),
+      tile(tr('Ø pro Einheit'), real.length ? fmtDuration(totalSec / real.length) : '—', plural(real.length, 'Einheit', 'Einheiten')),
+      tile(tr('Ø Tempo'), rates.length ? `${num(rates.reduce((t, x) => t + x.avgRate, 0) / rates.length, 2)}×` : '—', tr('Wiedergabetempo beim Üben')))),
     h('div.p-grid',
       h('div', h('h3.p-sub', tr('Minuten pro Woche')), bars(perWeek)),
       h('div', h('h3.p-sub', tr('Nach Wochentag')), bars(perWeekday)),
@@ -430,21 +430,13 @@ export async function renderProfile(root, section) {
   // Kachel als Spalte: Überschrift, ein Satz (bzw. Felder), Knopf. Der Inhalt füllt die Höhe, so sitzen alle Knöpfe einer Reihe auf gleicher Höhe.
   const accRow = (title, body, button) => h('div.acc-card', h('span.acc-title', title), h('div.acc-text', body), button);
   const stateLine = text => h('p.acc-lead', text); // Zustand (keine Erklärung), z. B. Belegung
-  // An/Aus-Einstellung als Knopf wie die übrigen: Beschriftung zeigt den Zustand, aktiviert = gefüllt
-  const onOffBtn = key => {
-    const b = h('button.btn.small', { type: 'button' });
-    const show = on => { b.textContent = on ? tr('Aktiviert') : tr('Deaktiviert'); b.classList.toggle('primary', on); };
-    b.addEventListener('click', async () => { const on = !settings()[key]; await saveSettings({ [key]: on }); show(on); });
-    show(!!settings()[key]);
-    return b;
-  };
   // Konto: Profil, Tutorial, Neustart, ganz zuletzt das endgültige Löschen
   const account = sect('account', tr('Konto'),
     h('div.acc',
       // Name + Helfer*in in einer Kachel; Helfer*in wirkt sofort (Knopf unten rechts für Bug-Meldungen und Ideen)
       accRow(tr('Name'), [nameIn], h('button.btn.small', { type: 'button', onclick: saveName }, tr('Speichern'))),
       // Helfer*in: Schalter statt Knopf, wirkt sofort (Knopf unten rechts für Bug-Meldungen und Ideen)
-      accRow(tr('Helfer*in'), [stateLine(tr('Knopf für Bugs und Ideen.'))], onOffBtn('tester')),
+      accRow(tr('Helfer*in'), [stateLine(tr('Knopf für Bugs und Ideen.'))], choiceRow([['on', tr('Aktiviert')], ['off', tr('Deaktiviert')]], settings().tester ? 'on' : 'off', id => saveSettings({ tester: id === 'on' }))),
       accRow(tr('Tutorial'), [stateLine(tr('Zeigt beide Teile noch einmal.'))],
         h('button.btn.small', {
           type: 'button',

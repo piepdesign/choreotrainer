@@ -216,5 +216,9 @@ addEventListener('keydown', async e => {
   if (!settings().introDone) await runIntro();
   document.documentElement.classList.remove('booting');
   syncTester();
-  route();
+  await route();
+  // nach einem Sprachwechsel an derselben Stelle weiter (Inhalt kann noch nachladen, darum mehrmals)
+  let back = null;
+  try { back = JSON.parse(sessionStorage.getItem('ct-scroll')); sessionStorage.removeItem('ct-scroll'); } catch { /* egal */ }
+  if (back && back.hash === (location.hash || '#/')) for (const ms of [0, 150, 400, 900]) setTimeout(() => window.scrollTo(0, back.y), ms);
 })();

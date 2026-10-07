@@ -101,6 +101,9 @@ main { padding: 0 var(--gutter) 80px; }
 /* Kacheln füllen jede Zeile ganz aus (auch eine übrige letzte Kachel) */
 .stats { display: flex; flex-wrap: wrap; gap: var(--tile-gap); margin-top: clamp(28px, 4vw, 48px); }
 .stats > .stat { flex: 1 1 200px; min-width: 0; }
+/* ausgeglichene Reihen (balanceTiles in util.js): gleich viele, gleich große Kacheln je Reihe */
+.stats.balanced { display: grid; grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr)); }
+.stats.balanced > .zone-empty { grid-column: 1 / -1; }
 .stat { padding: 14px 16px 16px; background: var(--surface); }
 .stat .hint { display: block; margin-top: 4px; text-transform: none; letter-spacing: 0; }
 .stat b { display: block; font-family: var(--wide); font-stretch: 125%; font-weight: 800; font-size: clamp(20px, 1.8vw, 26px); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -647,8 +650,36 @@ a.stat-link:hover { background: var(--surface-2); }
 .intro-frame:has(.intro-step.center) .intro-nav { width: min(560px, 80vw); border-top: 0; }
 
 /* ── Präferenzen: Titel über der Auswahl, Breite begrenzt ── */
-.prefs { display: grid; gap: 30px; margin-top: 8px; }
+.prefs { display: grid; margin-top: 8px; }
 .pref-block .p-sub { margin: 0 0 12px; }
+/* Einzelauswahl einzeilig: Titel links, gewählte Option rechts; schmal untereinander */
+.prefs { gap: 22px; }
+.pref-row { display: grid; grid-template-columns: minmax(170px, 280px) minmax(0, 380px); gap: 8px 28px; align-items: center; }
+.pref-row .p-sub { margin: 0; }
+.pref-row .pref-hint { margin: 4px 0 0; }
+@media (max-width: 600px) { .pref-row { grid-template-columns: minmax(0, 1fr); } }
+/* Auswahl-Zeile (choiceRow in ui.js): nur die gewählte Option, Klick klappt die Liste auf (wie das Ansicht-Menü) */
+.choice { position: relative; min-width: 0; }
+.choice-btn { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 42px; padding: 8px 12px; background: var(--surface); font-size: 12px; letter-spacing: .04em; text-align: left; color: var(--fg); transition: background .15s; }
+.choice-btn:hover, .choice.open .choice-btn { background: var(--surface-2); }
+.choice-btn.empty .choice-label { color: var(--muted); }
+.choice-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.choice-ico { display: grid; place-items: center; flex: none; width: 22px; }
+.choice-ico svg { display: block; }
+.choice-code { font: 800 12px var(--wide); font-stretch: 125%; letter-spacing: .02em; }
+.choice-chev { display: grid; place-items: center; flex: none; color: var(--muted); transition: transform .15s; }
+.choice.open .choice-chev { transform: rotate(180deg); }
+.choice-menu { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 60; display: grid; padding: 4px; max-height: min(320px, 60vh); overflow-y: auto; background: var(--bg); border: 1px solid var(--fg); box-shadow: 0 10px 30px rgba(0, 0, 0, .2); }
+.choice-menu button { display: flex; align-items: center; gap: 10px; padding: 8px 8px; font-size: 12px; letter-spacing: .04em; text-align: left; color: var(--muted); }
+.choice-menu button:hover { color: var(--fg); background: var(--surface); }
+.choice-menu button.on { color: var(--bg); background: var(--fg); }
+.acc-card > .choice { grid-area: btn; }
+/* in den Konto-Kacheln (grauer Grund) wie die Knöpfe daneben: Kontur, Großbuchstaben, gleiche Höhe */
+.acc-card .choice-btn { min-height: 0; padding: 5px 9px; background: transparent; border: 1px solid var(--fg); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.acc-card .choice-btn:hover, .acc-card .choice.open .choice-btn { background: var(--hover-fill); }
+.acc-card .choice-label { text-align: center; }
+.acc-card .choice-ico { display: none; } /* wie die Knöpfe daneben: nur Text */
+.acc-card .choice-menu button { text-transform: uppercase; font-size: 11px; letter-spacing: .08em; }
 /* Kacheln füllen jede Zeile (auch eine übrige letzte Kachel nimmt die volle Breite) */
 .provider-tiles { display: flex; flex-wrap: wrap; gap: var(--tile-gap); }
 .provider-tiles > button { flex: 1 1 118px; }

@@ -48,9 +48,13 @@ const DAYS = {
 };
 export const dayLabel = code => { const i = DAYS.de.indexOf(code); return i < 0 ? (code || '') : DAYS[lang][i]; };
 
-// Sprache wählen: merken und neu laden (Texte, die beim Laden einmal gebaut werden, kommen so mit)
+// Sprache wählen: merken und neu laden (Texte, die beim Laden einmal gebaut werden, kommen so mit).
+// Die Scrollposition kommt mit (app.js stellt sie nach dem Aufbau wieder her)
 export function setLang(l) {
   if (!supported(l)) return;
-  try { localStorage.setItem('ct-lang', l); } catch { /* privat */ }
+  try {
+    localStorage.setItem('ct-lang', l);
+    sessionStorage.setItem('ct-scroll', JSON.stringify({ hash: location.hash || '#/', y: scrollY }));
+  } catch { /* privat */ }
   location.reload();
 }

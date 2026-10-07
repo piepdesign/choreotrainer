@@ -207,6 +207,26 @@ export function inlineEdit(text, onSave, { href = null, clickToEdit = !href, pla
   return wrap;
 }
 
+// Kachelraster mit ausgeglichenen Reihen: so wenige Reihen wie möglich, alle gleich voll und alle Kacheln gleich groß.
+// Beispiel 6 Kacheln: 6 in einer Reihe, passt das nicht 3 + 3, dann 2 + 2 + 2 (nie 4 + 2). Mindestbreite je Kachel
+// 200 px, am Handy 140 px. Rechnet bei jeder Größenänderung und wenn Kacheln dazukommen oder wegfallen neu.
+export function balanceTiles(box) {
+  const fit = () => {
+    const n = [...box.children].filter(c => !c.matches('.zone-empty, [hidden]')).length;
+    const W = box.clientWidth;
+    if (!n || !W) return;
+    const gap = parseFloat(getComputedStyle(box).columnGap) || 0;
+    const min = innerWidth <= 600 ? 140 : 200;
+    const max = Math.max(1, Math.floor((W + gap) / (min + gap)));
+    const cols = Math.ceil(n / Math.ceil(n / max));
+    if (box.style.getPropertyValue('--cols') !== String(cols)) box.style.setProperty('--cols', cols);
+  };
+  box.classList.add('balanced');
+  new ResizeObserver(fit).observe(box);
+  new MutationObserver(fit).observe(box, { childList: true });
+  return box;
+}
+
 // right: Text oder Liste von Texten (eigene Spalten, ebenfalls zeilenübergreifend bündig)
 // Class als Zellen: Titel · Wochentag · Uhrzeit · Coach. In Listen (.stripes, .cm-list) stehen die
 // Zellen per Subgrid zeilenübergreifend bündig untereinander.

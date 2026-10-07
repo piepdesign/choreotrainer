@@ -1,11 +1,10 @@
 // Gemeinsame Bedienelemente: Auswahlliste mit „+ Neu …“, Präferenzen, Icons
 import { tr, lang, LANGS, setLang } from './i18n.js';
-import { h, holdGate, tt } from './util.js';
+import { h, holdGate, tt, balanceTiles } from './util.js';
 import { PROVIDERS } from './providers.js';
 import { BASE_STATS } from './settings.js';
 import { brandIcon } from './brand-icons.js';
 
-const brandSvg = id => brandIcon(id, 26);
 // Ansicht: halber Kreis (System), Sonne (Hell), Mond (Dunkel), Größe wie die Provider-Logos
 const svg26 = (body, size = 26) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">${body}</svg>`;
 const THEME_PATHS = {
@@ -28,7 +27,6 @@ export const TOOL_PATHS = {
   idea: '<path d="M9 17.5h6M9.8 20.5h4.4M12 3.5a5.8 5.8 0 0 0-3.3 10.6c.6.5.8 1.1.8 1.8v1.6h5v-1.6c0-.7.2-1.3.8-1.8A5.8 5.8 0 0 0 12 3.5z"/>',
 };
 export const toolIcon = (id, size = 22) => svg26(TOOL_PATHS[id], size);
-const THEME_ICONS = Object.fromEntries(Object.entries(THEME_PATHS).map(([k, p]) => [k, svg26(p)]));
 // gleiche Icons klein für die Kopfleiste
 export const themeIcon = (id, size = 18) => svg26(THEME_PATHS[id], size);
 
@@ -201,42 +199,62 @@ export function preferences(values, onChange, statValues = null, { baseLabel = t
     'Statistiken': tt(tr('Diese Kennzahlen siehst du in deiner „Base“. Klicke oder ziehe Kacheln hinein oder heraus.'), tr('Diese Kennzahlen siehst du in deiner „Base“. Tippe Kacheln an oder halte und ziehe sie hinein oder heraus.')),
     'Ansicht': tr('Hell, dunkel oder automatisch passend zu deinem System.'),
   };
-  const block = (title, control) => h('div.pref-block', h('h3.p-sub', tr(title)), hints ? h('p.pref-hint', HINTS[title]) : null, control);
-  // Einzelauswahl; render(neu) setzt die Markierung
-  // Einzelauswahl als Kacheln (Musikprovider, Ansicht); key = Name der Einstellung
-  const single = (key, options, value, content) => {
-    // Kacheln einmal bauen, beim Antippen nur die Markierung umschalten (Neuaufbau verschob die Ansicht)
-    const btns = options.map(o => h('button', {
-      type: 'button', role: 'radio',
-      onclick: () => { mark(o[0]); onChange({ [key]: o[0] }); },
-    }, content(o)));
-    const mark = v => btns.forEach((b, i) => { const on = options[i][0] === v; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
-    mark(value);
-    return h('div.provider-tiles', { role: 'radiogroup' }, btns);
-  };
+  // Einzelauswahl als eine Zeile (Titel links, gewählte Option rechts); Statistiken als Kacheln über die volle Breite
+  const block = (title, control, row = true) => h(`div.pref-block${row ? '.pref-row' : ''}`,
+    h('div.pref-head', h('h3.p-sub', tr(title)), hints ? h('p.pref-hint', HINTS[title]) : null), control);
   const chips = statPicker(values.baseStats || [], statValues, list => onChange({ baseStats: list }), { baseLabel });
   return h('div.prefs',
-    block('Musikprovider', single('provider', PROVIDERS, values.provider,
-      ([id, name]) => [h('i.brand', { html: brandSvg(id) }), h('span', name)])),
+    block('Musikprovider', choiceRow(PROVIDERS.map(([id, name]) => [id, name, brandIcon(id, 18)]), values.provider,
+      id => onChange({ provider: id }), { placeholder: tr('Auswählen …') })),
     // An/Aus und Lautstärke in einem: Aus · Leise · Mittel · Laut
-    block('Song-Cover Hörprobe', single('hoverPreview', [['off', tr('Aus')], ['low', tr('Leise')], ['mid', tr('Mittel')], ['high', tr('Laut')]],
-      values.hoverPreview === 'on' || !values.hoverPreview ? 'mid' : values.hoverPreview,
-      ([id, label]) => [h('i.brand', { html: svg26(SOUND_PATHS[id]) }), h('span', label)])),
-    // Helfer*in wie in den Einstellungen: ein Knopf, Beschriftung zeigt den Zustand, aktiviert = gefüllt
-    tester ? block('Helfer*in', (() => {
-      let on = !!values.tester;
-      const b = h('button.btn.small', { type: 'button' });
-      const show = () => { b.textContent = on ? tr('Aktiviert') : tr('Deaktiviert'); b.classList.toggle('primary', on); };
-      b.addEventListener('click', () => { on = !on; show(); onChange({ tester: on }); });
-      show();
-      return h('div.pref-onoff', b); // Erklärung steht schon unter der Überschrift
-    })()) : null,
-    block('Statistiken', chips),
-    block('Ansicht', single('theme', [['light', tr('Hell')], ['dark', tr('Dunkel')], ['system', tr('System')]], values.theme,
-      ([id, label]) => [h('i.brand', { html: THEME_ICONS[id] }), h('span', label)])),
-    language ? block('Sprache', h('div.provider-tiles.lang-tiles', { role: 'radiogroup' }, LANGS.map(([id, name]) => h(`button${id === lang ? '.on' : ''}`, {
-      type: 'button', role: 'radio', 'aria-checked': String(id === lang), lang: id, onclick: () => { if (id !== lang) setLang(id); },
-    }, h('b.lang-code', id.toUpperCase()), h('span', name))))) : null);
+    block('Song-Cover Hörprobe', choiceRow([['off', tr('Aus')], ['low', tr('Leise')], ['mid', tr('Mittel')], ['high', tr('Laut')]].map(([id, l]) => [id, l, svg26(SOUND_PATHS[id], 18)]),
+      values.hoverPreview === 'on' || !values.hoverPreview ? 'mid' : values.hoverPreview, id => onChange({ hoverPreview: id }))),
+    block('Ansicht', choiceRow([['light', tr('Hell')], ['dark', tr('Dunkel')], ['system', tr('System')]].map(([id, l]) => [id, l, svg26(THEME_PATHS[id], 18)]),
+      values.theme || 'system', id => onChange({ theme: id }))),
+    // Sprache: Wahl lädt die Seite neu (an derselben Stelle)
+    language ? block('Sprache', choiceRow(LANGS.map(([id, name]) => [id, name, `<b class="choice-code">${id.toUpperCase()}</b>`]), lang, id => setLang(id))) : null,
+    tester ? block('Helfer*in', choiceRow([['on', tr('Aktiviert')], ['off', tr('Deaktiviert')]].map(([id, l]) => [id, l, svg26(TOOL_PATHS.clipboard, 18)]), values.tester ? 'on' : 'off', id => onChange({ tester: id === 'on' }))) : null,
+    block('Statistiken', chips, false));
+}
+
+// Einzelauswahl in einer Zeile: zu sehen ist nur die gewählte Option (Symbol, Name, Pfeil). Klick klappt darunter
+// alle Optionen aus (Gestaltung wie das Ansicht-Menü in der Kopfleiste), Wahl schließt wieder. Esc/daneben schließt.
+// options: [[id, Name, Symbol-HTML?]] · onPick(id) · el.set(id) setzt von außen
+const CHEV = '<svg viewBox="0 0 12 8" width="12" height="8" aria-hidden="true"><path d="M1 1.5 6 6.5l5-5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>';
+export function choiceRow(options, value, onPick, { placeholder = '—' } = {}) {
+  let cur = value, menu = null;
+  const wrap = h('div.choice');
+  const btn = h('button.choice-btn', { type: 'button', 'aria-haspopup': 'listbox', 'aria-expanded': 'false' });
+  const face = o => [o?.[2] ? h('i.choice-ico', { html: o[2] }) : null, h('span.choice-label', o ? o[1] : placeholder)].filter(Boolean);
+  const paint = () => {
+    const o = options.find(x => x[0] === cur);
+    btn.replaceChildren(...face(o), h('i.choice-chev', { html: CHEV }));
+    btn.classList.toggle('empty', !o);
+  };
+  const close = () => {
+    if (!menu) return;
+    menu.remove(); menu = null;
+    wrap.classList.remove('open'); btn.setAttribute('aria-expanded', 'false');
+    removeEventListener('pointerdown', outside, true); removeEventListener('keydown', onKey, true);
+  };
+  const outside = e => { if (!wrap.contains(e.target)) close(); };
+  const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); btn.focus(); } };
+  btn.addEventListener('click', () => {
+    if (menu) { close(); return; }
+    menu = h('div.choice-menu', { role: 'listbox' }, options.map(o => h(`button${o[0] === cur ? '.on' : ''}`, {
+      type: 'button', role: 'option', 'aria-selected': String(o[0] === cur),
+      onclick: () => { const changed = o[0] !== cur; cur = o[0]; paint(); close(); if (changed) onPick(o[0]); },
+    }, ...face(o))));
+    wrap.append(menu);
+    wrap.classList.add('open'); btn.setAttribute('aria-expanded', 'true');
+    addEventListener('pointerdown', outside, true); addEventListener('keydown', onKey, true);
+    // ganz zu sehen: bei Platzmangel unten die Seite ein Stück mitscrollen
+    menu.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+  paint();
+  wrap.append(btn);
+  wrap.set = v => { cur = v; paint(); };
+  return wrap;
 }
 
 // Statistik-Kacheln wie in der Base. Oben die gezeigten, unten die übrigen.
@@ -246,8 +264,8 @@ export function statPicker(selected, values, onChange, { baseLabel = true } = {}
   let vals = values && !values.then ? values : {};
   const label = id => BASE_STATS.find(x => x[0] === id)?.[1] || id;
   const tile = id => h('div.stat.pick-tile', { 'data-id': id }, h('span.label', label(id)), h('b', vals[id]?.value ?? '—'));
-  const shown = h('div.stats.stat-zone.zone-in');
-  const rest = h('div.stats.stat-zone.zone-out');
+  const shown = balanceTiles(h('div.stats.stat-zone.zone-in'));
+  const rest = balanceTiles(h('div.stats.stat-zone.zone-out'));
   const hintIn = h('p.zone-empty', tt(tr('Hierher ziehen oder unten anklicken'), tr('Hierher ziehen oder unten antippen')));
   const hintOut = h('p.zone-empty', tr('Alle Statistiken sind in deiner Base'));
   let sel = selected.filter(id => BASE_STATS.some(x => x[0] === id));
