@@ -214,11 +214,20 @@ addEventListener('keydown', async e => {
   try { await loadSettings(); } catch (e) { console.error(e); }
   applyTheme();
   if (!settings().introDone) await runIntro();
-  document.documentElement.classList.remove('booting');
-  syncTester();
-  await route();
-  // nach einem Sprachwechsel an derselben Stelle weiter (Inhalt kann noch nachladen, darum mehrmals)
+  // Nach einem Sprachwechsel an derselben Stelle weiter, ohne sichtbaren Sprung: Seite bleibt unsichtbar, bis sie
+  // hoch genug aufgebaut ist (Einstellungen laden Teile nach, höchstens 1,2 s), dann einmal ohne Animation hin
   let back = null;
   try { back = JSON.parse(sessionStorage.getItem('ct-scroll')); sessionStorage.removeItem('ct-scroll'); } catch { /* egal */ }
-  if (back && back.hash === (location.hash || '#/')) for (const ms of [0, 150, 400, 900]) setTimeout(() => window.scrollTo(0, back.y), ms);
+  if (back && back.hash !== (location.hash || '#/')) back = null;
+  if (back) history.scrollRestoration = 'manual'; // nicht zusätzlich die Position des Browsers
+  else document.documentElement.classList.remove('booting');
+  syncTester();
+  await route();
+  if (back) {
+    const t0 = performance.now();
+    while (document.documentElement.scrollHeight < back.y + innerHeight && performance.now() - t0 < 1200) await new Promise(r => setTimeout(r, 50));
+    window.scrollTo({ top: back.y, behavior: 'instant' });
+    document.documentElement.classList.remove('booting');
+    history.scrollRestoration = 'auto';
+  }
 })();

@@ -44,11 +44,12 @@ export function classManager(onChange, { withImport = true } = {}) {
     const row = form.editingId() && list.querySelector(`.cm-row[data-id="${form.editingId()}"]`);
     if (row) { row.hidden = true; list.insertBefore(form.preview, row); } else list.append(form.preview);
   }
-  function openForm(cls = null) {
+  // scroll: nur nach eigenem Tippen (Bearbeiten/Weitere Class) hinscrollen, nicht beim automatischen Öffnen ohne Classes
+  function openForm(cls = null, scroll = true) {
     if (cls) form.edit(cls); else form.reset();
     open = true; form.hidden = false; addRow.hidden = true; msg.textContent = '';
     placePreview();
-    form.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (scroll) form.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
   function closeForm() {
     open = false; form.hidden = true; addRow.hidden = false;
@@ -83,7 +84,7 @@ export function classManager(onChange, { withImport = true } = {}) {
     }));
     placePreview();
     moreBtn.textContent = classes.length ? tr('Weitere Class') : tr('Neue Class');
-    if (first) { first = false; if (!classes.length) openForm(); }
+    if (first) { first = false; if (!classes.length) openForm(null, false); }
     return classes;
   }
   const el = h('div.class-manager', list, form, addRow);
