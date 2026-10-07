@@ -598,4 +598,9 @@ export default {
   "Klicken zum Umbenennen": "Clic para renombrar",
   "Einheit": "sesión",
   "Auswählen …": "Elegir …",
+  "Hier öffnen sich Songs.": "Aquí se abren las canciones.",
+  "Lautstärke beim Darüberfahren.": "Volumen al pasar el ratón.",
+  "Lautstärke beim Halten.": "Volumen al mantener pulsado.",
+  "Hell, dunkel oder wie das System.": "Claro, oscuro o como el sistema.",
+  "Sprache der App.": "Idioma de la app.",
 };

@@ -190,7 +190,9 @@ export function guideDialog({ title, steps, note = null, ok = 'OK' }) {
 }
 
 // language: Block „Sprache“ (nur Einstellungen; im Intro steht die Wahl beim Namen). Wahl lädt die Seite neu.
-export function preferences(values, onChange, statValues = null, { baseLabel = true, tester = false, hints = false, language = false } = {}) {
+// cards (Einstellungen): jede Auswahl als Zeile wie unter Daten (Titel · kurzer Satz · Auswahl), ohne Statistiken
+// (die stehen dort unter eigener Überschrift, statPicker)
+export function preferences(values, onChange, statValues = null, { baseLabel = true, tester = false, hints = false, language = false, cards = false } = {}) {
   // hints: im Intro ein Satz unter jedem Titel, was die Einstellung bewirkt
   const HINTS = {
     'Musikprovider': tr('Hier öffnen sich erkannte Songs: in der App, wenn sie installiert ist, sonst im Browser.'),
@@ -200,10 +202,19 @@ export function preferences(values, onChange, statValues = null, { baseLabel = t
     'Ansicht': tr('Hell, dunkel oder automatisch passend zu deinem System.'),
   };
   // Einzelauswahl als eine Zeile (Titel links, gewählte Option rechts); Statistiken als Kacheln über die volle Breite
-  const block = (title, control, row = true) => h(`div.pref-block${row ? '.pref-row' : ''}`,
-    h('div.pref-head', h('h3.p-sub', tr(title)), hints ? h('p.pref-hint', HINTS[title]) : null), control);
-  const chips = statPicker(values.baseStats || [], statValues, list => onChange({ baseStats: list }), { baseLabel });
-  return h('div.prefs',
+  // Kurzfassung je Zeile in den Einstellungen (ein Satz, Zustand statt Erklärung wie unter Daten)
+  const LEADS = {
+    'Musikprovider': tr('Hier öffnen sich Songs.'),
+    'Song-Cover Hörprobe': tt(tr('Lautstärke beim Darüberfahren.'), tr('Lautstärke beim Halten.')),
+    'Ansicht': tr('Hell, dunkel oder wie das System.'),
+    'Sprache': tr('Sprache der App.'),
+    'Helfer*in': tr('Knopf für Bugs und Ideen.'),
+  };
+  const block = (title, control, row = true) => cards && row
+    ? h('div.acc-card', h('span.acc-title', tr(title)), h('div.acc-text', h('p.acc-lead', LEADS[title])), control)
+    : h(`div.pref-block${row ? '.pref-row' : ''}`, h('div.pref-head', h('h3.p-sub', tr(title)), hints ? h('p.pref-hint', HINTS[title]) : null), control);
+  const chips = cards ? null : statPicker(values.baseStats || [], statValues, list => onChange({ baseStats: list }), { baseLabel });
+  return h(cards ? 'div.acc' : 'div.prefs',
     block('Musikprovider', choiceRow(PROVIDERS.map(([id, name]) => [id, name, brandIcon(id, 18)]), values.provider,
       id => onChange({ provider: id }), { placeholder: tr('Auswählen …') })),
     // An/Aus und Lautstärke in einem: Aus · Leise · Mittel · Laut
@@ -214,7 +225,7 @@ export function preferences(values, onChange, statValues = null, { baseLabel = t
     // Sprache: Wahl lädt die Seite neu (an derselben Stelle)
     language ? block('Sprache', choiceRow(LANGS.map(([id, name]) => [id, name, `<b class="choice-code">${id.toUpperCase()}</b>`]), lang, id => setLang(id))) : null,
     tester ? block('Helfer*in', choiceRow([['on', tr('Aktiviert')], ['off', tr('Deaktiviert')]].map(([id, l]) => [id, l, svg26(TOOL_PATHS.clipboard, 18)]), values.tester ? 'on' : 'off', id => onChange({ tester: id === 'on' }))) : null,
-    block('Statistiken', chips, false));
+    cards ? null : block('Statistiken', chips, false));
 }
 
 // Einzelauswahl in einer Zeile: zu sehen ist nur die gewählte Option (Symbol, Name, Pfeil). Klick klappt darunter

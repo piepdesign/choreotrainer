@@ -10,7 +10,7 @@ import { baseStats, latestRating, choreoLength, weekStart, dayKey } from './stat
 import { settings, saveSettings, applyTheme, resetSettings, BASE_STATS } from './settings.js';
 import { classManager } from './classform.js';
 import { go, toast, replaceHash, state } from './app.js';
-import { preferences, toggle, confirmDialog, choiceRow } from './ui.js';
+import { preferences, statPicker, toggle, confirmDialog, choiceRow } from './ui.js';
 import { storageState, askPersist, isInstalled, isIOS, canPromptInstall, promptInstall, exportBackup, readBackup, restoreBackup, missingVideos, relinkVideos, videoBytes, deleteRecordings, freeStorage, installApp, shareApp, SHARE_URL } from './backup.js';
 
 const DAY = 86400000;
@@ -420,8 +420,10 @@ export async function renderProfile(root, section) {
     recent.length ? h('p.label', recent.length === 1 ? tr('Eine Einheit.') : tr('Die letzten {n} Einheiten.', { n: recent.length })) : null);
 
   // ── Präferenzen und Konto ──
+  // Präferenzen als Zeilen wie unter Daten, Statistiken (Kacheln der Base) unter eigener Überschrift
   const prefs = sect('prefs', tr('Präferenzen'),
-    preferences(s, async patch => { if (patch.theme) applyTheme(patch.theme); await saveSettings(patch); }, baseStats(all), { language: true }));
+    preferences(s, async patch => { if (patch.theme) applyTheme(patch.theme); await saveSettings(patch); }, null, { language: true, cards: true }));
+  const statsSec = sect('stats', tr('Statistiken'), statPicker(s.baseStats || [], baseStats(all), list => saveSettings({ baseStats: list })));
 
   const nameIn = h('input.caps', { type: 'text', value: (s.name || '').toUpperCase(), placeholder: tr('DEIN NAME') });
   const saveName = async () => { if (!nameIn.value.trim()) return; await saveSettings({ name: nameIn.value.trim().toUpperCase() }); toast(tr('Name gespeichert')); go('#/settings', { keep: true }); };
@@ -572,7 +574,7 @@ export async function renderProfile(root, section) {
     choreos: h('div.p-tab', choreoSec),
   };
   if (settingsPage) {
-    root.append(h('section.p-head', h('h1.wide.p-name', tr('EINSTELLUNGEN'))), h('div.p-tab.p-settings', prefs, manageSec, dataSec, appSec, account));
+    root.append(h('section.p-head', h('h1.wide.p-name', tr('EINSTELLUNGEN'))), fitAccTitles(h('div.p-tab.p-settings', prefs, statsSec, manageSec, dataSec, appSec, account)));
     return () => { urls.forEach(u => URL.revokeObjectURL(u)); removeEventListener('ct-install', renderData); removeEventListener('ct-install', renderApp); };
   }
   function showTab(id, user = false) {
@@ -590,6 +592,27 @@ export async function renderProfile(root, section) {
   showTab(current);
   const removeTip = attachTooltip(root);
   return () => { removeTip(); urls.forEach(u => URL.revokeObjectURL(u)); };
+}
+
+// Titelspalte der Einstellungs-Zeilen so breit wie der längste Titel (110–230 px, längere brechen um): die Mitte
+// beginnt so nah wie möglich am Titel, bleibt aber in allen Abschnitten bündig. Misst neu, wenn Zeilen dazukommen.
+function fitAccTitles(root) {
+  let raf = 0;
+  const fit = () => {
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      const titles = [...root.querySelectorAll('.acc-title')];
+      if (!titles.length || !root.isConnected) return;
+      titles.forEach(t => t.classList.add('measure'));
+      const w = Math.max(...titles.map(t => t.getBoundingClientRect().width));
+      titles.forEach(t => t.classList.remove('measure'));
+      root.style.setProperty('--acc-title', `${Math.round(Math.min(230, Math.max(110, w + 1)))}px`);
+    });
+  };
+  new MutationObserver(fit).observe(root, { childList: true, subtree: true });
+  document.fonts?.ready.then(fit);
+  fit();
+  return root;
 }
 
 function tile(label, value, hint) {

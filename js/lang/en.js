@@ -598,4 +598,9 @@ export default {
   "Klicken zum Umbenennen": "Click to rename",
   "Einheit": "session",
   "Auswählen …": "Choose …",
+  "Hier öffnen sich Songs.": "Songs open here.",
+  "Lautstärke beim Darüberfahren.": "Volume on hover.",
+  "Lautstärke beim Halten.": "Volume while holding.",
+  "Hell, dunkel oder wie das System.": "Light, dark or like the system.",
+  "Sprache der App.": "Language of the app.",
 };

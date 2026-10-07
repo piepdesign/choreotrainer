@@ -598,4 +598,9 @@ export default {
   "Klicken zum Umbenennen": "Clicca per rinominare",
   "Einheit": "sessione",
   "Auswählen …": "Scegli …",
+  "Hier öffnen sich Songs.": "Qui si aprono i brani.",
+  "Lautstärke beim Darüberfahren.": "Volume al passaggio del mouse.",
+  "Lautstärke beim Halten.": "Volume tenendo premuto.",
+  "Hell, dunkel oder wie das System.": "Chiaro, scuro o come il sistema.",
+  "Sprache der App.": "Lingua dell’app.",
 };

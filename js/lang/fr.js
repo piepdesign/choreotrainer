@@ -598,4 +598,9 @@ export default {
   "Klicken zum Umbenennen": "Clique pour renommer",
   "Einheit": "séance",
   "Auswählen …": "Choisir …",
+  "Hier öffnen sich Songs.": "Les morceaux s’ouvrent ici.",
+  "Lautstärke beim Darüberfahren.": "Volume au survol.",
+  "Lautstärke beim Halten.": "Volume en maintenant appuyé.",
+  "Hell, dunkel oder wie das System.": "Clair, sombre ou comme le système.",
+  "Sprache der App.": "Langue de l’app.",
 };
