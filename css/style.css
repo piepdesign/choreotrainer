@@ -221,6 +221,13 @@ button.chip[data-hex] { width: 64px; height: 28px; padding: 0; }
 .suggest button { display: grid; grid-template-columns: 36px 1fr auto; gap: 10px; align-items: center; width: 100%; text-align: left; padding: 6px 8px; }
 .suggest button:hover, .suggest button.hl { background: var(--panel); }
 .suggest img { width: 36px; height: 36px; object-fit: cover; }
+/* Andere Fassungen (Remix, Edit …): gleiche Zeilen wie die Suchvorschläge, aber im Fluss statt als Aufklapper */
+.song-versions:empty { display: none; }
+.song-versions { margin-top: 8px; display: grid; gap: 6px; }
+.versions { border: 1px solid var(--fg); max-height: 320px; overflow: auto; }
+.versions button { display: grid; grid-template-columns: 36px 1fr auto; gap: 10px; align-items: center; width: 100%; text-align: left; padding: 6px 8px; }
+.versions button:hover { background: var(--panel); }
+.versions img { width: 36px; height: 36px; object-fit: cover; }
 .song-picked { display: grid; grid-template-columns: 56px 1fr auto; gap: 12px; align-items: center; padding: 6px 0; }
 .song-picked img, .song-picked .nocover { width: 56px; height: 56px; object-fit: cover; background: var(--panel); }
 

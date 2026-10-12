@@ -3,7 +3,7 @@ import { tr } from './i18n.js';
 import { h, fmt, debounce } from './util.js';
 import { searchSongs, songDetails } from './deezer.js';
 import { recognizeSong, scanTrack, median, enrich } from './recognize.js';
-import { songLink } from './providers.js';
+import { songLink, stopPreview } from './providers.js';
 import { prime } from './audio.js';
 
 const norm = s => String(s || '').trim().toLowerCase();
@@ -17,11 +17,21 @@ export const sameSong = (a, b) => {
   const x = simple(a?.title), y = simple(b?.title);
   return !!x && !!y && (x.startsWith(y) || y.startsWith(x));
 };
+// Fassung im Titel (Remix, Edit, Extended Mix …). Ohne Angabe: Original
+const VERSION = /remix|mix|edit|version|rework|bootleg|vip|dub|extended|cover|sped up|slowed/i;
+const versionOf = t => (String(t || '').match(/\(([^)]*)\)|\[([^\]]*)\]/g) || []).map(x => x.slice(1, -1)).filter(x => VERSION.test(x)).map(norm).sort().join('|');
+// Gleiche Fassung? Ist eine bestimmte Fassung gewählt, zählen nur Treffer genau dieser Fassung (Shazam meldet bei Remixen
+// oft das Original; dessen Zeitposition passt nicht zum Remix). Beim Original zählen alle Fassungen wie bisher.
+const sameVersion = (hit, chosen) => sameSong(hit, chosen) && (!versionOf(chosen?.title) || versionOf(hit?.title) === versionOf(chosen?.title));
+// Tempo gleich (auch halbes/doppeltes Zählen), Toleranz 4 %
+const sameTempo = (a, b) => !!a && !!b && [b, b * 2, b / 2].some(x => Math.abs(a - x) / x < 0.04);
+const baseTitle = t => String(t || '').replace(/\(.*?\)|\[.*?\]|feat\..*$/gi, '').replace(/\s+/g, ' ').trim();
 
 // getBlob(): aktuelles Video oder null · onChange(song, offset|null) · onOffset(offset): nur Startpunkt
 // align(prior): optionaler Abgleich mit der Songdatei → { offset, confidence } oder null
 // startField: Eingabefeld für den Startpunkt, steht als Schritt 2 unter dem Song
-export function songPicker({ song = null, getBlob, onChange, onOffset, align = null, startField = null }) {
+// tempo(): Tempo des Videos in BPM (oder Promise darauf), für den Hinweis auf andere Fassungen (Remix, verlangsamt)
+export function songPicker({ song = null, getBlob, onChange, onOffset, align = null, startField = null, tempo = null }) {
   let current = song;
   let editing = !song;
   let results = [];
@@ -36,6 +46,7 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
   const recStatus = h('div.label.song-status');
   const startStatus = h('div.label.song-status');
   const altBox = h('div.actions', { style: { marginTop: '6px' } });
+  const versionBox = h('div.song-versions');
   // Reihenfolge wie im Ablauf: 1 Song erkennen/suchen · 2 Startpunkt im Song
   const startStep = h('div.song-step',
     h('span.label.step-label', tr('Video beginnt im Song bei')),
@@ -43,7 +54,7 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
     h('div.actions', startBtn),
     startStatus);
   const el = h('div.song-steps',
-    h('div.song-step', search, picked, h('div.actions', recBtn), recStatus, altBox),
+    h('div.song-step', search, picked, h('div.actions', recBtn), recStatus, altBox, versionBox),
     onOffset ? startStep : null);
 
   // Weitere Treffer aus dem Scan zur Auswahl anbieten (z. B. Original vs. Sample-Quelle)
@@ -76,9 +87,57 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
     startBtn.disabled = !getBlob();
   }
 
+  // ── Andere Fassung (Remix, Edit …) ──
+  // Shazam meldet bei Remixen oft nur das Original. Das Tempo des Videos verrät es häufig (Remix oder verlangsamt gespielt).
+  let tempoP = null, tempoFor;
+  const videoTempo = () => {
+    const b = getBlob();
+    if (tempoFor !== b) { tempoFor = b; tempoP = Promise.resolve(tempo && b ? tempo(b) : null).catch(() => null); }
+    return tempoP;
+  };
+  async function offerVersions() {
+    versionBox.replaceChildren();
+    const s = current;
+    if (!s?.title || s.source === 'manual') return;
+    const link = h('div.actions', h('button.linkbtn', { type: 'button', onclick: () => listVersions(s) }, tr('Andere Fassung wählen (Remix, Edit …)')));
+    versionBox.replaceChildren(link);
+    const v = await videoTempo();
+    if (current !== s || !v || !s.bpm || sameTempo(v, s.bpm)) return;
+    versionBox.replaceChildren(h('div.label', tr('Das Video läuft mit etwa {v} BPM, der Song mit {s} BPM. Vermutlich eine andere Fassung (z. B. Remix) oder verlangsamt gespielt.', { v: Math.round(v), s: Math.round(s.bpm) })), link);
+  }
+  async function listVersions(s) {
+    const base = baseTitle(s.title);
+    versionBox.replaceChildren(h('div.label', tr('Suche Fassungen …')));
+    const v = await videoTempo();
+    const seen = new Set(s.source === 'deezer' ? [s.id] : []), list = [];
+    for (const q of [`${base} ${baseTitle(s.artist)}`, `${base} remix`, `${base} mix`]) {
+      try {
+        for (const x of await searchSongs(q)) if (!seen.has(x.id) && simple(x.title).startsWith(simple(base))) { seen.add(x.id); list.push(x); }
+      } catch { /* nächste Suche */ }
+    }
+    for (const x of list.slice(0, 16)) if (!x.bpm) { const d = await songDetails(x.id).catch(() => null); if (d?.bpm) x.bpm = d.bpm; }
+    if (current !== s) return;
+    list.sort((a, b) => sameTempo(v, b.bpm) - sameTempo(v, a.bpm));
+    if (!list.length) { versionBox.replaceChildren(h('div.label', tr('Keine weiteren Fassungen bei Deezer gefunden. Über die Suche oben lässt sich jede Fassung auch von Hand wählen.'))); return; }
+    versionBox.replaceChildren(
+      h('div.label', [v && tr('Video: etwa {v} BPM', { v: Math.round(v) }), tr('Cover überfahren oder halten: Hörprobe')].filter(Boolean).join(' · ')),
+      h('div.versions', ...list.map(x => h('button', { type: 'button', title: tr('Diese Fassung übernehmen'), onclick: () => pickVersion(x) },
+        x.cover ? songLink(h('img', { src: x.cover, alt: '' }), x) : h('div'),
+        h('div', h('div', x.title), h('div.label', x.artist)),
+        h('span.label', [x.duration && fmt(x.duration), x.bpm && `${Math.round(x.bpm)} BPM`, sameTempo(v, x.bpm) && tr('passt zum Tempo')].filter(Boolean).join(' · '))))),
+      h('div.actions', h('button.linkbtn', { type: 'button', onclick: () => offerVersions() }, tr('Abbrechen'))));
+  }
+  async function pickVersion(x) {
+    stopPreview();
+    versionBox.replaceChildren();
+    // Der bisherige Startpunkt gehörte zur alten Fassung: leeren, neu bestimmen (am sichersten per Abgleich mit der Songdatei)
+    await set(x, null, { reset: true });
+    recStatus.textContent = tr('Fassung übernommen. Den Startpunkt am besten mit der Songdatei dieser Fassung erkennen (Abgleich) oder von Hand eintragen.');
+  }
+
   // Deezer liefert BPM nur im Detailabruf. Erst darauf warten (max. 3 s), dann den Song einmal
   // vollständig melden. Zwei Meldungen hintereinander hatten sich gegenseitig überschrieben.
-  async function set(s, offset = null) {
+  async function set(s, offset = null, opts = {}) {
     current = s;
     editing = false;
     input.value = '';
@@ -92,7 +151,8 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
       recStatus.textContent = '';
       render();
     }
-    onChange?.(s, offset);
+    onChange?.(s, offset, opts);
+    offerVersions();
   }
 
   const runSearch = debounce(async q => {
@@ -154,7 +214,7 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
       try {
         const scan = await scanTrack(blob, msg => { startStatus.textContent = msg; });
         segments = scan.segments;
-        const mine = scan.candidates.filter(c => sameSong({ title: c.track.title }, current));
+        const mine = scan.candidates.filter(c => sameVersion({ title: c.track.title }, current));
         hits = mine.reduce((a, c) => a + c.hits, 0);
         shazam = median(mine.flatMap(c => c.offsets));
         others = scan.candidates.filter(c => !mine.includes(c));
@@ -183,7 +243,7 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
       if (shazam != null) {
         onOffset(Math.max(0, shazam), { file: hasFile ? null : undefined });
         startStatus.textContent = hasFile
-          ? tr('Video beginnt bei {t} im Song ({hits}/{n} Abschnitte). Die Songdatei passt aber nicht zum Video (anderer Song oder andere Aufnahme), Mitspielen mit der Datei ist deshalb aus. Bitte unten die richtige Datei laden.', { t: fmt(Math.max(0, shazam), true), hits, n: segments })
+          ? tr('Video beginnt bei {t} im Song ({hits}/{n} Abschnitte). Die Songdatei klingt aber anders als das Video (anderer Song oder andere Fassung). Zum Mitspielen läuft sie ab diesem Startpunkt; passt es nicht, lade unten die passende Datei.', { t: fmt(Math.max(0, shazam), true), hits, n: segments })
           : tr('Video beginnt bei {t} im Song ({hits}/{n} Abschnitte)', { t: fmt(Math.max(0, shazam), true), hits, n: segments });
       } else {
         const heard = others[0] ? ` ${tr('Gehört wurde: {song}.', { song: [others[0].track.subtitle, others[0].track.title].filter(Boolean).join(' — ') })}` : '';
@@ -202,5 +262,6 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
   }
 
   render();
+  offerVersions();
   return { el, get: () => current, typed: () => input.value.trim(), recognize, detectStart, refresh: render };
 }

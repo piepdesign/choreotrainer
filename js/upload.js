@@ -9,6 +9,8 @@ import { classPickers, confirmDialog } from './ui.js';
 import { dropzone } from './hub.js';
 import { state, go, toast } from './app.js';
 import { compressVideo } from './compress.js';
+import { analyzeBeat } from './beat.js';
+import { needsCapture } from './audio.js';
 
 
 const norm = s => String(s || '').trim().toLowerCase();
@@ -77,11 +79,17 @@ export async function renderUpload(root, kind, refId) {
   const picker = songPicker({
     song: preChoreo?.song || null,
     getBlob: () => file,
-    onChange: (s, offset) => { if (offset != null) offsetIn.value = fmt(offset, true); songStep.hidden = false; },
+    onChange: (s, offset, { reset } = {}) => {
+      if (reset) { offsetIn.value = ''; fileOffset = undefined; } // andere Fassung: alter Startpunkt passt nicht mehr
+      if (offset != null) offsetIn.value = fmt(offset, true);
+      songStep.hidden = false;
+    },
     // file: Position in der Songdatei (kann bei Musikvideo-Fassungen abweichen), null = Datei passt nicht
     onOffset: (offset, { file: pos } = {}) => { offsetIn.value = fmt(offset, true); fileOffset = pos; },
     align: () => (songFile && file ? alignToSong(file, songFile) : null),
     startField: offsetIn,
+    // Tempo des Videos für den Fassungs-Hinweis (auf dem Handy nicht, wenn die Analyse den Ton hörbar abspielen müsste)
+    tempo: b => (needsCapture(b) ? null : analyzeBeat(b).then(r => r?.bpm || null)),
   });
   // Schritt 3: Songdatei (optional) – gleicher Aufbau wie im Panel der Trainingsansicht
   const songFileIn = h('input', { type: 'file', accept: 'audio/*,audio/flac,audio/x-flac,.mp3,.m4a,.aac,.wav,.flac,.aiff', hidden: true });
@@ -93,7 +101,7 @@ export async function renderUpload(root, kind, refId) {
         h('button.linkbtn', { type: 'button', onclick: () => songFileIn.click() }, tr('Ersetzen')),
         h('button.linkbtn', { type: 'button', onclick: () => { songFile = null; renderSongStep(); } }, tr('Entfernen')))
       : h('div.actions', h('button.btn.small', { type: 'button', onclick: () => songFileIn.click() }, tr('Songdatei laden'))),
-    h('div.label', { style: { marginTop: '6px' } }, msg || tr('Zum Trainieren auf den Song.')));
+    h('div.label', { style: { marginTop: '6px' } }, msg || tr('Zum Trainieren auf den Song. Als Datei gibt es Songs z. B. als Kauf-Download (iTunes, Amazon, Beatport für Remixe) oder vom Coach. Downloads aus Streaming-Apps sind kopiergeschützt und lassen sich nicht laden.')));
   }
   songFileIn.addEventListener('change', async () => {
     const f = songFileIn.files[0];

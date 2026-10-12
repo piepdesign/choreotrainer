@@ -11,7 +11,7 @@ import { go, toast } from './app.js';
 import { settings, saveSettings, PANEL_SECTIONS } from './settings.js';
 import { icon, toggle, confirmDialog } from './ui.js';
 import { exportChoreoDialog } from './share.js';
-import { prime, needsCapture } from './audio.js';
+import { prime, needsCapture, toWav } from './audio.js';
 
 const MARKER_TYPES = {
   start: { label: tr('START'), color: 'var(--fg)', key: 'S' },
@@ -105,6 +105,24 @@ export async function renderTrain(root, recId) {
     if (songUrl) URL.revokeObjectURL(songUrl);
     songUrl = songBlob ? URL.createObjectURL(songBlob) : null;
     if (songUrl) songAudio.src = songUrl; else songAudio.removeAttribute('src');
+    if (songBlob) checkSeekable(songBlob);
+  }
+  // MP3 mit variabler Bitrate ohne Index-Kopf: Der Browser schätzt Länge und Sprungziele nur (im Test 115 statt 88 s).
+  // Dann landet jeder Sprung an der falschen Stelle. Solche Dateien zum Abspielen einmal entpacken (WAV, genau springbar).
+  async function checkSeekable(b) {
+    if (!/mpeg|mp3/i.test(b.type) && !/\.mp3$/i.test(b.name || '')) return;
+    await new Promise(r => (songAudio.readyState >= 1 ? r() : songAudio.addEventListener('loadedmetadata', r, { once: true })));
+    try {
+      const dec = await new OfflineAudioContext(2, 1, 44100).decodeAudioData(await b.arrayBuffer());
+      if (b !== songBlob || !isFinite(songAudio.duration) || Math.abs(songAudio.duration - dec.duration) < 0.5) return;
+      const pos = songAudio.currentTime, playing = !songAudio.paused;
+      URL.revokeObjectURL(songUrl);
+      songUrl = URL.createObjectURL(toWav(dec));
+      songAudio.src = songUrl;
+      songAudio.currentTime = pos;
+      if (song && Math.abs((song.duration || 0) - dec.duration) > 1 && song.source !== 'deezer') { song.duration = dec.duration; db.put('choreos', choreo); renderStatic(); }
+      if (playing) syncSong(true);
+    } catch { /* bleibt bei der Originaldatei */ }
   }
   loadSongAudio();
   songAudio.addEventListener('loadedmetadata', () => {
@@ -119,7 +137,7 @@ export async function renderTrain(root, recId) {
   // Original, z. B. Musikvideo), sonst der Startpunkt im Song. null = Datei passt nicht zum Video.
   const filePos = () => (rec.fileOffset !== undefined ? rec.fileOffset : rec.songOffset);
   const songMode = () => P.audio === 'song' && !!songBlob && filePos() != null;
-  let lastSeek = 0, lastSync = 0;
+  let lastSeek = 0, lastSync = 0, lastRate = 0, errS = 0;
   function syncSong(force = false) {
     if (!songMode()) { if (!songAudio.paused) songAudio.pause(); return; }
     songAudio.volume = P.volume;
@@ -135,14 +153,22 @@ export async function renderTrain(root, recId) {
     const err = target - songAudio.currentTime; // > 0: Song hinkt hinterher
     const now = performance.now();
     const touchMode = isTouch();
-    if (force || (touchMode ? Math.abs(err) > 0.5 && now - lastSeek > 3000 : Math.abs(err) > 0.25)) {
+    // Abweichung geglättet (~0,25 s): die gemeldete Position springt um einige ms, und die Ausgabe liegt immer etwas zurück
+    errS += (err - errS) * 0.07;
+    if (force || (touchMode ? Math.abs(err) > 0.5 && now - lastSeek > 3000 : Math.abs(errS) > 0.3)) {
       songAudio.currentTime = target;
       lastSeek = now;
+      errS = 0;
       if (songAudio.playbackRate !== P.rate) songAudio.playbackRate = P.rate;
     } else if (!touchMode) {
-      const nudge = Math.abs(err) < 0.008 ? 0 : Math.max(-0.06, Math.min(0.06, err * 0.8));
-      const r = P.rate * (1 + nudge);
-      if (Math.abs(songAudio.playbackRate - r) > 0.002) songAudio.playbackRate = r;
+      // Tempo nur selten und in kleinen Stufen anpassen (höchstens alle 0,5 s, bis 40 ms Abweichung gar nicht).
+      // Vorher wechselte es rund 15-mal pro Sekunde: jeder Wechsel setzt die Zeitdehnung neu auf, das stockte hörbar
+      if (now - lastRate > 500) {
+        lastRate = now;
+        const nudge = Math.abs(errS) < 0.04 ? 0 : Math.max(-0.03, Math.min(0.03, errS * 0.5));
+        const r = Math.round(P.rate * (1 + nudge) * 200) / 200;
+        if (Math.abs(songAudio.playbackRate - r) > 0.001) songAudio.playbackRate = r;
+      }
     } else if (songAudio.playbackRate !== P.rate) songAudio.playbackRate = P.rate;
     if (songAudio.paused) songAudio.play().catch(() => {});
   }
@@ -421,7 +447,13 @@ export async function renderTrain(root, recId) {
   const bMark = h('button.ctl.icon-ctl', { type: 'button', title: tr('Marker setzen'), 'aria-label': tr('Marker setzen'), html: icon('marker'), onclick: e => popover(e.currentTarget, markPop) });
   const toggleAudio = () => {
     if (!songBlob) { toast(tr('Erst unter SONG eine Songdatei laden')); return; }
-    if (P.audio !== 'song' && rec.fileOffset === null) { toast(tr('Die Songdatei passt nicht zum Video. Bitte die richtige Datei laden oder den Startpunkt von Hand eintragen.'), 5000); return; }
+    // Datei klang beim Abgleich anders als das Video: nicht sperren, sondern ab dem eingetragenen Startpunkt abspielen
+    // (vorher kam „Startpunkt von Hand eintragen“, obwohl das Feld schon ausgefüllt war)
+    if (P.audio !== 'song' && rec.fileOffset === null && rec.songOffset != null) {
+      delete rec.fileOffset;
+      saveRec();
+      toast(tr('Die Songdatei klingt anders als das Video (anderer Song oder andere Fassung). Sie läuft ab dem Startpunkt {t}; passt es nicht, den Startpunkt anpassen oder die passende Datei laden.', { t: fmt(rec.songOffset, true) }), 6000);
+    }
     if (P.audio !== 'song' && filePos() == null) { toast(tr('Erst den Startpunkt im Song setzen (Startpunkt erkennen)')); return; }
     P.audio = P.audio === 'song' ? 'video' : 'song';
     update();
@@ -843,10 +875,11 @@ export async function renderTrain(root, recId) {
   const picker = songPicker({
     song,
     getBlob: () => blob,
-    onChange: async (s, offset) => {
+    onChange: async (s, offset, { reset } = {}) => {
       // neuer Song → Titel folgt wieder dem Songtitel
       Object.assign(choreo, { song: s, songKey: songKeyOf(s), title: null });
       await db.put('choreos', choreo);
+      if (reset) { rec.songOffset = null; delete rec.fileOffset; } // andere Fassung: alter Startpunkt passt nicht mehr
       if (offset != null) rec.songOffset = offset;
       // Takt mit der Song-BPM als Hilfe neu schätzen, solange er nicht von Hand korrigiert wurde
       if (s.bpm && !P.manualBeat && Math.round(s.bpm) !== Math.round(P.bpm || 0)) { rec.beatTried = false; P.bpm = null; }
@@ -865,6 +898,7 @@ export async function renderTrain(root, recId) {
     },
     align: () => (songBlob ? alignToSong(blob, songBlob) : null),
     startField: offsetIn,
+    tempo: () => P.bpm || null, // Tempo des Videos aus der Takterkennung
   });
 
   // Songdatei laden / entfernen
@@ -918,7 +952,7 @@ export async function renderTrain(root, recId) {
       : h('div',
         h('span.label.step-label', tr('Songdatei (optional)')),
         h('div.actions', h('button.btn.small', { type: 'button', onclick: () => songFileIn.click() }, tr('Songdatei laden'))),
-        h('div.label', { style: { marginTop: '6px' } }, tr('Zum Trainieren auf den Song.'))));
+        h('div.label', { style: { marginTop: '6px' } }, tr('Zum Trainieren auf den Song. Als Datei gibt es Songs z. B. als Kauf-Download (iTunes, Amazon, Beatport für Remixe) oder vom Coach. Downloads aus Streaming-Apps sind kopiergeschützt und lassen sich nicht laden.'))));
   }
   songFileIn.addEventListener('change', () => setSongFile(songFileIn.files[0]));
   renderSongFile();

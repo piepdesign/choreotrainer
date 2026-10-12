@@ -95,8 +95,10 @@ export async function scanTrack(blob, onProgress = () => {}) {
     let data;
     try {
       data = await ask(signature(slice));
-      if (data.retryms) throw new Error(tr('Shazam bremst'));
     } catch (e) { lastError = e; failed.push(start); return; }
+    // „retryms“ kommt mit leerer Trefferliste: Shazam hat in diesem Abschnitt nichts erkannt (der Wert schlägt nur vor,
+    // es mit mehr Ton später erneut zu versuchen). Kein Bremsen: Abschnitt zählt als beantwortet, ohne Treffer.
+    // Vorher wurde das als „Shazam bremst“ gewertet und vergeblich wiederholt.
     answered++;
     onProgress(tr('Scanne Tonspur … {i}/{n}', { i: ++done, n: starts.length }));
     const track = data.track;
@@ -124,11 +126,11 @@ export async function scanTrack(blob, onProgress = () => {}) {
   } else {
     for (let k = 0; k < starts.length; k += 3) await Promise.all(starts.slice(k, k + 3).map(one));
   }
-  // Abgelehnte Abschnitte (Shazam bremst bei vielen Anfragen kurz hintereinander) nachholen: einzeln,
+  // Abschnitte mit Fehler (Dienst kurz nicht erreichbar) nachholen: einzeln,
   // mit wachsender Pause (2 s, 4 s, 8 s). Sonst zählen sie als „nicht erkannt“ und verzerren die Mehrheit.
   for (let round = 0; failed.length && round < 3 && !clearWinner(); round++) {
     const retry = failed.splice(0);
-    onProgress(tr('Shazam bremst kurz, frage erneut … ({i}/3)', { i: round + 1 }));
+    onProgress(tr('Erkennungsdienst antwortet nicht, frage erneut … ({i}/3)', { i: round + 1 }));
     await wait(2000 * 2 ** round);
     for (const start of retry) { await one(start); if (remote) await wait(900); }
   }
