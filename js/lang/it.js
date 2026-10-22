@@ -611,4 +611,6 @@ export default {
   "Video beginnt bei {t} im Song ({hits}/{n} Abschnitte). Die Songdatei klingt aber anders als das Video (anderer Song oder andere Fassung). Zum Mitspielen läuft sie ab diesem Startpunkt; passt es nicht, lade unten die passende Datei.": "Il video inizia a {t} nel brano ({hits}/{n} parti). Ma il file suona diverso dal video (altro brano o altra versione). Per suonare insieme parte da questo punto di partenza; se non combacia, carica qui sotto il file giusto.",
   "Die Songdatei klingt anders als das Video (anderer Song oder andere Fassung). Sie läuft ab dem Startpunkt {t}; passt es nicht, den Startpunkt anpassen oder die passende Datei laden.": "Il file suona diverso dal video (altro brano o altra versione). Parte dal punto di partenza {t}; se non combacia, modifica il punto di partenza o carica il file giusto.",
   "Zum Trainieren auf den Song. Als Datei gibt es Songs z. B. als Kauf-Download (iTunes, Amazon, Beatport für Remixe) oder vom Coach. Downloads aus Streaming-Apps sind kopiergeschützt und lassen sich nicht laden.": "Per allenarti sul brano. I brani come file si trovano ad es. come download a pagamento (iTunes, Amazon, Beatport per i remix) o dal coach. I download delle app di streaming sono protetti e non si possono caricare.",
+  "Impressum": "Note legali",
+  "Datenschutz": "Privacy",
 };

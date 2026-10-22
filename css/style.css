@@ -1,6 +1,75 @@
 /* ChoreoTrainer — angelehnt an A-29 „Good Beats Tool“:
    Schwarz/Weiß, breite Grotesk für Display, Mono für Labels, Farbstreifen als Codierung */
 
+/* Schriften lokal (OFL, Lizenzen in fonts/*/OFL.txt): kein Abruf bei Google, damit keine IP-Adresse dorthin geht.
+   Archivo variabel (Breite 62–125 %, Stärke 400–900), IBM Plex Mono 400/500/600; je Latin und Latin Extended. */
+@font-face { /* latin-ext */
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 400 900;
+  font-stretch: 62% 125%;
+  font-display: swap;
+  src: url(../fonts/archivo/archivo-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face { /* latin */
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 400 900;
+  font-stretch: 62% 125%;
+  font-display: swap;
+  src: url(../fonts/archivo/archivo-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face { /* latin-ext */
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(../fonts/ibm-plex-mono/ibm-plex-mono-400-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face { /* latin */
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(../fonts/ibm-plex-mono/ibm-plex-mono-400-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face { /* latin-ext */
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(../fonts/ibm-plex-mono/ibm-plex-mono-500-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face { /* latin */
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(../fonts/ibm-plex-mono/ibm-plex-mono-500-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face { /* latin-ext */
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url(../fonts/ibm-plex-mono/ibm-plex-mono-600-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face { /* latin */
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url(../fonts/ibm-plex-mono/ibm-plex-mono-600-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root {
   --bg: #fff;
   --fg: #000;
@@ -965,3 +1034,17 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 .controls > .ctl-group { min-height: 34px; } /* niedrig halten: mehr Höhe fürs Video */
 .ctl-group > .ctl { padding: 5px 2px; letter-spacing: .04em; }
 @media (max-width: 600px) { .ctl-group > .ctl { font-size: 9.5px; letter-spacing: .04em; padding: 4px 1px; } .ctl-group { padding: 2px; } }
+
+/* ── Impressum & Datenschutz ─────────────────── */
+/* Zeile ganz unten in den Einstellungen */
+.legal-links { margin: clamp(40px, 5vw, 64px) 0 0; }
+.legal-links a:hover { color: var(--fg); }
+/* eigene Seiten impressum.html / datenschutz.html: schlicht, Mono */
+.legal-page { max-width: 720px; padding: 18px var(--gutter) 64px; }
+.legal-page .wordmark { display: inline-block; margin-bottom: clamp(32px, 5vw, 56px); }
+.legal-page h1 { font-size: clamp(28px, 4vw, 44px); text-transform: uppercase; margin: 0 0 24px; }
+.legal-page h2 { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; margin: 28px 0 6px; }
+.legal-page p { margin: 0 0 10px; }
+.legal-page a:not(.wordmark) { text-decoration: underline; text-underline-offset: 3px; }
+.legal-page hr { border: 0; border-top: 1px solid var(--rule); margin: 56px 0; }
+.legal-page .back { display: inline-block; margin-top: 40px; }

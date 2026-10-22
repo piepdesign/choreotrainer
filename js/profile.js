@@ -574,7 +574,9 @@ export async function renderProfile(root, section) {
     choreos: h('div.p-tab', choreoSec),
   };
   if (settingsPage) {
-    root.append(h('section.p-head', h('h1.wide.p-name', tr('EINSTELLUNGEN'))), fitAccTitles(h('div.p-tab.p-settings', prefs, statsSec, manageSec, dataSec, appSec, account)));
+    // Impressum und Datenschutz: eine leise Zeile ganz unten, eigene Seiten im selben Tab
+    const legal = h('p.label.legal-links', h('a', { href: 'impressum.html' }, tr('Impressum')), ' · ', h('a', { href: 'datenschutz.html' }, tr('Datenschutz')));
+    root.append(h('section.p-head', h('h1.wide.p-name', tr('EINSTELLUNGEN'))), fitAccTitles(h('div.p-tab.p-settings', prefs, statsSec, manageSec, dataSec, appSec, account)), legal);
     return () => { urls.forEach(u => URL.revokeObjectURL(u)); removeEventListener('ct-install', renderData); removeEventListener('ct-install', renderApp); };
   }
   function showTab(id, user = false) {

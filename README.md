@@ -32,3 +32,8 @@ Dann `http://localhost:8417` öffnen.
 GPL-3.0, wegen des enthaltenen vibra-Moduls (`vendor/vibra/`, ebenfalls GPL-3.0).
 
 Enthalten außerdem [Mediabunny](https://github.com/Vanilagy/mediabunny) (`vendor/mediabunny/`, MPL-2.0, unverändert) zum Verkleinern der Videos beim Hochladen.
+
+## Impressum & Datenschutz
+
+- [Impressum](https://piepdesign.github.io/choreotrainer/impressum.html)
+- [Datenschutz](https://piepdesign.github.io/choreotrainer/datenschutz.html)
