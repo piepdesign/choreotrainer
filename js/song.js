@@ -103,7 +103,7 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
     versionBox.replaceChildren(link);
     const v = await videoTempo();
     if (current !== s || !v || !s.bpm || sameTempo(v, s.bpm)) return;
-    versionBox.replaceChildren(h('div.label', tr('Das Video läuft mit etwa {v} BPM, der Song mit {s} BPM. Vermutlich eine andere Fassung (z. B. Remix) oder verlangsamt gespielt.', { v: Math.round(v), s: Math.round(s.bpm) })), link);
+    versionBox.replaceChildren(h('div.hint-text', tr('Das Video läuft mit etwa {v} BPM, der Song mit {s} BPM. Vermutlich eine andere Fassung (z. B. Remix) oder verlangsamt gespielt.', { v: Math.round(v), s: Math.round(s.bpm) })), link);
   }
   async function listVersions(s) {
     const base = baseTitle(s.title);
@@ -118,7 +118,7 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
     for (const x of list.slice(0, 16)) if (!x.bpm) { const d = await songDetails(x.id).catch(() => null); if (d?.bpm) x.bpm = d.bpm; }
     if (current !== s) return;
     list.sort((a, b) => sameTempo(v, b.bpm) - sameTempo(v, a.bpm));
-    if (!list.length) { versionBox.replaceChildren(h('div.label', tr('Keine weiteren Fassungen bei Deezer gefunden. Über die Suche oben lässt sich jede Fassung auch von Hand wählen.'))); return; }
+    if (!list.length) { versionBox.replaceChildren(h('div.hint-text', tr('Keine weiteren Fassungen bei Deezer gefunden. Über die Suche oben lässt sich jede Fassung auch von Hand wählen.'))); return; }
     versionBox.replaceChildren(
       h('div.label', [v && tr('Video: etwa {v} BPM', { v: Math.round(v) }), tr('Cover überfahren oder halten: Hörprobe')].filter(Boolean).join(' · ')),
       h('div.versions', ...list.map(x => h('button', { type: 'button', title: tr('Diese Fassung übernehmen'), onclick: () => pickVersion(x) },

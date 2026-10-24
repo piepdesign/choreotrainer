@@ -533,14 +533,16 @@ export async function renderTrain(root, recId) {
   const slider = (label, min, max, step, get, set, fmtV) => {
     const val = h('span', fmtV(get()));
     const input = h('input', { type: 'range', min, max, step, value: get() });
-    input.addEventListener('input', () => { set(Number(input.value)); val.textContent = fmtV(get()); update(); });
+    const fill = () => input.style.setProperty('--p', `${(input.value - min) / (max - min) * 100}%`); // Füllung bis zum Wert
+    fill();
+    input.addEventListener('input', () => { set(Number(input.value)); val.textContent = fmtV(get()); fill(); update(); });
     return [h('div.prow', h('span', label), val), input];
   };
   const small = (label, onclick, on) => h(`button.btn.small${on ? '.primary' : ''}`, { type: 'button', onclick }, label);
 
   const ratePop = () => [
     ...slider(tr('Tempo'), 0.25, 1.5, 0.05, () => P.rate, v => { P.rate = v; }, v => `${num(v, 2)}×`),
-    h('div.btns', [0.5, 0.75, 0.9, 1].map(v => small(`${num(v)}×`, () => { P.rate = v; update(); closePop(); }))),
+    h('div.btns', [0.5, 0.75, 0.9, 1].map(v => small(`${num(v)}×`, () => { P.rate = v; update(); closePop(); }, Math.abs(P.rate - v) < 0.001))),
     h('div.note', tr('Tonhöhe bleibt gleich.')),
   ];
   const volPop = () => [
@@ -952,7 +954,7 @@ export async function renderTrain(root, recId) {
       : h('div',
         h('span.label.step-label', tr('Songdatei (optional)')),
         h('div.actions', h('button.btn.small', { type: 'button', onclick: () => songFileIn.click() }, tr('Songdatei laden'))),
-        h('div.label', { style: { marginTop: '6px' } }, tr('Zum Trainieren auf den Song. Als Datei gibt es Songs z. B. als Kauf-Download (iTunes, Amazon, Beatport für Remixe) oder vom Coach. Downloads aus Streaming-Apps sind kopiergeschützt und lassen sich nicht laden.'))));
+        h('div.hint-text', { style: { marginTop: '6px' } }, tr('Zum Trainieren auf den Song. Als Datei gibt es Songs z. B. als Kauf-Download (iTunes, Amazon, Beatport für Remixe) oder vom Coach. Downloads aus Streaming-Apps sind kopiergeschützt und lassen sich nicht laden.'))));
   }
   songFileIn.addEventListener('change', () => setSongFile(songFileIn.files[0]));
   renderSongFile();

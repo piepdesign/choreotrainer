@@ -350,7 +350,7 @@ export async function renderProfile(root, section) {
       { label: tr('Verlauf'), value: c => c.ratings?.length || 0, cell: c => sparkline(c.ratings), dir: -1 },
       { label: tr('Zuletzt bewertet'), value: c => c.ratings?.at(-1)?.ts || 0, cell: c => h('span.label', c.ratings?.length ? relDate(c.ratings.at(-1).ts) : tr('nie')), dir: -1 },
     ], choreos, { sort: 1, key: 'ct-sort-status', href: c => ((recsByChoreo[c.id] || []).length ? `#/train/${recsByChoreo[c.id].at(-1).id}` : null) }),
-    h('p.label', tt(tr('Spaltenüberschrift anklicken zum Sortieren. Standard: die wackligsten zuerst.'), tr('Spaltenüberschrift antippen zum Sortieren. Standard: die wackligsten zuerst.'))));
+    h('p.hint-text', tt(tr('Spaltenüberschrift anklicken zum Sortieren. Standard: die wackligsten zuerst.'), tr('Spaltenüberschrift antippen zum Sortieren. Standard: die wackligsten zuerst.'))));
 
   // ── Choreos: Galerie / Liste ──
   let view = 'gallery', gsort = 'recent';

@@ -526,7 +526,7 @@ function choreoBlock(c, recs, sessions, urls) {
         h('strong', title),
         h('span', fmtRecDate(r.recordedAt)),
         h('span.muted', r.duration ? fmt(r.duration) : ''),
-        h('span.muted', { style: { flex: 1, minWidth: '120px' } }, (r.notes || '').slice(0, 80)),
+        h('span.muted.rec-notes', (r.notes || '').slice(0, 80)),
         h('button.linkbtn', { onclick: () => title.startEdit() }, tr('Umbenennen')),
         h('button.linkbtn', {
           onclick: async () => {
