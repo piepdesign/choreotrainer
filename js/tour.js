@@ -291,11 +291,8 @@ export function trainTour() {
     { target: sec('status'), block: true, side: true, before: panelOpen, title: tr('Status'), text: [
       tr('Bewertet von 1 bis 5, wie gut du die Choreo kannst.')] },
     { target: sec('recs'), block: true, side: true, before: panelOpen, title: tr('Aufnahmen'), text: [
-      tr('Chronik aller Aufnahmen der Choreo, nach Datum, zum Wechseln.'),
-      tr('Der Name der aktuellen Aufnahme ist umbenennbar.'),
-      tr('Hinzufügen lädt ein weiteres Video zur Choreo.'),
-      tr('Löschen entfernt die aktuelle Aufnahme samt Video.'),
-      tr('Exportieren speichert die Choreo als Datei zum Teilen oder Sichern.')] },
+      tr('Alle Aufnahmen der Choreo nach Datum, zum Wechseln. Die aktuelle ist umbenennbar.'),
+      tr('Darunter: Aufnahme hinzufügen oder löschen, Choreo exportieren oder in eine andere Class verschieben.')] },
     { target: sec('keys'), block: true, side: true, before: panelOpen, when: () => !!document.querySelector(sec('keys')), title: tr('Tasten'), text: [
       tr('Alle Tastenkürzel.')] },
   ], {

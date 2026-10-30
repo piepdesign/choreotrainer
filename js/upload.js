@@ -95,13 +95,13 @@ export async function renderUpload(root, kind, refId) {
   const songFileIn = h('input', { type: 'file', accept: 'audio/*,audio/flac,audio/x-flac,.mp3,.m4a,.aac,.wav,.flac,.aiff', hidden: true });
   const songStep = h('div.song-step', { hidden: !preChoreo?.song });
   function renderSongStep(msg = '') {
-    songStep.replaceChildren(songFileIn, h('span.label.step-label', tr('Songdatei (optional)')), songFile
+    songStep.replaceChildren(songFileIn, songFile
       ? h('div.actions',
         h('span.label', `♪ ${songFile.name}`),
         h('button.linkbtn', { type: 'button', onclick: () => songFileIn.click() }, tr('Ersetzen')),
         h('button.linkbtn', { type: 'button', onclick: () => { songFile = null; renderSongStep(); } }, tr('Entfernen')))
-      : h('div.actions', h('button.btn.small', { type: 'button', onclick: () => songFileIn.click() }, tr('Songdatei laden'))),
-    h('div.hint-text', { style: { marginTop: '6px' } }, msg || tr('Zum Trainieren auf den Song. Als Datei gibt es Songs z. B. als Kauf-Download (iTunes, Amazon, Beatport für Remixe) oder vom Coach. Downloads aus Streaming-Apps sind kopiergeschützt und lassen sich nicht laden.')));
+      : h('div.actions', h('button.btn.small', { type: 'button', title: tr('Kauf-Download oder vom Coach. Downloads aus Streaming-Apps sind kopiergeschützt.'), onclick: () => songFileIn.click() }, tr('Songdatei laden'))),
+    ...(msg ? [h('div.hint-text', { style: { marginTop: '6px' } }, msg)] : []));
   }
   songFileIn.addEventListener('change', async () => {
     const f = songFileIn.files[0];
@@ -151,7 +151,9 @@ export async function renderUpload(root, kind, refId) {
           h('button.linkbtn', { onclick: () => { file = null; renderLeft(); } }, tr('Anderes Video'))),
         packInfo);
       startPack();
-      if (!dateIn.dataset.touched && file.lastModified) dateIn.value = isoDate(file.lastModified);
+      // Aufnahmetag aus Metadaten oder Dateiname, nicht der Tag des Hochladens
+      const mine = file;
+      if (!dateIn.dataset.touched) recordedDate(file).then(d => { if (d && file === mine && !dateIn.dataset.touched) dateIn.value = d; });
       // Song automatisch erkennen, solange noch keiner gewählt ist
       if (!picker.get() && !picker.typed()) picker.recognize(true);
     }
@@ -249,6 +251,55 @@ export async function renderUpload(root, kind, refId) {
   }
 
   return () => { job?.cancel(); if (previewUrl) URL.revokeObjectURL(previewUrl); };
+}
+
+// Aufnahmetag (JJJJ-MM-TT) bestimmen, der Reihe nach: Aufnahmedatum in den Metadaten (iPhone, Android),
+// Datum im Dateinamen (IMG_20261028_…, VID-20261028-WA…, 2026-10-28 19.30.12 …), Erstellzeit des Videos,
+// Änderungsdatum der Datei. Liefert null, wenn nichts Brauchbares dabei ist.
+export async function recordedDate(file) {
+  const ok = d => (d && d.getFullYear() >= 2000 && d.getTime() <= Date.now() + 864e5 ? isoDate(d.getTime()) : null);
+  const meta = await movieDates(file).catch(() => ({}));
+  return (meta.tagged && ok(meta.tagged)) || dateFromName(file.name) || (meta.created && ok(meta.created))
+    || (file.lastModified ? isoDate(file.lastModified) : null);
+}
+function dateFromName(name) {
+  const n = String(name);
+  let m, y, mo, d;
+  if ((m = n.match(/(?:^|\D)(20\d\d)[-_.]?(0[1-9]|1[0-2])[-_.]?(0[1-9]|[12]\d|3[01])(?!\d)/))) [, y, mo, d] = m;
+  else if ((m = n.match(/(?:^|\D)(0[1-9]|[12]\d|3[01])[-_.](0[1-9]|1[0-2])[-_.](20\d\d)(?!\d)/))) [, d, mo, y] = m;
+  else return null;
+  return new Date(+y, mo - 1, +d) <= Date.now() ? `${y}-${mo}-${d}` : null;
+}
+// MP4/MOV: Box „moov“ suchen (steht am Anfang oder am Ende) und darin lesen.
+// tagged = Aufnahmedatum als Text (com.apple.quicktime.creationdate bzw. ©day), created = Erstellzeit aus „mvhd“
+async function movieDates(file) {
+  const read = async (at, n) => new DataView(await file.slice(at, at + n).arrayBuffer());
+  let pos = 0;
+  for (let i = 0; i < 64 && pos + 8 <= file.size; i++) {
+    const v = await read(pos, 16);
+    let size = v.getUint32(0);
+    const type = String.fromCharCode(v.getUint8(4), v.getUint8(5), v.getUint8(6), v.getUint8(7));
+    if (size === 1) size = v.getUint32(8) * 2 ** 32 + v.getUint32(12);
+    else if (size === 0) size = file.size - pos;
+    if (size < 8) break;
+    if (type === 'moov') {
+      const buf = new Uint8Array(await file.slice(pos, pos + Math.min(size, 32e6)).arrayBuffer());
+      const text = new TextDecoder('latin1').decode(buf);
+      const out = {};
+      // Text mit Zeitzone (2026-10-28T19:30:12+0100): Datum wie geschrieben, also Ortszeit der Aufnahme
+      const t = text.match(/(20\d\d)-(\d\d)-(\d\d)T(\d\d):(\d\d)(?::(\d\d))?(?:\.\d+)?(Z|[+-]\d\d:?\d\d)?/);
+      if (t) out.tagged = t[7] === 'Z' ? new Date(t[0]) : new Date(+t[1], t[2] - 1, +t[3], +t[4], +t[5]);
+      const at = text.indexOf('mvhd');
+      if (at > 0) {
+        const d = new DataView(buf.buffer, at + 4);
+        const secs = d.getUint8(0) === 1 ? d.getUint32(4) * 2 ** 32 + d.getUint32(8) : d.getUint32(4);
+        if (secs) out.created = new Date((secs - 2082844800) * 1000); // Sekunden seit 1904, UTC
+      }
+      return out;
+    }
+    pos += size;
+  }
+  return {};
 }
 
 // Dauer + Vorschaubild (Frame bei ~1 s)

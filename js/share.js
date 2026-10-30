@@ -2,14 +2,14 @@
 // Export: Class mit allen, ausgewählten oder ohne Choreos bzw. eine einzelne Choreo, wahlweise mit Videos und
 // Songdateien. Mit dabei: Class-Angaben, Choreos (Song, Status), Aufnahmen (Marker, Notizen, Einstellungen).
 // Nicht dabei: Einheiten (Übungszeit-Protokoll).
-// Import: Choreos landen in ihrer Class, wenn es die schon gibt (gleiche ID oder gleiche Angaben). Sonst wird gefragt:
-// in eine bestehende Class einfügen oder aus den Angaben eine neue anlegen. Schon vorhandene Choreos (gleiche ID)
-// kommen als Kopie dazu, nichts wird überschrieben.
-import { tr, tn } from './i18n.js';
+// Import einer Class: landet in ihrer Class, wenn es die schon gibt (gleiche ID oder gleiche Angaben), sonst wird sie
+// angelegt. Import einer Choreo: immer fragen, wohin (Class aus der Datei, andere Class oder neue Class).
+// Schon vorhandene Choreos (gleiche ID) kommen als Kopie dazu, nichts wird überschrieben.
+import { tr, tn, dayLabel } from './i18n.js';
 import { db, uid, untracked } from './db.js';
 import { packFile, unpackFile } from './backup.js';
-import { h, isTouch, classTitle, classMeta, byClassOrder, PALETTE } from './util.js';
-import { toggle } from './ui.js';
+import { h, isTouch, classTitle, classMeta, byClassOrder, PALETTE, WEEKDAYS, CLASS_TITLES, CLASS_LEVELS } from './util.js';
+import { toggle, classPickers } from './ui.js';
 
 const FORMAT = 'choreotrainer-export';
 const KEYS = ['category', 'level', 'weekday', 'time', 'coach'];
@@ -105,32 +105,89 @@ export async function readExport(file) {
   return head;
 }
 
-// Ziel-Class bestimmen. Liefert { cls, created } oder null (abgebrochen)
-async function targetClass(src, kind, contextClassId) {
+// Class wählen (Import einer Choreo, Choreo verschieben). Optionen als Liste, die gewählte zeigt ihr Eingabefeld:
+// file = Class aus der Datei (existing: gibt es hier schon) · other = bestehende Class · new = neue Class aus Angaben.
+// Liefert { cls, created } oder null (abgebrochen)
+export async function chooseClass({ title, text, file = null, existing = null, exclude = null, preselect = null, ok }) {
   const classes = (await db.all('classes')).sort(byClassOrder);
-  const same = classes.find(c => c.id === src.id) || classes.find(c => KEYS.every(k => norm(c[k]) === norm(src[k])));
+  const others = classes.filter(c => c.id !== exclude && c.id !== existing?.id);
+  const select = h('select', others.map(c => h('option', { value: c.id, selected: c.id === preselect }, label(c))));
+  const f = {
+    ...classPickers(classes, { styles: CLASS_TITLES, levels: CLASS_LEVELS }),
+    weekday: h('select', h('option', { value: '' }, '—'), WEEKDAYS.map(d => h('option', { value: d }, dayLabel(d)))),
+    time: h('input', { type: 'time' }),
+  };
+  const field = (l, input) => h('label.field', h('span', l), input);
+  const newBox = h('div.choice-sub',
+    h('div.row', field('Style', f.category), field('Level', f.level)),
+    h('div.row', field(tr('Wochentag'), f.weekday), field(tr('Uhrzeit'), f.time), field('Coach', f.coach)));
+  const options = [
+    file && ['file', existing ? [label(existing), ' ', h('span.muted', tr('wie in der Datei'))] : tr('„{name}“ anlegen', { name: label(file) }), null],
+    others.length && ['other', existing || file ? tr('Andere Class') : tr('Bestehende Class'), select],
+    ['new', tr('Neue Class'), newBox],
+  ].filter(Boolean);
+  let mode = options[0][0];
+  const msg = h('span.label');
+  const items = options.map(([v, l, sub]) => {
+    const radio = h('input', { type: 'radio', name: 'cls-choice', value: v, checked: v === mode });
+    radio.addEventListener('change', () => { mode = v; render(); });
+    return [v, h('label.share-item', radio, h('span', l)), sub];
+  });
+  const list = h('div.choice-list');
+  function render() { list.replaceChildren(...items.flatMap(([v, el, sub]) => [el, v === mode && sub ? sub : null].filter(Boolean))); }
+  render();
+  const choice = await new Promise(resolve => {
+    const close = v => { box.remove(); resolve(v); };
+    const go = () => {
+      if (mode === 'new' && !f.category.value.trim()) { msg.textContent = tr('Bitte mindestens den Style angeben'); f.category.focus(); return; }
+      close(mode);
+    };
+    const box = h('div.modal', { onclick: e => { if (e.target === box) close(null); } },
+      h('div.modal-card.share-card', h('h2.wide', title), text ? h('p.label', text) : null, list,
+        h('div.actions', h('button.btn.small.primary', { type: 'button', onclick: go }, ok), h('button.linkbtn', { type: 'button', onclick: () => close(null) }, tr('Abbrechen')), msg)));
+    document.body.append(box);
+  });
+  if (!choice) return null;
+  if (choice === 'other') return { cls: classes.find(c => c.id === select.value), created: false };
+  if (choice === 'file' && existing) return { cls: existing, created: false };
+  const vals = choice === 'file' ? file : Object.fromEntries(Object.entries(f).map(([k, el]) => [k, String(el.value || '').trim()]));
+  // gibt es die eingetragene Class schon, dort einfügen statt doppelt anlegen
+  const same = classes.find(c => KEYS.every(k => norm(c[k]) === norm(vals[k])));
   if (same) return { cls: same, created: false };
-  const fresh = async () => {
-    const cls = { ...src, id: classes.some(c => c.id === src.id) ? uid() : src.id, order: classes.length, color: src.color || PALETTE[classes.length % PALETTE.length], created: Date.now() };
+  const cls = choice === 'file'
+    ? { ...file, id: classes.some(c => c.id === file.id) ? uid() : file.id, order: classes.length, color: file.color || PALETTE[classes.length % PALETTE.length], created: Date.now() }
+    : { id: uid(), ...vals, color: PALETTE[classes.length % PALETTE.length], order: classes.length, created: Date.now() };
+  await db.put('classes', cls);
+  return { cls, created: true };
+}
+
+// Choreo in eine andere Class verschieben (samt Aufnahmen, die hängen an der Choreo). Liefert die neue Class oder null
+export async function moveChoreo(choreo) {
+  const r = await chooseClass({ title: tr('CLASS ÄNDERN'), text: choreoName(choreo), exclude: choreo.classId, ok: tr('Verschieben') });
+  if (!r) return null;
+  choreo.classId = r.cls.id; // am selben Objekt, sonst schreibt die offene Trainingsansicht die alte Class zurück
+  await db.put('choreos', choreo);
+  return r.cls;
+}
+
+// Ziel-Class bestimmen. Liefert { cls, created } oder null (abgebrochen)
+async function targetClass(src, kind, contextClassId, choreoTitle) {
+  const classes = await db.all('classes');
+  const same = classes.find(c => c.id === src.id) || classes.find(c => KEYS.every(k => norm(c[k]) === norm(src[k])));
+  if (kind === 'class') {
+    // ganze Class: in die gleiche, sonst so anlegen, wie sie exportiert wurde
+    if (same) return { cls: same, created: false };
+    const cls = { ...src, order: classes.length, color: src.color || PALETTE[classes.length % PALETTE.length], created: Date.now() };
     await db.put('classes', cls);
     return { cls, created: true };
-  };
-  if (kind === 'class' || !classes.length) return fresh(); // ganze Class: so anlegen, wie sie exportiert wurde
-  // Choreo, deren Class es hier nicht gibt: fragen
-  const select = h('select', classes.map(c => h('option', { value: c.id, selected: c.id === contextClassId }, label(c))));
-  const choice = await dialog(tr('CHOREO IMPORTIEREN'), [
-    h('p', tr('Die Class „{name}“ gibt es hier noch nicht.', { name: label(src) })),
-    h('label.field', h('span', tr('In bestehende Class einfügen')), select),
-  ], [[tr('Einfügen'), () => select.value, '.primary'], [tr('Neue Class anlegen'), 'new'], [tr('Abbrechen'), null]]);
-  if (!choice) return null;
-  if (choice === 'new') return fresh();
-  return { cls: classes.find(c => c.id === choice), created: false };
+  }
+  return chooseClass({ title: tr('CHOREO IMPORTIEREN'), text: choreoTitle, file: src, existing: same || null, preselect: contextClassId, ok: tr('Importieren') });
 }
 
 export async function importExport(file, { classId: contextClassId } = {}) {
   const head = await readExport(file);
   const { class: srcClass, choreos = [], recordings = [] } = head.data;
-  const target = await targetClass(srcClass, head.kind, contextClassId);
+  const target = await targetClass(srcClass, head.kind, contextClassId, choreos.map(choreoName).join(', '));
   if (!target) return null;
   const videos = new Map(head.videos || []);
   let copies = 0;

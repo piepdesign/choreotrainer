@@ -9,7 +9,7 @@ import { isInstalled, installApp } from './backup.js';
 import { songLink } from './providers.js';
 import { classPickers, icon, confirmDialog } from './ui.js';
 import { classForm } from './classform.js';
-import { exportClassDialog, exportChoreoDialog, chooseFile, importExport, importSummary } from './share.js';
+import { exportClassDialog, exportChoreoDialog, chooseFile, importExport, importSummary, moveChoreo } from './share.js';
 
 export async function loadAll() {
   const [classes, choreos, recordings, sessions] = await Promise.all(
@@ -546,6 +546,10 @@ function choreoBlock(c, recs, sessions, urls) {
             catch (e) { console.error(e); toast(tr('Export fehlgeschlagen: {msg}', { msg: e.message }), 5000); }
           },
         }, tr('Exportieren')),
+        h('button.linkbtn', {
+          type: 'button',
+          onclick: async () => { const to = await moveChoreo(c); if (to) { toast(tr('Verschoben nach „{name}“', { name: classTitle(to) })); go(location.hash); } },
+        }, tr('Class ändern')),
         h('button.linkbtn', {
           onclick: async () => {
             const name = c.title || c.song?.title || tr('Ohne Song');

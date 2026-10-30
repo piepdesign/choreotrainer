@@ -1,7 +1,7 @@
 // Trainingsansicht: Player mit Spiegeln, Tempo, Lautstärke, Bild, Loop, 8er-Count, Markern, Song-Zeitleiste
 import { tr, num } from './i18n.js';
 import { db, uid, deleteRecording, deleteChoreo, untracked } from './db.js';
-import { h, holdGate, isTouch, tt, fmt, fmtDate, WEEKDAYS, fmtRecDate, fmtDuration, relDate, parseTime, debounce, inlineEdit, fitInput, classTitle, classMeta, PALETTE, textOn } from './util.js';
+import { h, holdGate, isTouch, tt, fmt, fmtDate, WEEKDAYS, fmtRecDate, parseTime, debounce, inlineEdit, fitInput, classTitle, classMeta, PALETTE, textOn } from './util.js';
 import { analyzeBeat } from './beat.js';
 import { songPicker, songKeyOf, sameSong } from './song.js';
 import { identifyAudio } from './recognize.js';
@@ -10,7 +10,7 @@ import { recTitle } from './hub.js';
 import { go, toast } from './app.js';
 import { settings, saveSettings, PANEL_SECTIONS } from './settings.js';
 import { icon, toggle, confirmDialog } from './ui.js';
-import { exportChoreoDialog } from './share.js';
+import { exportChoreoDialog, moveChoreo } from './share.js';
 import { prime, needsCapture, toWav } from './audio.js';
 
 const MARKER_TYPES = {
@@ -29,6 +29,8 @@ function saveCountView(c) {
   try { localStorage.setItem('ct-count', JSON.stringify(c)); } catch { /* egal */ }
 }
 
+// Woher Songdateien kommen (Tooltip am Knopf, sonst kein Erklärtext im Panel)
+const SONGFILE_TIP = tr('Kauf-Download oder vom Coach. Downloads aus Streaming-Apps sind kopiergeschützt.');
 const RATING_HINT = ['', tr('noch gar nicht'), tr('Bruchstücke'), tr('mit Video'), tr('fast frei'), tr('sitzt')];
 
 export async function renderTrain(root, recId) {
@@ -697,7 +699,6 @@ export async function renderTrain(root, recId) {
     await db.put('sessions', { ...rest, seconds: Math.round(session.seconds), avgRate: Math.round((rateTime / session.seconds) * 100) / 100 });
     choreo.lastPracticed = Date.now();
     await db.put('choreos', choreo);
-    statLine.textContent = statText();
   }
   const sessionTimer = setInterval(saveSession, 10000);
   const onHide = () => { if (document.hidden) saveSession(); };
@@ -806,7 +807,8 @@ export async function renderTrain(root, recId) {
         renderRating();
       },
     }, v)));
-    ratingHint.textContent = cur ? `${cur}/5 · ${RATING_HINT[cur]}` : tr('1 = noch gar nicht · 5 = sitzt');
+    ratingHint.textContent = cur ? RATING_HINT[cur] : '';
+    ratingHint.hidden = !cur;
   }
 
   // Klick auf einen Marker blendet rechts in seiner Zeile Icons ein: Umbenennen · Hierhin · Auf jetzt setzen · Löschen
@@ -865,7 +867,7 @@ export async function renderTrain(root, recId) {
           act('trash', tr('Löschen'), () => { rec.markers = rec.markers.filter(x => x !== m); menuFor = null; update(); renderMarkers(); })));
       }
       return li;
-    }) : [h('li.muted', { style: { display: 'block' } }, tt(tr('Noch keine Marker. Taste S/E/N/H oder Fähnchen in der Leiste.'), tr('Noch keine Marker. Über das Fähnchen in der Leiste setzen.')))]));
+    }) : [h('li.muted', { style: { display: 'block' } }, tr('Noch keine Marker.'))]));
   }
 
   const notesIn = h('textarea', { placeholder: tr('5, 6, 7, 8 Anmerkungen …') }, rec.notes || '');
@@ -935,7 +937,7 @@ export async function renderTrain(root, recId) {
   function renderSongFile() {
     songFileRow.hidden = !song;
     songFileRow.replaceChildren(songFileIn, songBlob
-      ? h('div', h('span.label.step-label', tr('Songdatei')), h('div.actions',
+      ? h('div', h('div.actions',
         h('span.label', `♪ ${songBlob.name || tr('Songdatei')}`),
         h('button.linkbtn', { type: 'button', onclick: () => songFileIn.click() }, tr('Ersetzen')),
         h('button.linkbtn', {
@@ -952,18 +954,11 @@ export async function renderTrain(root, recId) {
           },
         }, tr('Entfernen'))))
       : h('div',
-        h('span.label.step-label', tr('Songdatei (optional)')),
-        h('div.actions', h('button.btn.small', { type: 'button', onclick: () => songFileIn.click() }, tr('Songdatei laden'))),
-        h('div.hint-text', { style: { marginTop: '6px' } }, tr('Zum Trainieren auf den Song. Als Datei gibt es Songs z. B. als Kauf-Download (iTunes, Amazon, Beatport für Remixe) oder vom Coach. Downloads aus Streaming-Apps sind kopiergeschützt und lassen sich nicht laden.'))));
+        h('div.actions', h('button.btn.small', { type: 'button', title: SONGFILE_TIP, onclick: () => songFileIn.click() }, tr('Songdatei laden')))));
   }
   songFileIn.addEventListener('change', () => setSongFile(songFileIn.files[0]));
   renderSongFile();
 
-  const statText = () => {
-    const secs = sessions.reduce((a, s) => a + s.seconds, 0) + (session?.seconds || 0);
-    return tr('Geübt {t} · zuletzt {when}', { t: fmtDuration(secs), when: relDate(choreo.lastPracticed) });
-  };
-  const statLine = h('div.label', statText());
 
   const recIndex = recs.findIndex(r => r.id === rec.id);
   let songSection, togglePanel = () => {}, stopFit = () => {};
@@ -1009,7 +1004,11 @@ export async function renderTrain(root, recId) {
           try { const r = await exportChoreoDialog(choreo); if (r) toast(r.files ? tr('Choreo exportiert: {n} Dateien ({mb} MB)', { n: r.files, mb: Math.round(r.bytes / 1e6) }) : tr('Choreo exportiert, ohne Videos'), 3500); }
           catch (e) { console.error(e); toast(tr('Export fehlgeschlagen: {msg}', { msg: e.message }), 5000); }
         },
-      }, tr('Choreo exportieren'))),
+      }, tr('Choreo exportieren')),
+      h('button.linkbtn', {
+        type: 'button',
+        onclick: async () => { const to = await moveChoreo(choreo); if (to) { toast(tr('Verschoben nach „{name}“', { name: classTitle(to) })); go(location.hash, { replace: true }); } },
+      }, tr('Class ändern'))),
   ];
   const KEYS = [
     ['␣', tr('Play/Pause')], ['← →', tr('±2 s (⇧ ±0,2)')], ['M', tr('Spiegeln')], ['↑ ↓', tr('Tempo')],
@@ -1021,7 +1020,7 @@ export async function renderTrain(root, recId) {
     song: [tr('Song'), [picker.el, songFileRow]],
     marker: [tr('Marker'), [markerList]],
     notes: [tr('Notizen'), [notesIn]],
-    status: [tr('Status'), [ratingBox, ratingHint, h('div', { style: { marginTop: '8px' } }, statLine)]],
+    status: [tr('Status'), [ratingBox, ratingHint]],
     recs: [tr('Aufnahmen'), recsBody],
     ...(isTouch() ? {} : { keys: [tr('Tasten'), keysBody] }), // ohne Tastatur keine Tastenliste
   };

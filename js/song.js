@@ -42,16 +42,14 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
   const picked = h('div');
   // prime(): auf dem Handy muss das Mithören direkt im Antippen starten (iOS)
   const recBtn = h('button.btn.small', { type: 'button', onclick: () => { prime(getBlob()); recognize(false); } }, tr('Aus Video erkennen'));
-  const startBtn = h('button.btn.small', { type: 'button', onclick: () => { prime(getBlob()); detectStart(); } }, tr('Startpunkt erkennen'));
+  const startBtn = h('button.btn.small', { type: 'button', title: tr('Startpunkt im Song erkennen'), onclick: () => { prime(getBlob()); detectStart(); } }, tr('Erkennen'));
   const recStatus = h('div.label.song-status');
   const startStatus = h('div.label.song-status');
   const altBox = h('div.actions', { style: { marginTop: '6px' } });
   const versionBox = h('div.song-versions');
   // Reihenfolge wie im Ablauf: 1 Song erkennen/suchen · 2 Startpunkt im Song
   const startStep = h('div.song-step',
-    h('span.label.step-label', tr('Video beginnt im Song bei')),
-    startField,
-    h('div.actions', startBtn),
+    h('div.start-row', h('span.label', tr('Start:')), startField, startBtn),
     startStatus);
   const el = h('div.song-steps',
     h('div.song-step', search, picked, h('div.actions', recBtn), recStatus, altBox, versionBox),
@@ -66,7 +64,7 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
         altBox.replaceChildren();
         recStatus.textContent = tr('Übernehme …');
         await set(await enrich({ title: a.title, subtitle: a.artist, key: a.key }), a.offset);
-        recStatus.textContent = a.offset != null ? tr('Video beginnt bei {t} im Song', { t: fmt(a.offset, true) }) : '';
+        recStatus.textContent = '';
       },
     }, tr('Oder: {song} ({hits}/{n})', { song: [a.artist, a.title].filter(Boolean).join(' — '), hits: a.hits, n: r.segments }))));
   }
@@ -99,11 +97,11 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
     versionBox.replaceChildren();
     const s = current;
     if (!s?.title || s.source === 'manual') return;
-    const link = h('div.actions', h('button.linkbtn', { type: 'button', onclick: () => listVersions(s) }, tr('Andere Fassung wählen (Remix, Edit …)')));
+    const link = h('div.actions', h('button.btn.small', { type: 'button', title: tr('Remix, Edit …'), onclick: () => listVersions(s) }, tr('Andere Fassung')));
     versionBox.replaceChildren(link);
     const v = await videoTempo();
     if (current !== s || !v || !s.bpm || sameTempo(v, s.bpm)) return;
-    versionBox.replaceChildren(h('div.hint-text', tr('Das Video läuft mit etwa {v} BPM, der Song mit {s} BPM. Vermutlich eine andere Fassung (z. B. Remix) oder verlangsamt gespielt.', { v: Math.round(v), s: Math.round(s.bpm) })), link);
+    versionBox.replaceChildren(h('div.hint-text', tr('Video {v} BPM, Song {s} BPM: andere Fassung oder verlangsamt?', { v: Math.round(v), s: Math.round(s.bpm) })), link);
   }
   async function listVersions(s) {
     const base = baseTitle(s.title);
@@ -118,9 +116,8 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
     for (const x of list.slice(0, 16)) if (!x.bpm) { const d = await songDetails(x.id).catch(() => null); if (d?.bpm) x.bpm = d.bpm; }
     if (current !== s) return;
     list.sort((a, b) => sameTempo(v, b.bpm) - sameTempo(v, a.bpm));
-    if (!list.length) { versionBox.replaceChildren(h('div.hint-text', tr('Keine weiteren Fassungen bei Deezer gefunden. Über die Suche oben lässt sich jede Fassung auch von Hand wählen.'))); return; }
+    if (!list.length) { versionBox.replaceChildren(h('div.hint-text', tr('Keine weiteren Fassungen gefunden.'))); return; }
     versionBox.replaceChildren(
-      h('div.label', [v && tr('Video: etwa {v} BPM', { v: Math.round(v) }), tr('Cover überfahren oder halten: Hörprobe')].filter(Boolean).join(' · ')),
       h('div.versions', ...list.map(x => h('button', { type: 'button', title: tr('Diese Fassung übernehmen'), onclick: () => pickVersion(x) },
         x.cover ? songLink(h('img', { src: x.cover, alt: '' }), x) : h('div'),
         h('div', h('div', x.title), h('div.label', x.artist)),
@@ -132,7 +129,7 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
     versionBox.replaceChildren();
     // Der bisherige Startpunkt gehörte zur alten Fassung: leeren, neu bestimmen (am sichersten per Abgleich mit der Songdatei)
     await set(x, null, { reset: true });
-    recStatus.textContent = tr('Fassung übernommen. Den Startpunkt am besten mit der Songdatei dieser Fassung erkennen (Abgleich) oder von Hand eintragen.');
+    recStatus.textContent = tr('Fassung übernommen. Start neu erkennen.');
   }
 
   // Deezer liefert BPM nur im Detailabruf. Erst darauf warten (max. 3 s), dann den Song einmal
@@ -191,7 +188,7 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
       else if (auto && (current || input.value.trim())) recStatus.textContent = tr('Erkannt: {song} (nicht übernommen)', { song: `${r.song.artist} — ${r.song.title}` });
       else {
         await set(r.song, r.offset);
-        recStatus.textContent = tr('Erkannt in {hits}/{n} Abschnitten', { hits: r.hits, n: r.segments }) + (r.offset != null ? ` · ${tr('Video beginnt bei {t} im Song', { t: fmt(r.offset, true) })}` : '');
+        recStatus.textContent = tr('Erkannt in {hits}/{n} Abschnitten', { hits: r.hits, n: r.segments });
         showAlternatives(r);
       }
     } catch (e) {
@@ -236,22 +233,21 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
         onOffset(songPos, { file: r.offset });
         const diff = shazam != null ? r.offset - shazam : 0;
         startStatus.textContent = Math.abs(diff) > 1.5
-          ? tr('Video beginnt bei {t} im Song, in deiner Songdatei bei {f} (Datei ist anders geschnitten, z. B. Musikvideo-Fassung; zum Mitspielen gilt die Datei)', { t: fmt(songPos, true), f: fmt(r.offset, true) })
-          : tr('Video beginnt bei {t} im Song (Abgleich mit Songdatei)', { t: fmt(r.offset, true) });
+          ? tr('In der Songdatei bei {f} (anders geschnitten, zum Mitspielen gilt die Datei)', { f: fmt(r.offset, true) })
+          : tr('Per Songdatei abgeglichen');
         return;
       }
       if (shazam != null) {
         onOffset(Math.max(0, shazam), { file: hasFile ? null : undefined });
         startStatus.textContent = hasFile
-          ? tr('Video beginnt bei {t} im Song ({hits}/{n} Abschnitte). Die Songdatei klingt aber anders als das Video (anderer Song oder andere Fassung). Zum Mitspielen läuft sie ab diesem Startpunkt; passt es nicht, lade unten die passende Datei.', { t: fmt(Math.max(0, shazam), true), hits, n: segments })
-          : tr('Video beginnt bei {t} im Song ({hits}/{n} Abschnitte)', { t: fmt(Math.max(0, shazam), true), hits, n: segments });
+          ? tr('Erkannt, aber die Songdatei klingt anders als das Video (andere Fassung?). Sie läuft trotzdem ab hier mit.')
+          : tr('Erkannt in {hits}/{n} Abschnitten', { hits, n: segments });
       } else {
         const heard = others[0] ? ` ${tr('Gehört wurde: {song}.', { song: [others[0].track.subtitle, others[0].track.title].filter(Boolean).join(' — ') })}` : '';
         // ganze Sätze (Satzbau je Sprache verschieden)
-        const hint = align && !hasFile ? tr('Lade unten die Songdatei, dann klappt es per Abgleich. Oder trag den Startpunkt von Hand ein.')
-          : hasFile ? tr('Auch der Abgleich mit der Songdatei war unsicher (anderer Song oder verlangsamt?). Trag den Startpunkt von Hand ein.')
-            : tr('Trag den Startpunkt von Hand ein.');
-        startStatus.textContent = `${tr('„{title}“ nicht in der Tonspur gefunden.', { title: current.title })}${heard} ${hint}`;
+        const hint = align && !hasFile ? tr('Songdatei laden oder Start von Hand eintragen.')
+          : tr('Start von Hand eintragen.');
+        startStatus.textContent = `${tr('„{title}“ nicht gefunden.', { title: current.title })}${heard} ${hint}`;
       }
     } catch (e) {
       console.warn(e);

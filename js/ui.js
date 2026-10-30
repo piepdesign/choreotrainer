@@ -200,11 +200,11 @@ export function guideDialog({ title, steps, note = null, ok = 'OK' }) {
 export function preferences(values, onChange, statValues = null, { baseLabel = true, tester = false, hints = false, language = false, cards = false } = {}) {
   // hints: im Intro ein Satz unter jedem Titel, was die Einstellung bewirkt
   const HINTS = {
-    'Musikprovider': tr('Hier öffnen sich erkannte Songs: in der App, wenn sie installiert ist, sonst im Browser.'),
-    'Song-Cover Hörprobe': tt(tr('Fährst du mit der Maus über ein Song-Cover, spielt eine 30-Sekunden-Hörprobe in dieser Lautstärke.'), tr('Hältst du ein Song-Cover gedrückt, spielt eine 30-Sekunden-Hörprobe in dieser Lautstärke.')),
-    'Helfer*in': tr('Blendet unten rechts einen Knopf ein, über den du Bugs und Ideen direkt per Mail meldest.'),
-    'Statistiken': tt(tr('Diese Kennzahlen siehst du in deiner „Base“. Klicke oder ziehe Kacheln hinein oder heraus.'), tr('Diese Kennzahlen siehst du in deiner „Base“. Tippe Kacheln an oder halte und ziehe sie hinein oder heraus.')),
-    'Ansicht': tr('Hell, dunkel oder automatisch passend zu deinem System.'),
+    'Musikprovider': tr('Hier öffnen sich erkannte Songs.'),
+    'Song-Cover Hörprobe': tt(tr('Hörprobe beim Darüberfahren über ein Song-Cover.'), tr('Hörprobe beim Halten eines Song-Covers.')),
+    'Helfer*in': tr('Knopf unten rechts für Bugs und Ideen per Mail.'),
+    'Statistiken': tt(tr('Kennzahlen in deiner Base. Klicken oder ziehen.'), tr('Kennzahlen in deiner Base. Antippen oder halten und ziehen.')),
+    'Ansicht': tr('Hell, dunkel oder wie das System.'),
   };
   // Einzelauswahl als eine Zeile (Titel links, gewählte Option rechts); Statistiken als Kacheln über die volle Breite
   // Kurzfassung je Zeile in den Einstellungen (ein Satz, Zustand statt Erklärung wie unter Daten)

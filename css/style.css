@@ -555,6 +555,9 @@ main:has(.train) { padding-bottom: 0; }
 .share-list { display: grid; gap: 6px; max-height: 40vh; overflow: auto; padding: 8px 10px; background: var(--surface); }
 .share-item { display: flex; gap: 10px; align-items: center; font-size: 13px; cursor: pointer; }
 .share-item input { margin: 0; accent-color: var(--fg); }
+.choice-list { display: grid; gap: 10px; }
+.choice-list > select, .choice-sub { margin-left: 23px; width: calc(100% - 23px); }
+.choice-sub { display: grid; gap: 10px; }
 .tooltip { position: fixed; z-index: 70; pointer-events: none; background: var(--fg); color: var(--bg); font-size: 11px; padding: 6px 8px; max-width: 280px; }
 
 /* ── Intro ───────────────────────────────────── */
@@ -725,6 +728,9 @@ a.stat-link:hover { background: var(--surface-2); }
 .song-status:empty { display: none; }
 .song-status { margin-top: 6px; }
 .song-step .offset-in { width: 90px; display: block; }
+.start-row { display: grid; grid-template-columns: auto minmax(70px, 1fr) auto; gap: 8px; align-items: center; }
+.start-row .offset-in { width: 100%; }
+.side .song-step .start-row .btn { width: auto; }
 /* Song-Panel: in jedem Schritt der Knopf unter dem Inhalt, alle gleich breit */
 .side .song-step .btn { width: 100%; justify-content: center; text-align: center; }
 .side .song-step .btn + .label { margin-top: 6px; }

@@ -3,7 +3,7 @@
 // Class-Farben, Werte immer in Textfarbe, Tooltip auf jedem Datenpunkt.
 import { tr, tn, num, lang, locale, dayLabel } from './i18n.js';
 import { db, deleteAllData } from './db.js';
-import { h, balanceTiles, tt, isTouch, fmt, fmtDuration, relDate, fmtRecDate, classTitle, stripe, byClassOrder, WEEKDAYS, textOn, plural } from './util.js';
+import { h, balanceTiles, isTouch, fmt, fmtDuration, relDate, fmtRecDate, classTitle, stripe, byClassOrder, WEEKDAYS, textOn, plural } from './util.js';
 import { loadAll, dots, choreoCard, fitCardLabels, recTitle, nextClass, importInto, addRow, newClassDialog } from './hub.js';
 import { songLink } from './providers.js';
 import { baseStats, latestRating, choreoLength, weekStart, dayKey } from './stats.js';
@@ -349,8 +349,7 @@ export async function renderProfile(root, section) {
       { label: tr('Status'), value: statusOf, cell: c => dots(latestRating(c)) },
       { label: tr('Verlauf'), value: c => c.ratings?.length || 0, cell: c => sparkline(c.ratings), dir: -1 },
       { label: tr('Zuletzt bewertet'), value: c => c.ratings?.at(-1)?.ts || 0, cell: c => h('span.label', c.ratings?.length ? relDate(c.ratings.at(-1).ts) : tr('nie')), dir: -1 },
-    ], choreos, { sort: 1, key: 'ct-sort-status', href: c => ((recsByChoreo[c.id] || []).length ? `#/train/${recsByChoreo[c.id].at(-1).id}` : null) }),
-    h('p.hint-text', tt(tr('Spaltenüberschrift anklicken zum Sortieren. Standard: die wackligsten zuerst.'), tr('Spaltenüberschrift antippen zum Sortieren. Standard: die wackligsten zuerst.'))));
+    ], choreos, { sort: 1, key: 'ct-sort-status', href: c => ((recsByChoreo[c.id] || []).length ? `#/train/${recsByChoreo[c.id].at(-1).id}` : null) }));
 
   // ── Choreos: Galerie / Liste ──
   let view = 'gallery', gsort = 'recent';
@@ -448,7 +447,7 @@ export async function renderProfile(root, section) {
         h('button.btn.small', {
           type: 'button',
           onclick: async () => {
-            if (!(await confirmDialog({ title: tr('NEUSTART'), text: tr('Setzt Name, Präferenzen und Panel-Anordnung zurück, das Intro startet neu. Classes, Choreos, Videos und Statistiken bleiben.'), ok: tr('Zurücksetzen'), danger: false }))) return;
+            if (!(await confirmDialog({ title: tr('NEUSTART'), text: tr('Setzt Name, Präferenzen und Panel zurück und startet das Intro. Deine Daten bleiben.'), ok: tr('Zurücksetzen'), danger: false }))) return;
             await resetSettings(); location.hash = '#/'; location.reload();
           },
         }, tr('Zurücksetzen'))),
@@ -456,7 +455,7 @@ export async function renderProfile(root, section) {
         h('button.btn.small.danger', {
           type: 'button',
           onclick: async () => {
-            if (!(await confirmDialog({ title: tr('ALLES LÖSCHEN'), text: tr('Löscht in diesem Browser alle Classes, Choreos, Videos, Songdateien, Einheiten und das Profil. Lässt sich nicht rückgängig machen.'), ok: tr('Alles löschen'), typeToConfirm: settings().name || tr('LÖSCHEN') }))) return;
+            if (!(await confirmDialog({ title: tr('ALLES LÖSCHEN'), text: tr('Löscht alles in diesem Browser. Lässt sich nicht rückgängig machen.'), ok: tr('Alles löschen'), typeToConfirm: settings().name || tr('LÖSCHEN') }))) return;
             await deleteAllData();
             location.hash = '#/';
             location.reload();
@@ -484,7 +483,7 @@ export async function renderProfile(root, section) {
           type: 'button',
           onclick: async () => {
             // Mit oder ohne Videos erst hier im Fenster wählen
-            if (!(await confirmDialog({ title: tr('SICHERN'), text: tr('Speichert Classes, Choreos, Aufnahmen, Einheiten und Präferenzen als Datei.'), ok: tr('Sichern'), danger: false,
+            if (!(await confirmDialog({ title: tr('SICHERN'), text: tr('Speichert alles als Datei.'), ok: tr('Sichern'), danger: false,
               extra: [toggle(`${tr('Mit Videos und Songdateien')}${vBytes ? ` (${mb(vBytes)})` : ''}`, withVideos, v => { withVideos = v; })] }))) return;
             try {
               const r = await exportBackup({ videos: withVideos });
@@ -533,7 +532,7 @@ export async function renderProfile(root, section) {
       h('button.btn.small.danger', {
         type: 'button',
         onclick: async () => {
-          if (!(await confirmDialog({ title: tr('AUFNAHMEN LÖSCHEN'), text: tr('Löscht alle Choreos mit Aufnahmen, Videos und Songdateien ({size}) sowie die Einheiten und gibt den Speicher frei. Classes, Profil und Präferenzen bleiben. Lässt sich nicht rückgängig machen.', { size: mb(vBytes) }), ok: tr('Löschen') }))) return;
+          if (!(await confirmDialog({ title: tr('AUFNAHMEN LÖSCHEN'), text: tr('Löscht alle Choreos samt Videos ({size}). Classes und Profil bleiben. Lässt sich nicht rückgängig machen.', { size: mb(vBytes) }), ok: tr('Löschen') }))) return;
           await deleteRecordings();
           freeStorage();
         },
@@ -559,7 +558,7 @@ export async function renderProfile(root, section) {
           type: 'button',
           onclick: async () => {
             const r = await shareApp();
-            if (r === 'copied') toast(tr('Link kopiert, zum Einfügen in Messenger oder Social Media.'), 3500);
+            if (r === 'copied') toast(tr('Link kopiert.'), 3500);
             if (r === 'failed') toast(`Link: ${SHARE_URL}`, 6000);
           },
         }, tr('Teilen'))));

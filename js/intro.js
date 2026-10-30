@@ -157,9 +157,9 @@ export async function runIntro() {
           choice('browser', tr('Im Browser nutzen'), () => { state.appHint = false; }));
         return h('div.intro-step',
           h('h1.wide', tr('ALS APP NUTZEN?')),
-          h('p.intro-lead', tr('Installiert startet ChoreoTrainer wie eine eigene App, auch ohne Internet, und der Browser räumt deine Daten nicht von sich aus.')),
+          h('p.intro-lead', tr('Startet wie eine eigene App, auch offline, und der Browser löscht deine Daten nicht.')),
           tiles,
-          isIOS() ? h('p.intro-lead', tr('Am iPhone hat die installierte App einen eigenen Speicher. Am besten jetzt installieren und dort weitermachen.')) : null,
+          isIOS() ? h('p.intro-lead', tr('Am iPhone hat die App einen eigenen Speicher: jetzt installieren und dort weitermachen.')) : null,
           h('p.intro-lead', tr('(Jederzeit unter Einstellungen › App)')));
       },
       canGo: () => !!state.appChoice, // „>“ erst nach einer Wahl (abgebrochene Installation hebt sie wieder auf)
