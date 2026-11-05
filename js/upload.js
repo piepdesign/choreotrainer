@@ -49,6 +49,8 @@ export async function renderUpload(root, kind, refId) {
   const keepBtn = () => h('button.linkbtn', { type: 'button', onclick: useOriginal }, tr('Original behalten'));
   let saving = false;
   let picked; // Antwort auf „Choreo gibt es schon“: Choreo, 'new' oder undefined (noch nicht gefragt)
+  let pickedFor = null; // Song-Schlüssel, für den gefragt wurde (anderer Song: neu fragen)
+  let asking = null; // offene Abfrage (nicht doppelt zeigen)
 
   const classes = (await db.all('classes')).sort(byClassOrder);
   let preChoreo = null, preClass = null;
@@ -65,11 +67,40 @@ export async function renderUpload(root, kind, refId) {
     weekday: h('select', h('option', { value: '' }, '—'), WEEKDAYS.map(d => h('option', { value: d }, dayLabel(d)))),
     time: h('input', { type: 'time' }),
   };
-  const fill = c => { for (const k of Object.keys(f)) f[k].value = c?.[k] || ''; };
+  const fill = c => { for (const k of Object.keys(f)) f[k].value = c?.[k] || ''; showColor(); };
+  const selectChip = c => chips.querySelectorAll('.chip').forEach(x => x.classList.toggle('sel', x.dataset.id === c?.id));
   const chips = h('div.chips', classes.map(c => h('button.chip', {
-    type: 'button', style: { background: `#${c.color}`, color: textOn(c.color) },
-    onclick: e => { fill(c); chips.querySelectorAll('.chip').forEach(x => x.classList.remove('sel')); e.currentTarget.classList.add('sel'); },
+    type: 'button', 'data-id': c.id, style: { background: `#${c.color}`, color: textOn(c.color) },
+    onclick: () => {
+      fill(c); selectChip(c);
+      if (picked && picked !== 'new' && picked.classId !== c.id) picked = undefined; // andere Class gewählt: beim Speichern neu fragen
+    },
   }, `${classTitle(c)}${classMeta(c) ? ' · ' + classMeta(c) : ''}`.toUpperCase())));
+  // Farbe für eine neue Class (nur sichtbar, solange die Angaben zu keiner bestehenden Class passen)
+  const KEYS = ['category', 'level', 'weekday', 'time', 'coach'];
+  const values = () => Object.fromEntries(Object.entries(f).map(([k, el]) => [k, String(el.value || '').trim()]));
+  const existingClass = v => classes.find(c => KEYS.every(k => norm(c[k]) === norm(v[k])));
+  let color = PALETTE[classes.length % PALETTE.length];
+  const colorPicker = h('input', { type: 'color', value: '#7a2cff' });
+  const customChip = h('label.chip.custom', { title: tr('Eigene Farbe') }, h('span', tr('Eigene')), colorPicker);
+  const swatches = h('div.chips', PALETTE.map(p => h('button.chip', {
+    type: 'button', 'data-hex': p, style: { background: `#${p}`, color: textOn(p) },
+    onclick: () => pickColor(p), title: tr('Farbe'), 'aria-label': tr('Farbe'),
+  })), customChip);
+  colorPicker.addEventListener('input', () => pickColor(colorPicker.value.replace('#', '').toUpperCase()));
+  function pickColor(hex) {
+    color = hex;
+    swatches.querySelectorAll('button.chip').forEach(x => x.classList.toggle('sel', x.dataset.hex === hex));
+    customChip.classList.toggle('sel', !PALETTE.includes(hex));
+  }
+  pickColor(color);
+  const colorRow = h('div', { style: { marginTop: '12px' }, hidden: true }, h('span.label.color-label', tr('Farbe der neuen Class')), swatches);
+  function showColor() {
+    const v = values();
+    colorRow.hidden = !v.category || !!existingClass(v);
+    selectChip(existingClass(v));
+  }
+  for (const el of Object.values(f)) for (const ev of ['input', 'change']) el.addEventListener(ev, showColor);
   if (preClass) fill(preClass);
   const field = (label, input) => h('label.field', h('span', label), input);
 
@@ -85,6 +116,7 @@ export async function renderUpload(root, kind, refId) {
       if (reset) { offsetIn.value = ''; fileOffset = undefined; } // andere Fassung: alter Startpunkt passt nicht mehr
       if (offset != null) offsetIn.value = fmt(offset, true);
       songStep.hidden = false;
+      askExisting(s); // gleich fragen, sobald der Song feststeht (nicht erst beim Speichern)
     },
     // file: Position in der Songdatei (kann bei Musikvideo-Fassungen abweichen), null = Datei passt nicht
     onOffset: (offset, { file: pos } = {}) => { offsetIn.value = fmt(offset, true); fileOffset = pos; },
@@ -173,7 +205,8 @@ export async function renderUpload(root, kind, refId) {
         h('div.fieldset', h('span.label', 'Class'),
           classes.length ? chips : null,
           h('div.row', field('Style', f.category), field('Level', f.level)),
-          h('div.row', { style: { marginTop: '12px' } }, field(tr('Wochentag'), f.weekday), field(tr('Uhrzeit'), f.time), field('Coach', f.coach))),
+          h('div.row', { style: { marginTop: '12px' } }, field(tr('Wochentag'), f.weekday), field(tr('Uhrzeit'), f.time), field('Coach', f.coach)),
+          colorRow),
         h('div.fieldset', h('span.label', tr('Song')),
           picker.el, songStep),
         h('div.fieldset', h('span.label', tr('Recording')), h('div.row', field(tr('Aufgenommen am'), dateIn))),
@@ -182,24 +215,35 @@ export async function renderUpload(root, kind, refId) {
   );
   renderLeft();
 
+  // Über „Neue Choreo“: Gibt es den Song schon als Choreo (in dieser oder einer anderen Class)? Dann fragen.
+  // Läuft, sobald ein Song gewählt oder erkannt ist, und noch einmal beim Speichern (falls dort noch offen).
+  // → true = weiter, false = abgebrochen
+  async function askExisting(song) {
+    if (preChoreo || !song) return true;
+    const key = songKeyOf(song);
+    if (picked !== undefined && pickedFor === key) return true;
+    if (asking) return asking;
+    asking = (async () => {
+      const same = await sameSongChoreos(song);
+      if (!same.length) { picked = 'new'; pickedFor = key; return true; }
+      const r = await chooseChoreo(same, song, values());
+      if (!r) return false; // abgebrochen: beim Speichern noch einmal fragen
+      picked = r; pickedFor = key;
+      if (r !== 'new') { const k = classes.find(c => c.id === r.classId); if (k) fill(k); } // Class der gewählten Choreo eintragen
+      return true;
+    })();
+    try { return await asking; } finally { asking = null; }
+  }
+
   async function save() {
     if (!file) return;
     let song = picker.get();
     if (!song && picker.typed()) song = { source: 'manual', title: picker.typed(), artist: '' };
-    const cls = Object.fromEntries(Object.entries(f).map(([k, el]) => [k, el.value.trim()]));
-    if (!cls.category) { toast(tr('Bitte mindestens den Style der Class angeben')); f.category.focus(); return; }
-
     // Knopf zeigt den Stand (nicht ausgegraut wie „disabled“, sonst ist er am Handy kaum lesbar), weitere Klicks zählen nicht
     if (saving && packing) return;
-    // Über „Neue Choreo“: Gibt es den Song schon als Choreo (in dieser oder einer anderen Class)? Dann fragen
-    if (!preChoreo && song && picked === undefined) {
-      const same = await sameSongChoreos(song);
-      if (same.length) {
-        const r = await chooseChoreo(same, song, cls);
-        if (!r) return; // abgebrochen: nichts speichern
-        picked = r;
-      } else picked = 'new';
-    }
+    if (!(await askExisting(song))) return;
+    const cls = values();
+    if (!cls.category && !(picked && picked !== 'new')) { toast(tr('Bitte mindestens den Style der Class angeben')); f.category.focus(); return; }
     saveBtn.classList.add('busy');
     saveBtn.setAttribute('aria-busy', 'true');
     // noch am Verkleinern: warten (Fortschritt im Knopf), danach geht es von selbst weiter
@@ -213,7 +257,7 @@ export async function renderUpload(root, kind, refId) {
       let klass = target ? classes.find(c => c.id === target.classId)
         : classes.find(c => ['category', 'level', 'weekday', 'time', 'coach'].every(k => norm(c[k]) === norm(cls[k])));
       if (!klass) {
-        klass = { id: uid(), ...cls, color: PALETTE[classes.length % PALETTE.length], order: classes.length, created: Date.now() };
+        klass = { id: uid(), ...cls, color, order: classes.length, created: Date.now() };
         await db.put('classes', klass);
       }
       // Choreo finden oder anlegen (gleiche Class + gleicher Song = gleiche Choreo)

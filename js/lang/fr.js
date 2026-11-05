@@ -614,4 +614,5 @@ export default {
   "Loop": "Loop",
   "Von „{from}“ übernommen: {what}.": "Repris de « {from} » : {what}.",
   "Nichts von „{from}“ liegt in dieser Aufnahme.": "Rien de « {from} » ne tombe dans cet enregistrement.",
+  "Farbe der neuen Class": "Couleur de la nouvelle class",
 };
