@@ -1,5 +1,5 @@
 // Upload: Video + Class + Song + Recording-Datum + Notizen → Class › Choreo › Aufnahme
-import { tr, dayLabel } from './i18n.js';
+import { tr, tn, dayLabel } from './i18n.js';
 import { db, uid, requestPersist } from './db.js';
 import { h, fmt, parseTime, isoDate, classTitle, classMeta, PALETTE, textOn, WEEKDAYS, byClassOrder, CLASS_TITLES, CLASS_LEVELS } from './util.js';
 import { songPicker, songKeyOf, sameSong } from './song.js';
@@ -11,6 +11,7 @@ import { state, go, toast } from './app.js';
 import { compressVideo } from './compress.js';
 import { analyzeBeat } from './beat.js';
 import { needsCapture } from './audio.js';
+import { carrySource, carryOver } from './carry.js';
 
 
 const norm = s => String(s || '').trim().toLowerCase();
@@ -47,6 +48,7 @@ export async function renderUpload(root, kind, refId) {
   function useOriginal() { keepOriginal = true; job?.cancel(); }
   const keepBtn = () => h('button.linkbtn', { type: 'button', onclick: useOriginal }, tr('Original behalten'));
   let saving = false;
+  let picked; // Antwort auf „Choreo gibt es schon“: Choreo, 'new' oder undefined (noch nicht gefragt)
 
   const classes = (await db.all('classes')).sort(byClassOrder);
   let preChoreo = null, preClass = null;
@@ -189,6 +191,15 @@ export async function renderUpload(root, kind, refId) {
 
     // Knopf zeigt den Stand (nicht ausgegraut wie „disabled“, sonst ist er am Handy kaum lesbar), weitere Klicks zählen nicht
     if (saving && packing) return;
+    // Über „Neue Choreo“: Gibt es den Song schon als Choreo (in dieser oder einer anderen Class)? Dann fragen
+    if (!preChoreo && song && picked === undefined) {
+      const same = await sameSongChoreos(song);
+      if (same.length) {
+        const r = await chooseChoreo(same, song, cls);
+        if (!r) return; // abgebrochen: nichts speichern
+        picked = r;
+      } else picked = 'new';
+    }
     saveBtn.classList.add('busy');
     saveBtn.setAttribute('aria-busy', 'true');
     // noch am Verkleinern: warten (Fortschritt im Knopf), danach geht es von selbst weiter
@@ -197,15 +208,18 @@ export async function renderUpload(root, kind, refId) {
     saveBtn.disabled = true;
     saveBtn.textContent = tr('Speichere …');
     try {
-      // Class finden oder anlegen
-      let klass = classes.find(c => ['category', 'level', 'weekday', 'time', 'coach'].every(k => norm(c[k]) === norm(cls[k])));
+      // Class finden oder anlegen (bei gewählter bestehender Choreo gilt deren Class)
+      const target = picked && picked !== 'new' ? picked : null;
+      let klass = target ? classes.find(c => c.id === target.classId)
+        : classes.find(c => ['category', 'level', 'weekday', 'time', 'coach'].every(k => norm(c[k]) === norm(cls[k])));
       if (!klass) {
         klass = { id: uid(), ...cls, color: PALETTE[classes.length % PALETTE.length], order: classes.length, created: Date.now() };
         await db.put('classes', klass);
       }
       // Choreo finden oder anlegen (gleiche Class + gleicher Song = gleiche Choreo)
-      let choreo = preChoreo && preChoreo.classId === klass.id ? preChoreo : null;
-      if (!choreo && song) {
+      // „Als neue Choreo anlegen“ gewählt: nicht in die gleichnamige einsortieren
+      let choreo = target || (preChoreo && preChoreo.classId === klass.id ? preChoreo : null);
+      if (!choreo && song && picked !== 'new') {
         const key = songKeyOf(song);
         choreo = (await db.byIndex('choreos', 'classId', klass.id)).find(c => c.songKey === key) || null;
       }
@@ -235,13 +249,22 @@ export async function renderUpload(root, kind, refId) {
         player: {},
       };
       if (packed) rec.storedSize = packed.size; // fileName/size bleiben die des Originals (zum Wiederfinden beim Zuordnen)
+      // Bestehende Choreo: Marker, Loop, 8er, Start/Ende der zuletzt gespeicherten Aufnahme übernehmen (umgerechnet)
+      let carried = null;
+      const src = count ? await carrySource(choreo.id) : null;
+      if (src) {
+        saveBtn.textContent = tr('Übernehme Marker …');
+        carried = await carryOver(src, rec, packed || file).catch(e => { console.warn(e); return null; });
+      }
       await db.put('videos', packed || file, rec.id);
       if (songFile) await db.put('videos', songFile, `song:${choreo.id}`);
       await db.put('recordings', rec);
       requestPersist(); // spätestens jetzt liegen Daten vor: Browser bitten, sie nicht selbst zu räumen
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       go(`#/train/${rec.id}`, { replace: true });
+      if (carried) toast(carryText(carried), 5000);
     } catch (e) {
+      picked = undefined;
       console.error(e);
       toast(tr('Speichern fehlgeschlagen: {msg}', { msg: e.message }), 5000);
       saveBtn.disabled = false;
@@ -251,6 +274,59 @@ export async function renderUpload(root, kind, refId) {
   }
 
   return () => { job?.cancel(); if (previewUrl) URL.revokeObjectURL(previewUrl); };
+}
+
+// Choreos mit demselben Song: gleicher Schlüssel (Deezer-ID bzw. Interpret|Titel) oder gleicher Titel und
+// passender Interpret (z. B. einmal über Deezer gewählt, einmal von Hand eingetippt).
+async function sameSongChoreos(song) {
+  const key = songKeyOf(song), artist = norm(song.artist);
+  const fits = c => c.song && (c.songKey === key || (sameSong(c.song, song)
+    && (!artist || !norm(c.song.artist) || norm(c.song.artist).includes(artist) || artist.includes(norm(c.song.artist)))));
+  const out = [];
+  for (const c of (await db.all('choreos')).filter(fits)) {
+    const klass = await db.get('classes', c.classId);
+    if (klass) out.push({ choreo: c, klass, recs: (await db.byIndex('recordings', 'choreoId', c.id)).length });
+  }
+  return out;
+}
+
+// Abfrage: zur bestehenden Choreo hinzufügen oder neue Choreo anlegen. → Choreo, 'new' oder null (abgebrochen)
+// Vorgewählt: die Choreo in der eingetragenen Class, sonst die zuletzt geübte.
+function chooseChoreo(list, song, cls) {
+  const sameClass = x => ['category', 'level', 'weekday', 'time', 'coach'].every(k => norm(x.klass[k]) === norm(cls[k]));
+  list.sort((a, b) => sameClass(b) - sameClass(a) || (b.choreo.lastPracticed || 0) - (a.choreo.lastPracticed || 0));
+  let mode = list[0].choreo.id;
+  const radio = (v, l) => {
+    const r = h('input', { type: 'radio', name: 'choreo-choice', value: v, checked: v === mode });
+    r.addEventListener('change', () => { mode = v; });
+    return h('label.share-item', r, h('span', l));
+  };
+  const items = [
+    ...list.map(x => radio(x.choreo.id, [tr('Zu Class „{cls}“', { cls: [classTitle(x.klass), classMeta(x.klass)].filter(Boolean).join(' · ') }), ' ',
+      h('span.muted', tn(x.recs, 'Aufnahme', 'Aufnahmen'))])),
+    radio('new', tr('Als neue Choreo anlegen')),
+  ];
+  return new Promise(resolve => {
+    const close = v => { box.remove(); removeEventListener('keydown', onKey, true); resolve(v); };
+    const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(null); } };
+    const ok = () => close(mode === 'new' ? 'new' : list.find(x => x.choreo.id === mode).choreo);
+    const box = h('div.modal', { onclick: e => { if (e.target === box) close(null); } },
+      h('div.modal-card.share-card', h('h2.wide', tr('CHOREO GIBT ES SCHON')),
+        h('p.label', tr('„{song}“ ist schon angelegt. Neue Aufnahme dazu?', { song: song.title })),
+        h('div.choice-list', items),
+        h('p.hint-text', tr('Marker, Loop, 8er und Start/Ende kommen von der letzten Aufnahme, umgerechnet auf die Stelle im Song. Der Status bleibt.')),
+        h('div.actions', h('button.btn.small.primary', { type: 'button', onclick: ok }, tr('Hinzufügen')),
+          h('button.linkbtn', { type: 'button', onclick: () => close(null) }, tr('Abbrechen')))));
+    addEventListener('keydown', onKey, true);
+    document.body.append(box);
+    box.querySelector('button.primary').focus();
+  });
+}
+
+function carryText(c) {
+  if (!c.how) return tr('Keine gemeinsame Stelle mit „{from}“ gefunden. Marker und 8er bitte neu setzen.', { from: c.from });
+  const parts = [c.markers && tn(c.markers, 'Marker', 'Marker'), c.loop && tr('Loop'), c.beat && tr('8er')].filter(Boolean);
+  return parts.length ? tr('Von „{from}“ übernommen: {what}.', { from: c.from, what: parts.join(', ') }) : tr('Nichts von „{from}“ liegt in dieser Aufnahme.', { from: c.from });
 }
 
 // Aufnahmetag (JJJJ-MM-TT) bestimmen, der Reihe nach: Aufnahmedatum in den Metadaten (iPhone, Android),
