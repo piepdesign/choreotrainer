@@ -9,7 +9,7 @@ import { tr, tn, dayLabel } from './i18n.js';
 import { db, uid, untracked } from './db.js';
 import { packFile, unpackFile } from './backup.js';
 import { h, isTouch, classTitle, classMeta, byClassOrder, PALETTE, WEEKDAYS, CLASS_TITLES, CLASS_LEVELS } from './util.js';
-import { toggle, classPickers } from './ui.js';
+import { toggle, classPickers, colorChooser } from './ui.js';
 
 const FORMAT = 'choreotrainer-export';
 const KEYS = ['category', 'level', 'weekday', 'time', 'coach'];
@@ -118,11 +118,14 @@ export async function chooseClass({ title, text, file = null, existing = null, e
     time: h('input', { type: 'time' }),
   };
   const field = (l, input) => h('label.field', h('span', l), input);
+  const fileColors = file && !existing ? colorChooser(file.color || PALETTE[classes.length % PALETTE.length]) : null;
+  const colors = colorChooser(PALETTE[classes.length % PALETTE.length]);
   const newBox = h('div.choice-sub',
     h('div.row', field('Style', f.category), field('Level', f.level)),
-    h('div.row', field(tr('Wochentag'), f.weekday), field(tr('Uhrzeit'), f.time), field('Coach', f.coach)));
+    h('div.row', field(tr('Wochentag'), f.weekday), field(tr('Uhrzeit'), f.time), field('Coach', f.coach)),
+    h('div', h('span.label.color-label', tr('Farbe')), colors));
   const options = [
-    file && ['file', existing ? [label(existing), ' ', h('span.muted', tr('wie in der Datei'))] : tr('„{name}“ anlegen', { name: label(file) }), null],
+    file && ['file', existing ? [label(existing), ' ', h('span.muted', tr('wie in der Datei'))] : tr('„{name}“ anlegen', { name: label(file) }), fileColors && h('div.choice-sub', fileColors)],
     others.length && ['other', existing || file ? tr('Andere Class') : tr('Bestehende Class'), select],
     ['new', tr('Neue Class'), newBox],
   ].filter(Boolean);
@@ -155,8 +158,8 @@ export async function chooseClass({ title, text, file = null, existing = null, e
   const same = classes.find(c => KEYS.every(k => norm(c[k]) === norm(vals[k])));
   if (same) return { cls: same, created: false };
   const cls = choice === 'file'
-    ? { ...file, id: classes.some(c => c.id === file.id) ? uid() : file.id, order: classes.length, color: file.color || PALETTE[classes.length % PALETTE.length], created: Date.now() }
-    : { id: uid(), ...vals, color: PALETTE[classes.length % PALETTE.length], order: classes.length, created: Date.now() };
+    ? { ...file, id: classes.some(c => c.id === file.id) ? uid() : file.id, order: classes.length, color: fileColors?.value || file.color || PALETTE[classes.length % PALETTE.length], created: Date.now() }
+    : { id: uid(), ...vals, color: colors.value, order: classes.length, created: Date.now() };
   await db.put('classes', cls);
   return { cls, created: true };
 }

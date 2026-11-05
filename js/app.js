@@ -9,7 +9,7 @@ import { requestPersist, undo, redo } from './db.js';
 import { loadSettings, settings, saveSettings, applyTheme } from './settings.js';
 import { h } from './util.js';
 import { stopPreview } from './providers.js';
-import { themeIcon, toolIcon } from './ui.js';
+import { themeIcon, toolIcon, thanksDialog } from './ui.js';
 import { maybeTour } from './tour.js';
 import { registerServiceWorker, freedNotice } from './backup.js';
 
@@ -73,6 +73,7 @@ backBtn.addEventListener('click', back);
 
 async function route() {
   stopPreview(); // Hörprobe nicht in die nächste Seite mitnehmen
+  const fromTrain = current?.startsWith('#/train/');
   if (cleanup) { try { await cleanup(); } catch (e) { console.error(e); } cleanup = null; }
   if (current) scrolls[current] = scrollY;
   const hash = location.hash || '#/';
@@ -95,6 +96,12 @@ async function route() {
     }
     window.scrollTo(0, y);
     maybeTour(current); // Tutorial, falls noch nicht gesehen (Teil 1 auf der Base, Teil 2 im Training)
+    // Trainingsansicht verlassen, beide Tutorials durch (oder übersprungen): einmal Danke sagen und auf die Doku verweisen
+    const s = settings();
+    if (fromTrain && !current.startsWith('#/train/') && s.tourDone && s.tourTrainDone && !s.thanksShown) {
+      saveSettings({ thanksShown: true });
+      thanksDialog();
+    }
     // zurück: dort weiter, wo man war (nach dem Aufbau, auch gegen Abschnitts-Sprünge der Seite)
     if (back != null) requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, back)));
     return;

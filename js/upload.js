@@ -5,7 +5,7 @@ import { h, fmt, parseTime, isoDate, classTitle, classMeta, PALETTE, textOn, WEE
 import { songPicker, songKeyOf, sameSong } from './song.js';
 import { identifyAudio } from './recognize.js';
 import { alignToSong, checkAudio } from './align.js';
-import { classPickers, confirmDialog } from './ui.js';
+import { classPickers, confirmDialog, colorChooser } from './ui.js';
 import { dropzone } from './hub.js';
 import { state, go, toast } from './app.js';
 import { compressVideo } from './compress.js';
@@ -80,20 +80,7 @@ export async function renderUpload(root, kind, refId) {
   const KEYS = ['category', 'level', 'weekday', 'time', 'coach'];
   const values = () => Object.fromEntries(Object.entries(f).map(([k, el]) => [k, String(el.value || '').trim()]));
   const existingClass = v => classes.find(c => KEYS.every(k => norm(c[k]) === norm(v[k])));
-  let color = PALETTE[classes.length % PALETTE.length];
-  const colorPicker = h('input', { type: 'color', value: '#7a2cff' });
-  const customChip = h('label.chip.custom', { title: tr('Eigene Farbe') }, h('span', tr('Eigene')), colorPicker);
-  const swatches = h('div.chips', PALETTE.map(p => h('button.chip', {
-    type: 'button', 'data-hex': p, style: { background: `#${p}`, color: textOn(p) },
-    onclick: () => pickColor(p), title: tr('Farbe'), 'aria-label': tr('Farbe'),
-  })), customChip);
-  colorPicker.addEventListener('input', () => pickColor(colorPicker.value.replace('#', '').toUpperCase()));
-  function pickColor(hex) {
-    color = hex;
-    swatches.querySelectorAll('button.chip').forEach(x => x.classList.toggle('sel', x.dataset.hex === hex));
-    customChip.classList.toggle('sel', !PALETTE.includes(hex));
-  }
-  pickColor(color);
+  const swatches = colorChooser(PALETTE[classes.length % PALETTE.length]);
   const colorRow = h('div', { style: { marginTop: '12px' }, hidden: true }, h('span.label.color-label', tr('Farbe der neuen Class')), swatches);
   function showColor() {
     const v = values();
@@ -257,7 +244,7 @@ export async function renderUpload(root, kind, refId) {
       let klass = target ? classes.find(c => c.id === target.classId)
         : classes.find(c => ['category', 'level', 'weekday', 'time', 'coach'].every(k => norm(c[k]) === norm(cls[k])));
       if (!klass) {
-        klass = { id: uid(), ...cls, color, order: classes.length, created: Date.now() };
+        klass = { id: uid(), ...cls, color: swatches.value, order: classes.length, created: Date.now() };
         await db.put('classes', klass);
       }
       // Choreo finden oder anlegen (gleiche Class + gleicher Song = gleiche Choreo)

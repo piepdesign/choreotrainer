@@ -116,6 +116,8 @@
 [hidden] { display: none !important; }
 html.booting .topbar, html.booting main { visibility: hidden; }
 html, body { margin: 0; }
+/* Platz für die Scrollleiste immer freihalten: Seiten mit und ohne Scrollleiste haben dieselbe Breite (kein Springen) */
+html { scrollbar-gutter: stable; }
 body {
   background: var(--bg);
   color: var(--fg);

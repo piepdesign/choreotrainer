@@ -29,6 +29,7 @@ const DEFAULTS = {
   hoverPreview: 'mid', // Hörprobe beim Hovern über Cover: off | low | mid | high (früher on = mid)
   tourDone: false, // Tutorial Teil 1 (Base, Profil, Einstellungen) gesehen
   tourTrainDone: false, // Tutorial Teil 2 (Trainingsansicht) gesehen
+  thanksShown: false, // Danke-Hinweis mit Link zur Projekt-Doku gezeigt (einmalig nach der ersten Trainingsansicht)
   tester: true, // Helfer*in: Knopf unten rechts für Bug-Meldungen und Ideen (Standard: aktiviert)
   appHint: true, // Hinweis in der Base, als App zu installieren (nur solange nicht installiert)
 };

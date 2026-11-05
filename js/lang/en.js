@@ -615,4 +615,7 @@ export default {
   "Von „{from}“ übernommen: {what}.": "Taken from “{from}”: {what}.",
   "Nichts von „{from}“ liegt in dieser Aufnahme.": "Nothing from “{from}” falls within this recording.",
   "Farbe der neuen Class": "Colour of the new class",
+  "DANKE!": "THANK YOU!",
+  "Schön, dass du mit dem ChoreoTrainer übst. Wenn dich das Projekt dahinter interessiert: Auf meiner Webseite steht die Doku dazu.": "Great that you practise with ChoreoTrainer. If you are curious about the project behind it, the documentation is on my website.",
+  "Zur Doku": "To the docs",
 };

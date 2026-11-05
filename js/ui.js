@@ -1,6 +1,6 @@
 // Gemeinsame Bedienelemente: Auswahlliste mit „+ Neu …“, Präferenzen, Icons
 import { tr, lang, LANGS, setLang } from './i18n.js';
-import { h, holdGate, tt, balanceTiles } from './util.js';
+import { h, holdGate, tt, balanceTiles, PALETTE, textOn } from './util.js';
 import { PROVIDERS } from './providers.js';
 import { BASE_STATS } from './settings.js';
 import { brandIcon } from './brand-icons.js';
@@ -78,6 +78,26 @@ export function pickSelect(options, { value = '', empty = '—', addLabel = tr('
   // weitere Optionen nachladen (z. B. aus gespeicherten Classes), Auswahl bleibt
   wrap.setOptions = list => { const v = wrap.value; for (const o of list) if (o && !opts.includes(o)) opts.push(o); fill(v); };
   return wrap;
+}
+
+// Farbwahl für eine neue Class: Palette plus eigene Farbe. → Element mit .value (Hex ohne #)
+export function colorChooser(initial = PALETTE[0]) {
+  const picker = h('input', { type: 'color', value: '#7a2cff' });
+  const custom = h('label.chip.custom', { title: tr('Eigene Farbe') }, h('span', tr('Eigene')), picker);
+  const el = h('div.chips', PALETTE.map(p => h('button.chip', {
+    type: 'button', 'data-hex': p, style: { background: `#${p}`, color: textOn(p) },
+    onclick: () => pick(p), title: tr('Farbe'), 'aria-label': tr('Farbe'),
+  })), custom);
+  let color;
+  function pick(hex) {
+    color = hex;
+    el.querySelectorAll('button.chip').forEach(x => x.classList.toggle('sel', x.dataset.hex === hex));
+    custom.classList.toggle('sel', !PALETTE.includes(hex));
+  }
+  picker.addEventListener('input', () => pick(picker.value.replace('#', '').toUpperCase()));
+  pick(initial);
+  Object.defineProperty(el, 'value', { get: () => color, set: pick });
+  return el;
 }
 
 // Die drei Class-Felder als Auswahllisten. Vorschläge + alles, was in Classes schon vorkommt.
@@ -165,6 +185,23 @@ export function confirmDialog({ title, text, ok = tr('Bestätigen'), danger = tr
     addEventListener('keydown', onKey, true);
     document.body.append(box);
     (input || okBtn).focus();
+  });
+}
+
+// Einmaliger Dank nach der ersten Trainingsansicht, mit Link zur Projekt-Doku auf piep.design
+export const DOCS_URL = 'https://piep.design/choreo%E2%80%93trainer';
+export function thanksDialog() {
+  return new Promise(resolve => {
+    const close = () => { box.remove(); removeEventListener('keydown', onKey, true); resolve(); };
+    const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    const link = h('a.btn.small.primary', { href: DOCS_URL, target: '_blank', rel: 'noopener', onclick: () => setTimeout(close, 0) }, tr('Zur Doku'));
+    const box = h('div.modal', { onclick: e => { if (e.target === box) close(); } },
+      h('div.modal-card.confirm-card', h('h2.wide', tr('DANKE!')),
+        h('p', tr('Schön, dass du mit dem ChoreoTrainer übst. Wenn dich das Projekt dahinter interessiert: Auf meiner Webseite steht die Doku dazu.')),
+        h('div.actions', link, h('button.linkbtn', { type: 'button', onclick: close }, tr('Schließen')))));
+    addEventListener('keydown', onKey, true);
+    document.body.append(box);
+    link.focus();
   });
 }
 
