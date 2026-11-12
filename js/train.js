@@ -1,7 +1,8 @@
 // Trainingsansicht: Player mit Spiegeln, Tempo, Lautstärke, Bild, Loop, 8er-Count, Markern, Song-Zeitleiste
-import { tr, num } from './i18n.js';
+import { tr, tn, num } from './i18n.js';
 import { db, uid, deleteRecording, deleteChoreo, untracked } from './db.js';
-import { h, holdGate, isTouch, tt, fmt, fmtDate, WEEKDAYS, fmtRecDate, parseTime, debounce, inlineEdit, fitInput, classTitle, classMeta, PALETTE, textOn } from './util.js';
+import { h, holdGate, isTouch, tt, fmt, fmtDate, WEEKDAYS, fmtRecDate, parseTime, debounce, inlineEdit, fitInput, classTitle, classMeta, choreoMeta, isSub, PALETTE, textOn } from './util.js';
+import { songFileFor, sameSongChoreos } from './songshare.js';
 import { analyzeBeat } from './beat.js';
 import { songPicker, songKeyOf, sameSong } from './song.js';
 import { identifyAudio } from './recognize.js';
@@ -57,7 +58,9 @@ export async function renderTrain(root, recId) {
     return;
   }
   const songKey = `song:${choreo.id}`; // Songdatei gehört zur Choreo, gilt für alle Aufnahmen
-  let songBlob = (await db.get('videos', songKey)) || null;
+  // eigene Songdatei, sonst die einer anderen Choreo zum selben Song (songFrom = diese Choreo)
+  let { blob: songBlob, from: songFrom } = await songFileFor(choreo);
+  const songFromName = songFrom ? classTitle((await db.get('classes', songFrom.classId)) || {}) : '';
 
   const url = URL.createObjectURL(blob);
   const color = cls?.color || PALETTE[3];
@@ -880,6 +883,16 @@ export async function renderTrain(root, recId) {
     song,
     getBlob: () => blob,
     onChange: async (s, offset, { reset } = {}) => {
+      // Gibt es den bisherigen Song in weiteren Choreos (andere Classes)? Dann fragen, ob die Korrektur überall gilt
+      // (gleicher Song, z. B. Fassung korrigiert) oder nur hier (hier war ein falscher Song gewählt).
+      const others = song ? await sameSongChoreos(song, choreo.id) : [];
+      if (others.length && songKeyOf(s) !== choreo.songKey && await confirmDialog({
+        title: tr('SONG AUCH IN ANDEREN CHOREOS'),
+        text: tr('„{song}“ gehört auch zu {n}. Dort ebenfalls ändern?', { song: song.title, n: tn(others.length, 'Choreo', 'Choreos') }),
+        ok: tr('Überall ändern'), cancelLabel: tr('Nur hier'), danger: false,
+      })) {
+        for (const { choreo: o } of others) { Object.assign(o, { song: s, songKey: songKeyOf(s) }); if (o.title === song.title) o.title = null; await db.put('choreos', o); }
+      }
       // neuer Song → Titel folgt wieder dem Songtitel
       Object.assign(choreo, { song: s, songKey: songKeyOf(s), title: null });
       await db.put('choreos', choreo);
@@ -928,7 +941,7 @@ export async function renderTrain(root, recId) {
     await db.put('videos', file, songKey);
     delete rec.fileOffset; // neue Datei: Position darin bestimmt gleich der Abgleich
     if (P.audio === 'song') P.audio = 'video'; // erst nach bestandener Prüfung wieder mit der Datei abspielen
-    songBlob = file;
+    songBlob = file; songFrom = null;
     loadSongAudio();
     renderSongFile();
     update();
@@ -939,8 +952,10 @@ export async function renderTrain(root, recId) {
     songFileRow.replaceChildren(songFileIn, songBlob
       ? h('div', h('div.actions',
         h('span.label', `♪ ${songBlob.name || tr('Songdatei')}`),
-        h('button.linkbtn', { type: 'button', onclick: () => songFileIn.click() }, tr('Ersetzen')),
-        h('button.linkbtn', {
+        // von einer anderen Choreo mitgenutzt: „Eigene laden“ statt Ersetzen, kein Entfernen (gehört der anderen)
+        songFrom ? h('span.label.muted', tr('von „{cls}“', { cls: songFromName })) : null,
+        h('button.linkbtn', { type: 'button', onclick: () => songFileIn.click() }, songFrom ? tr('Eigene laden') : tr('Ersetzen')),
+        songFrom ? null : h('button.linkbtn', {
           type: 'button',
           onclick: async () => {
             if (!(await confirmDialog({ title: tr('SONGDATEI ENTFERNEN'), text: tr('Die Songdatei wird aus dieser Choreo entfernt.'), ok: tr('Entfernen') }))) return;
@@ -1096,6 +1111,7 @@ export async function renderTrain(root, recId) {
   }
 
   // Aufnahmetag = Class-Tag → Wochentag steht schon beim Class-Tag, nicht noch einmal am Datum
+  const sub = isSub(choreo, cls);
   const sameDay = !!cls.weekday && !!rec.recordedAt && WEEKDAYS[(new Date(rec.recordedAt).getDay() + 6) % 7] === cls.weekday;
   const panelBtn = h('button.ctl.icon-ctl.panel-btn', { type: 'button', title: tr('Seitenpanel ein/aus (P)'), 'aria-label': tr('Seitenpanel ein/aus') });
   const panelIcon = open => { panelBtn.innerHTML = icon(open ? 'panelOpen' : 'panelClosed'); panelBtn.classList.toggle('on', open); };
@@ -1115,7 +1131,8 @@ export async function renderTrain(root, recId) {
   titleEl.addEventListener('click', () => titleEl.classList.remove('marquee'));
   const crumbs = h('div.crumbs',
     h('a.tag', { href: `#/class/${cls.id}`, style: { background: `#${color}`, color: textOn(color) } }, classTitle(cls).toUpperCase()),
-    h('span.label', classMeta(cls)),
+    sub ? h('span.label.sub-label', tr('Vertretung')) : null,
+    h('span.label', choreoMeta(choreo, cls)),
     h('span.label', titleEdit(), ` · ${recIndex + 1}/${recs.length} · ${sameDay ? fmtDate(rec.recordedAt) : fmtRecDate(rec.recordedAt)}`),
     panelBtn,
     titleEl);

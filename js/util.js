@@ -156,6 +156,15 @@ export function classMeta(c) {
   return [dayLabel(c.weekday), c.time, c.coach].filter(Boolean).join(' · ');
 }
 
+// Coach einer Choreo: eigener (z. B. Vertretung) oder der der Class
+export const coachOf = (c, cls) => (c?.coach || cls?.coach || '').trim();
+// Vertretung = Choreo hat einen eigenen Coach, der nicht der Coach der Class ist
+export const isSub = (c, cls) => !!c?.coach && c.coach.trim().toLowerCase() !== String(cls?.coach || '').trim().toLowerCase();
+// Class-Angaben mit dem Coach der Choreo (Kopfzeile Training)
+export const choreoMeta = (c, cls) => classMeta({ ...cls, coach: coachOf(c, cls) });
+// „Vertretung · Anna“ bzw. leer
+export const subLabel = (c, cls) => (isSub(c, cls) ? `${tr('Vertretung')} · ${c.coach.trim()}` : '');
+
 export function songTitle(s) {
   if (!s) return tr('Ohne Song');
   return s.artist ? `${s.artist} — ${s.title}` : s.title;

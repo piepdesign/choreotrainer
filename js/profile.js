@@ -3,7 +3,7 @@
 // Class-Farben, Werte immer in Textfarbe, Tooltip auf jedem Datenpunkt.
 import { tr, tn, num, lang, locale, dayLabel } from './i18n.js';
 import { db, deleteAllData } from './db.js';
-import { h, balanceTiles, isTouch, fmt, fmtDuration, relDate, fmtRecDate, classTitle, stripe, byClassOrder, WEEKDAYS, textOn, plural } from './util.js';
+import { h, balanceTiles, isTouch, fmt, fmtDuration, relDate, fmtRecDate, classTitle, coachOf, isSub, stripe, byClassOrder, WEEKDAYS, textOn, plural } from './util.js';
 import { loadAll, dots, choreoCard, fitCardLabels, recTitle, nextClass, importInto, addRow, newClassDialog } from './hub.js';
 import { songLink } from './providers.js';
 import { baseStats, latestRating, choreoLength, weekStart, dayKey } from './stats.js';
@@ -314,6 +314,19 @@ export async function renderProfile(root, section) {
     label: titleOf(c), color: classById[c.classId]?.color,
     value: min(real.filter(x => x.choreoId === c.id).reduce((t, x) => t + x.seconds, 0)),
   })).filter(i => i.value).sort((a, b) => b.value - a.value).slice(0, 8);
+  // Übungszeit nach Coach: Vertretungen zählen beim Coach, der die Choreo gezeigt hat (nur ab zwei Coaches sinnvoll)
+  const coachMin = {};
+  for (const c of choreos) {
+    const name = coachOf(c, classById[c.classId]) || '—';
+    const v = real.filter(x => x.choreoId === c.id).reduce((t, x) => t + x.seconds, 0);
+    const e = (coachMin[name.toLowerCase()] ||= { label: name, sec: 0, subs: 0 });
+    e.sec += v;
+    if (isSub(c, classById[c.classId])) e.subs++;
+  }
+  const perCoach = Object.values(coachMin).map(e => ({
+    label: e.label, value: min(e.sec),
+    tip: `${e.label}: ${min(e.sec)} min${e.subs ? ` · ${tr('davon {n} als Vertretung', { n: plural(e.subs, 'Choreo', 'Choreos') })}` : ''}`,
+  })).filter(i => i.value).sort((a, b) => b.value - a.value);
   const totalSec = real.reduce((t, x) => t + x.seconds, 0);
   const monthSec = real.filter(x => x.start > now - 30 * DAY).reduce((t, x) => t + x.seconds, 0);
   const rates = real.filter(x => x.avgRate);
@@ -328,7 +341,8 @@ export async function renderProfile(root, section) {
       h('div', h('h3.p-sub', tr('Minuten pro Woche')), bars(perWeek)),
       h('div', h('h3.p-sub', tr('Nach Wochentag')), bars(perWeekday)),
       h('div', h('h3.p-sub', tr('Nach Tageszeit')), bars(perSlot)),
-      h('div.span-all', h('h3.p-sub', tr('Nach Choreo')), perChoreo.length ? hbars(perChoreo) : h('p.empty', tr('Noch keine Übungszeit.')))));
+      h('div.span-all', h('h3.p-sub', tr('Nach Choreo')), perChoreo.length ? hbars(perChoreo) : h('p.empty', tr('Noch keine Übungszeit.'))),
+      perCoach.length > 1 ? h('div.span-all', h('h3.p-sub', tr('Nach Coach')), hbars(perCoach)) : null));
 
   // ── Status ──
   const rated = choreos.filter(c => latestRating(c));

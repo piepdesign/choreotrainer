@@ -166,7 +166,10 @@ export async function deleteRecording(id) {
 export async function deleteChoreo(id) {
   for (const r of await db.byIndex('recordings', 'choreoId', id)) await deleteRecording(r.id);
   for (const s of await db.byIndex('sessions', 'choreoId', id)) await db.del('sessions', s.id);
-  await db.del('videos', `song:${id}`); // Songdatei der Choreo
+  // Songdatei der Choreo; nutzt eine andere Choreo denselben Song, geht die Datei an sie über
+  const { handOverSongFile } = await import('./songshare.js');
+  await handOverSongFile(await db.get('choreos', id));
+  await db.del('videos', `song:${id}`);
   await db.del('choreos', id);
 }
 

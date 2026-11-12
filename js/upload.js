@@ -1,7 +1,7 @@
 // Upload: Video + Class + Song + Recording-Datum + Notizen → Class › Choreo › Aufnahme
 import { tr, tn, dayLabel } from './i18n.js';
 import { db, uid, requestPersist } from './db.js';
-import { h, fmt, parseTime, isoDate, classTitle, classMeta, PALETTE, textOn, WEEKDAYS, byClassOrder, CLASS_TITLES, CLASS_LEVELS } from './util.js';
+import { h, fmt, parseTime, isoDate, classTitle, classMeta, subLabel, PALETTE, textOn, WEEKDAYS, byClassOrder, CLASS_TITLES, CLASS_LEVELS } from './util.js';
 import { songPicker, songKeyOf, sameSong } from './song.js';
 import { identifyAudio } from './recognize.js';
 import { alignToSong, checkAudio } from './align.js';
@@ -12,6 +12,7 @@ import { compressVideo } from './compress.js';
 import { analyzeBeat } from './beat.js';
 import { needsCapture } from './audio.js';
 import { carrySource, carryOver } from './carry.js';
+import { sameSongChoreos } from './songshare.js';
 
 
 const norm = s => String(s || '').trim().toLowerCase();
@@ -51,6 +52,9 @@ export async function renderUpload(root, kind, refId) {
   let picked; // Antwort auf „Choreo gibt es schon“: Choreo, 'new' oder undefined (noch nicht gefragt)
   let pickedFor = null; // Song-Schlüssel, für den gefragt wurde (anderer Song: neu fragen)
   let asking = null; // offene Abfrage (nicht doppelt zeigen)
+  let sameAs = null; // Song einer bestehenden Choreo, wenn „Neue Choreo zum selben Song“ gewählt wurde
+  let beatFrom = null; // neue Choreo zum selben Song: Aufnahme einer anderen Choreo, deren 8er übernommen wird
+  let subPick = null, subFor = null; // Antwort auf „Vertretung?“ ({ mode, klass }) und für welche Angaben gefragt wurde
 
   const classes = (await db.all('classes')).sort(byClassOrder);
   let preChoreo = null, preClass = null;
@@ -80,12 +84,14 @@ export async function renderUpload(root, kind, refId) {
   const KEYS = ['category', 'level', 'weekday', 'time', 'coach'];
   const values = () => Object.fromEntries(Object.entries(f).map(([k, el]) => [k, String(el.value || '').trim()]));
   const existingClass = v => classes.find(c => KEYS.every(k => norm(c[k]) === norm(v[k])));
+  // gleiche Class bis auf den Coach (Vertretung oder Coach noch nicht eingetragen)
+  const nearClass = v => (v.category ? classes.find(c => KEYS.filter(k => k !== 'coach').every(k => norm(c[k]) === norm(v[k]))) : null);
   const swatches = colorChooser(PALETTE[classes.length % PALETTE.length]);
   const colorRow = h('div', { style: { marginTop: '12px' }, hidden: true }, h('span.label.color-label', tr('Farbe der neuen Class')), swatches);
   function showColor() {
     const v = values();
-    colorRow.hidden = !v.category || !!existingClass(v);
-    selectChip(existingClass(v));
+    colorRow.hidden = !v.category || !!existingClass(v) || !!nearClass(v);
+    selectChip(existingClass(v) || nearClass(v));
   }
   for (const el of Object.values(f)) for (const ev of ['input', 'change']) el.addEventListener(ev, showColor);
   if (preClass) fill(preClass);
@@ -212,14 +218,38 @@ export async function renderUpload(root, kind, refId) {
     if (asking) return asking;
     asking = (async () => {
       const same = await sameSongChoreos(song);
+      beatFrom = null; sameAs = null;
       if (!same.length) { picked = 'new'; pickedFor = key; return true; }
+      for (const x of same) {
+        x.beat = (await db.byIndex('recordings', 'choreoId', x.choreo.id)).filter(r => r.player?.bpm).sort((a, b) => (b.uploadedAt || 0) - (a.uploadedAt || 0))[0] || null;
+        x.songFile = !!(await db.get('videos', `song:${x.choreo.id}`));
+      }
       const r = await chooseChoreo(same, song, values());
       if (!r) return false; // abgebrochen: beim Speichern noch einmal fragen
-      picked = r; pickedFor = key;
-      if (r !== 'new') { const k = classes.find(c => c.id === r.classId); if (k) fill(k); } // Class der gewählten Choreo eintragen
+      picked = r.choreo || 'new'; pickedFor = key; beatFrom = r.beatFrom || null;
+      // neue Choreo zum selben Song: Songdaten der bestehenden übernehmen (Interpret, Cover, Deezer-ID), damit beide
+      // denselben Schlüssel haben, falls hier nur der Titel eingetippt wurde
+      sameAs = !r.choreo && (!picker.get() || picker.get().source === 'manual') ? same[0].choreo.song : null;
+      if (r.choreo) { const k = classes.find(c => c.id === r.choreo.classId); if (k) fill(k); } // Class der gewählten Choreo eintragen
       return true;
     })();
     try { return await asking; } finally { asking = null; }
+  }
+
+  // Vor dem Speichern: Passt alles zu einer Class außer dem Coach? Dann fragen (Vertretung, Coach eintragen, neue Class).
+  // Ohne eingetragenen Coach gilt die passende Class ohne Frage. → true = weiter, false = abgebrochen
+  async function askSub(cls) {
+    const key = JSON.stringify(cls);
+    if (subFor === key) return true;
+    subPick = null;
+    if ((picked && picked !== 'new') || existingClass(cls)) { subFor = key; return true; }
+    const near = nearClass(cls);
+    if (!near) { subFor = key; return true; }
+    if (!cls.coach) { subPick = { mode: 'same', klass: near }; subFor = key; return true; }
+    const r = await chooseSub(near, cls.coach);
+    if (!r) return false;
+    subPick = r; subFor = key;
+    return true;
   }
 
   async function save() {
@@ -229,8 +259,10 @@ export async function renderUpload(root, kind, refId) {
     // Knopf zeigt den Stand (nicht ausgegraut wie „disabled“, sonst ist er am Handy kaum lesbar), weitere Klicks zählen nicht
     if (saving && packing) return;
     if (!(await askExisting(song))) return;
+    if (sameAs && picked === 'new' && pickedFor === songKeyOf(song)) song = { ...sameAs };
     const cls = values();
     if (!cls.category && !(picked && picked !== 'new')) { toast(tr('Bitte mindestens den Style der Class angeben')); f.category.focus(); return; }
+    if (!(await askSub(cls))) return;
     saveBtn.classList.add('busy');
     saveBtn.setAttribute('aria-busy', 'true');
     // noch am Verkleinern: warten (Fortschritt im Knopf), danach geht es von selbst weiter
@@ -241,8 +273,14 @@ export async function renderUpload(root, kind, refId) {
     try {
       // Class finden oder anlegen (bei gewählter bestehender Choreo gilt deren Class)
       const target = picked && picked !== 'new' ? picked : null;
-      let klass = target ? classes.find(c => c.id === target.classId)
-        : classes.find(c => ['category', 'level', 'weekday', 'time', 'coach'].every(k => norm(c[k]) === norm(cls[k])));
+      let klass = target ? classes.find(c => c.id === target.classId) : existingClass(cls);
+      let subCoach = '';
+      if (!klass && subPick) {
+        klass = subPick.klass;
+        if (subPick.mode === 'sub') subCoach = cls.coach;
+        else if (subPick.mode === 'coach') { klass.coach = cls.coach; await db.put('classes', klass); }
+        else if (subPick.mode === 'new') klass = null; // „Neue Class mit …“; 'same' = passende Class ohne Coach-Angabe
+      }
       if (!klass) {
         klass = { id: uid(), ...cls, color: swatches.value, order: classes.length, created: Date.now() };
         await db.put('classes', klass);
@@ -256,6 +294,7 @@ export async function renderUpload(root, kind, refId) {
       }
       if (!choreo) {
         choreo = { id: uid(), classId: klass.id, song, songKey: song ? songKeyOf(song) : `none:${uid()}`, created: Date.now(), ratings: [], lastPracticed: null };
+        if (subCoach) choreo.coach = subCoach; // Vertretung: Coach dieser Choreo
       } else if (song && !choreo.song) {
         Object.assign(choreo, { song, songKey: songKeyOf(song) });
       }
@@ -286,6 +325,11 @@ export async function renderUpload(root, kind, refId) {
       if (src) {
         saveBtn.textContent = tr('Übernehme Marker …');
         carried = await carryOver(src, rec, packed || file).catch(e => { console.warn(e); return null; });
+      } else if (!count && beatFrom) {
+        // neue Choreo zum selben Song: nur den Takt (8er) der anderen Choreo übernehmen, keine Marker
+        saveBtn.textContent = tr('Übernehme 8er …');
+        const got = await carryOver(beatFrom, rec, packed || file, { beatOnly: true }).catch(e => { console.warn(e); return null; });
+        if (got) carried = { ...got, beatOnly: true, from: beatFrom.className || got.from };
       }
       await db.put('videos', packed || file, rec.id);
       if (songFile) await db.put('videos', songFile, `song:${choreo.id}`);
@@ -307,46 +351,82 @@ export async function renderUpload(root, kind, refId) {
   return () => { job?.cancel(); if (previewUrl) URL.revokeObjectURL(previewUrl); };
 }
 
-// Choreos mit demselben Song: gleicher Schlüssel (Deezer-ID bzw. Interpret|Titel) oder gleicher Titel und
-// passender Interpret (z. B. einmal über Deezer gewählt, einmal von Hand eingetippt).
-async function sameSongChoreos(song) {
-  const key = songKeyOf(song), artist = norm(song.artist);
-  const fits = c => c.song && (c.songKey === key || (sameSong(c.song, song)
-    && (!artist || !norm(c.song.artist) || norm(c.song.artist).includes(artist) || artist.includes(norm(c.song.artist)))));
-  const out = [];
-  for (const c of (await db.all('choreos')).filter(fits)) {
-    const klass = await db.get('classes', c.classId);
-    if (klass) out.push({ choreo: c, klass, recs: (await db.byIndex('recordings', 'choreoId', c.id)).length });
-  }
-  return out;
-}
-
-// Abfrage: zur bestehenden Choreo hinzufügen oder neue Choreo anlegen. → Choreo, 'new' oder null (abgebrochen)
-// Vorgewählt: die Choreo in der eingetragenen Class, sonst die zuletzt geübte.
+// Abfrage „Song gibt es schon“: Neue Aufnahme zu einer bestehenden Choreo oder neue Choreo zum selben Song (andere Class,
+// andere Schritte). → { choreo } | { beatFrom } (neue Choreo, ggf. mit 8er einer anderen) | null (abgebrochen)
+// Vorgewählt: die Choreo in der eingetragenen Class. Ist eine andere Class eingetragen: neue Choreo. Ist noch keine
+// Class eingetragen: die zuletzt geübte Choreo (meist die nächste Woche derselben Choreo).
 function chooseChoreo(list, song, cls) {
-  const sameClass = x => ['category', 'level', 'weekday', 'time', 'coach'].every(k => norm(x.klass[k]) === norm(cls[k]));
+  const sameClass = x => ['category', 'level', 'weekday', 'time'].every(k => norm(x.klass[k]) === norm(cls[k]));
   list.sort((a, b) => sameClass(b) - sameClass(a) || (b.choreo.lastPracticed || 0) - (a.choreo.lastPracticed || 0));
-  let mode = list[0].choreo.id;
+  const entered = !!cls.category;
+  let mode = sameClass(list[0]) || !entered ? list[0].choreo.id : 'new';
+  const name = k => [classTitle(k), classMeta(k)].filter(Boolean).join(' · ');
+  const beatSrc = list.find(x => x.beat), fileSrc = list.find(x => x.songFile);
+  const beatBox = h('input', { type: 'checkbox', checked: true });
+  const newExtras = h('div.new-extras',
+    beatSrc ? h('label.share-item', beatBox, h('span', tr('8er von „{cls}“ übernehmen', { cls: classTitle(beatSrc.klass) }))) : null,
+    h('p.hint-text', fileSrc
+      ? tr('Eigene Marker und eigener Status. Die Songdatei von „{cls}“ wird mitgenutzt.', { cls: classTitle(fileSrc.klass) })
+      : tr('Eigene Marker und eigener Status, nur der Song ist derselbe.')));
+  const addHint = h('p.hint-text', tr('Marker, Loop, 8er und Start/Ende kommen von der letzten Aufnahme, umgerechnet auf die Stelle im Song. Der Status bleibt.'));
+  const show = () => { newExtras.hidden = mode !== 'new'; addHint.hidden = mode === 'new'; };
   const radio = (v, l) => {
     const r = h('input', { type: 'radio', name: 'choreo-choice', value: v, checked: v === mode });
-    r.addEventListener('change', () => { mode = v; });
+    r.addEventListener('change', () => { mode = v; show(); });
     return h('label.share-item', r, h('span', l));
   };
   const items = [
-    ...list.map(x => radio(x.choreo.id, [tr('Zu Class „{cls}“', { cls: [classTitle(x.klass), classMeta(x.klass)].filter(Boolean).join(' · ') }), ' ',
-      h('span.muted', tn(x.recs, 'Aufnahme', 'Aufnahmen'))])),
-    radio('new', tr('Als neue Choreo anlegen')),
+    ...list.map(x => radio(x.choreo.id, [tr('Neue Aufnahme zur Choreo in „{cls}“', { cls: name(x.klass) }), ' ',
+      h('span.muted', [tn(x.recs, 'Aufnahme', 'Aufnahmen'), subLabel(x.choreo, x.klass)].filter(Boolean).join(' · '))])),
+    radio('new', entered && !list.some(sameClass) ? tr('Neue Choreo in „{cls}“', { cls: name(cls) }) : tr('Neue Choreo zum selben Song')),
   ];
+  show();
   return new Promise(resolve => {
     const close = v => { box.remove(); removeEventListener('keydown', onKey, true); resolve(v); };
     const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(null); } };
-    const ok = () => close(mode === 'new' ? 'new' : list.find(x => x.choreo.id === mode).choreo);
+    const ok = () => {
+      if (mode !== 'new') return close({ choreo: list.find(x => x.choreo.id === mode).choreo });
+      const beat = beatSrc && beatBox.checked ? { ...beatSrc.beat, className: classTitle(beatSrc.klass) } : null;
+      close({ beatFrom: beat });
+    };
     const box = h('div.modal', { onclick: e => { if (e.target === box) close(null); } },
-      h('div.modal-card.share-card', h('h2.wide', tr('CHOREO GIBT ES SCHON')),
-        h('p.label', tr('„{song}“ ist schon angelegt. Neue Aufnahme dazu?', { song: song.title })),
+      h('div.modal-card.share-card', h('h2.wide', tr('SONG GIBT ES SCHON')),
+        h('p.label', tr('„{song}“ gibt es schon als Choreo. Gleiche Choreo oder eine neue zum selben Song?', { song: song.title })),
         h('div.choice-list', items),
-        h('p.hint-text', tr('Marker, Loop, 8er und Start/Ende kommen von der letzten Aufnahme, umgerechnet auf die Stelle im Song. Der Status bleibt.')),
-        h('div.actions', h('button.btn.small.primary', { type: 'button', onclick: ok }, tr('Hinzufügen')),
+        addHint, newExtras,
+        h('div.actions', h('button.btn.small.primary', { type: 'button', onclick: ok }, tr('Weiter')),
+          h('button.linkbtn', { type: 'button', onclick: () => close(null) }, tr('Abbrechen')))));
+    addEventListener('keydown', onKey, true);
+    document.body.append(box);
+    box.querySelector('button.primary').focus();
+  });
+}
+
+// Abfrage „Vertretung?“: Angaben passen zu einer Class, nur der Coach ist ein anderer.
+// → { mode: 'sub' | 'coach' | 'new', klass } | null (abgebrochen)
+function chooseSub(klass, coach) {
+  const has = !!String(klass.coach || '').trim();
+  const opts = [
+    ['sub', tr('Vertretung in dieser Class'), tr('Die Choreo kommt in „{cls}“, mit {coach} als Coach dieser Choreo.', { cls: classTitle(klass), coach })],
+    ...(has ? [] : [['coach', tr('{coach} als Coach der Class eintragen', { coach }), tr('Gilt dann für alle Choreos der Class.')]]),
+    ['new', tr('Neue Class mit {coach}', { coach }), tr('Eigene Class, z. B. bei einem festen Kurs von {coach}.', { coach })],
+  ];
+  let mode = has ? 'sub' : 'coach';
+  return new Promise(resolve => {
+    const close = v => { box.remove(); removeEventListener('keydown', onKey, true); resolve(v); };
+    const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(null); } };
+    const items = opts.map(([v, l, hint]) => {
+      const r = h('input', { type: 'radio', name: 'sub-choice', value: v, checked: v === mode });
+      r.addEventListener('change', () => { mode = v; });
+      return h('label.share-item', r, h('span', l, ' ', h('span.muted', hint)));
+    });
+    const box = h('div.modal', { onclick: e => { if (e.target === box) close(null); } },
+      h('div.modal-card.share-card', h('h2.wide', tr('VERTRETUNG?')),
+        h('p.label', has
+          ? tr('„{cls}“ hat Coach {old}. Eingetragen ist {coach}.', { cls: [classTitle(klass), classMeta(klass)].filter(Boolean).join(' · '), old: klass.coach, coach })
+          : tr('„{cls}“ hat noch keinen Coach. Eingetragen ist {coach}.', { cls: [classTitle(klass), classMeta(klass)].filter(Boolean).join(' · '), coach })),
+        h('div.choice-list', items),
+        h('div.actions', h('button.btn.small.primary', { type: 'button', onclick: () => close({ mode, klass }) }, tr('Weiter')),
           h('button.linkbtn', { type: 'button', onclick: () => close(null) }, tr('Abbrechen')))));
     addEventListener('keydown', onKey, true);
     document.body.append(box);
@@ -355,6 +435,7 @@ function chooseChoreo(list, song, cls) {
 }
 
 function carryText(c) {
+  if (c.beatOnly) return c.beat ? tr('8er von „{from}“ übernommen.', { from: c.from }) : tr('Kein gemeinsamer Takt mit „{from}“ gefunden. 8er bitte neu setzen.', { from: c.from });
   if (!c.how) return tr('Keine gemeinsame Stelle mit „{from}“ gefunden. Marker und 8er bitte neu setzen.', { from: c.from });
   const parts = [c.markers && tn(c.markers, 'Marker', 'Marker'), c.loop && tr('Loop'), c.beat && tr('8er')].filter(Boolean);
   return parts.length ? tr('Von „{from}“ übernommen: {what}.', { from: c.from, what: parts.join(', ') }) : tr('Nichts von „{from}“ liegt in dieser Aufnahme.', { from: c.from });

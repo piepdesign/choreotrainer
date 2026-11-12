@@ -37,16 +37,21 @@ async function offsetBetween(src, rec, blob) {
 }
 
 // Überträgt in rec (noch nicht gespeichert). blob = Video der neuen Aufnahme. → Zusammenfassung oder null
-export async function carryOver(src, rec, blob) {
+// beatOnly: nur den Takt (Tempo und „1“), z. B. von einer anderen Choreo zum selben Song. Marker, Loop und Ansicht
+// gehören zur jeweiligen Choreo und bleiben weg.
+export async function carryOver(src, rec, blob, { beatOnly = false } = {}) {
   if (!src) return null;
   const off = await offsetBetween(src, rec, blob);
   const d = rec.duration || Infinity;
   const inside = t => t >= 0 && t <= d;
   const p = src.player || {}, P = {};
   // zeitunabhängig
-  for (const k of ['bpm', 'manualBeat', 'countOn', 'click', 'mirror', 'rate']) if (p[k] !== undefined) P[k] = p[k];
+  for (const k of beatOnly ? ['bpm', 'manualBeat'] : ['bpm', 'manualBeat', 'countOn', 'click', 'mirror', 'rate']) if (p[k] !== undefined) P[k] = p[k];
   const out = { from: src.title, how: off?.how || null, markers: 0, loop: false, beat: !!p.bpm };
-  if (off) {
+  if (off && beatOnly) {
+    if (p.bpm) { const E = 480 / p.bpm, a = (p.anchor || 0) - off.shift; P.anchor = Math.round((((a % E) + E) % E) * 1000) / 1000; }
+    if (rec.songOffset == null && src.songOffset != null) rec.songOffset = Math.round((src.songOffset + off.shift) * 100) / 100;
+  } else if (off) {
     const map = t => Math.round((t - off.shift) * 1000) / 1000;
     rec.markers = (src.markers || []).map(m => ({ ...m, id: uid(), t: map(m.t) })).filter(m => inside(m.t));
     out.markers = rec.markers.length;

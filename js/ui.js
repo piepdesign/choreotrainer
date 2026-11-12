@@ -168,7 +168,7 @@ export function toggle(label, on, onChange) {
 }
 
 // Bestätigung vor Zurücksetzen/Löschen: erklärt kurz, was passiert. typeToConfirm: Wort, das eingetippt werden muss.
-export function confirmDialog({ title, text, ok = tr('Bestätigen'), danger = true, typeToConfirm = null, cancel = true, extra = [] }) {
+export function confirmDialog({ title, text, ok = tr('Bestätigen'), danger = true, typeToConfirm = null, cancel = true, cancelLabel = tr('Abbrechen'), extra = [] }) {
   return new Promise(resolve => {
     const close = v => { box.remove(); removeEventListener('keydown', onKey, true); resolve(v); };
     const okBtn = h(`button.btn.small${danger ? '.danger' : '.primary'}`, { type: 'button', onclick: () => close(true) }, ok);
@@ -181,7 +181,7 @@ export function confirmDialog({ title, text, ok = tr('Bestätigen'), danger = tr
     const box = h('div.modal', { onclick: e => { if (e.target === box) close(false); } },
       h('div.modal-card.confirm-card', h('h2.wide', title), h('p', text), ...extra, // extra: z. B. ein Schalter vor dem Bestätigen
         input ? h('label.field', h('span', tr('Zur Bestätigung „{word}“ eintippen', { word: typeToConfirm })), input) : null,
-        h('div.actions', okBtn, cancel ? h('button.linkbtn', { type: 'button', onclick: () => close(false) }, tr('Abbrechen')) : null)));
+        h('div.actions', okBtn, cancel ? h('button.linkbtn', { type: 'button', onclick: () => close(false) }, cancelLabel) : null)));
     addEventListener('keydown', onKey, true);
     document.body.append(box);
     (input || okBtn).focus();

@@ -1111,3 +1111,14 @@ input:is([type=text], [type=date], [type=time], [type=number], [type=search], :n
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
 }
+
+/* Gleicher Song in mehreren Classes, Vertretung */
+.choreo-block .sub-label, .choreo-block .also-in { margin-top: 4px; }
+.also-in a, .song-page-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.song-page-link { text-decoration: none; }
+.song-page-link:hover .t { text-decoration: underline; }
+.new-extras { display: grid; gap: 6px; }
+.new-extras[hidden] { display: none; }
+.choice-list .share-item .muted { display: inline; }
+.songlist li > a.song-page-link { min-width: 0; }
+.songlist li > a.song-page-link .label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

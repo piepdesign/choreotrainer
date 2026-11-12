@@ -1,6 +1,6 @@
 // Einstieg: Router, Theme, globale Helfer
 import { tr } from './i18n.js'; // zuerst: Sprache steht fest, bevor andere Module Texte bauen
-import { renderHub, renderClass } from './hub.js';
+import { renderHub, renderClass, renderSong } from './hub.js';
 import { renderUpload } from './upload.js';
 import { renderTrain } from './train.js';
 import { renderProfile } from './profile.js';
@@ -29,6 +29,7 @@ const routes = [
   [/^#?\/?$/, () => renderHub(view), 'hub'],
   [/^#\/upload(?:\?(choreo|class)=([\w-]+))?$/, m => renderUpload(view, m[1], m[2]), 'upload'],
   [/^#\/class\/([\w-]+)$/, m => renderClass(view, m[1]), 'hub'],
+  [/^#\/song\/([^/]+)$/, m => renderSong(view, decodeURIComponent(m[1])), 'hub'],
   [/^#\/train\/([\w-]+)$/, m => renderTrain(view, m[1]), null],
   [/^#\/profile(?:\/(\w+))?$/, m => renderProfile(view, m[1]), 'profile'],
   [/^#\/settings$/, () => renderProfile(view, 'settings'), 'settings'],

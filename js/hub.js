@@ -1,13 +1,14 @@
 // Base (Übersicht) und Class-Ansicht
 import { tr, tn, dayLabel } from './i18n.js';
 import { db, deleteChoreo, deleteClass, deleteRecording } from './db.js';
-import { h, balanceTiles, isTouch, onHold, holdGate, tt, fmt, fmtRecDate, fmtDuration, relDate, classTitle, classMeta, stripe, inlineEdit, PALETTE, textOn, WEEKDAYS, byClassOrder, CLASS_TITLES, CLASS_LEVELS } from './util.js';
+import { h, balanceTiles, isTouch, onHold, holdGate, tt, fmt, fmtRecDate, fmtDuration, relDate, classTitle, classMeta, subLabel, stripe, inlineEdit, PALETTE, textOn, WEEKDAYS, byClassOrder, CLASS_TITLES, CLASS_LEVELS } from './util.js';
 import { state, go, toast } from './app.js';
 import { baseStats } from './stats.js';
 import { settings, saveSettings, BASE_STATS } from './settings.js';
 import { isInstalled, installApp } from './backup.js';
 import { songLink } from './providers.js';
-import { classPickers, icon, confirmDialog } from './ui.js';
+import { classPickers, icon, confirmDialog, pickSelect } from './ui.js';
+import { fitsSong } from './songshare.js';
 import { classForm } from './classform.js';
 import { exportClassDialog, exportChoreoDialog, chooseFile, importExport, importSummary, moveChoreo } from './share.js';
 
@@ -199,7 +200,7 @@ export async function renderHub(root) {
   const songs = [];
   const seen = new Set();
   for (const c of [...choreos].sort((a, b) => b.created - a.created)) {
-    if (!c.song || seen.has(c.songKey)) continue;
+    if (!c.song || seen.has(c.songKey) || songs.some(x => fitsSong(x, c.song))) continue; // gleicher Song nur einmal
     seen.add(c.songKey);
     songs.push(c);
   }
@@ -209,10 +210,16 @@ export async function renderHub(root) {
   const cardsRow = fitCardLabels(h('div.cards.hscroll', recent.map(c => choreoCard(c, classById[c.classId], recsByChoreo[c.id] || [], urls)),
     choreos.length > 5 ? h('a.more', { href: '#/profile/choreos', title: tr('Alle {n} Choreos', { n: choreos.length }) }, '>') : null));
   // Letzte Songs: so hoch wie die Choreo-Zeile, darüber hinaus senkrecht scrollbar
-  const songList = h('ul.songlist.vscroll', songs.map(c => h('li',
-    songLink(cover(c.song), c.song),
-    songLink(h('div', h('div.t', c.song.title), h('div.label', c.song.artist || '—')), c.song),
-    h('span.label', c.song.duration ? fmt(c.song.duration) : ''))));
+  // Song in mehreren Choreos (z. B. zwei Classes): Titel führt zur Song-Seite, rechts die Zahl der Choreos
+  const uses = c => choreos.filter(x => fitsSong(x, c.song)).length;
+  const songList = h('ul.songlist.vscroll', songs.map(c => {
+    const n = uses(c);
+    const text = h('div', h('div.t', c.song.title), h('div.label', c.song.artist || '—'));
+    return h('li',
+      songLink(cover(c.song), c.song),
+      n > 1 ? h('a.song-page-link', { href: songHref(c), title: tr('Alle Choreos zu diesem Song') }, text) : songLink(text, c.song),
+      h('span.label', n > 1 ? tn(n, 'Choreo', 'Choreos') : c.song.duration ? fmt(c.song.duration) : ''));
+  }));
 
   root.append(
     h('div', { style: { height: '12px' } }),
@@ -371,7 +378,7 @@ export function choreoCard(c, cls, recs, urls) {
   return h('a.card', { href: latest ? `#/train/${latest.id}` : `#/class/${c.classId}` },
     thumb,
     h('h3', c.title || c.song?.title || tr('Ohne Song')),
-    h('div.label', `${cls ? classTitle(cls) : ''} · ${relDate(c.lastPracticed || c.created)}`),
+    h('div.label', [cls ? classTitle(cls) : '', cls && subLabel(c, cls) ? tr('Vertretung') : '', relDate(c.lastPracticed || c.created)].filter(Boolean).join(' · ')),
     // kurz und einzeilig: nur „in 4 Tagen“, Tag und Uhrzeit im Tooltip. Zeile bleibt auch ohne Angabe stehen,
     // damit gleiche Infos in allen Kacheln auf derselben Höhe sitzen
     h('div.label.next-class', { title: cls && nextClass(cls) ? tr('Nächste Class {when}', { when: nextClass(cls) }) : null }, cls && nextClass(cls) ? tr('Nächste Class {when}', { when: nextClass(cls).split(' · ').at(-1) }) : '\u00a0'),
@@ -411,7 +418,7 @@ export async function renderClass(root, id) {
         },
       }, tr('Löschen'))),
     editBox,
-    ...(mine.length ? mine.map(c => choreoBlock(c, recsByChoreo[c.id] || [], sessions, urls)) : [h('p.empty', tr('Keine Choreos in dieser Class.'))]),
+    ...(mine.length ? mine.map(c => choreoBlock(c, recsByChoreo[c.id] || [], sessions, urls, { cls, choreos, classes })) : [h('p.empty', tr('Keine Choreos in dieser Class.'))]),
     // unter der letzten Choreo: neue Choreo (Video hochladen), daneben kleiner: aus einem Export übernehmen
     addRow(h('a.btn.small', { href: `#/upload?class=${id}`, onclick: () => { state.pendingFile = null; } }, tr('Neue Choreo')), () => importInto(id)),
   );
@@ -500,8 +507,21 @@ function classEditor(cls, header, close, allClasses = []) {
     h('div.actions',
       h('button.btn.primary', {
         onclick: async () => {
+          const oldCoach = String(cls.coach || '').trim();
           for (const k of Object.keys(f)) cls[k] = f[k].value.trim();
           cls.color = color;
+          // Coach der Class gewechselt: Bisherige Choreos behalten auf Wunsch den alten Coach (sonst stünde dort der neue).
+          // Choreos mit dem neuen Coach als Vertretung sind ab jetzt keine Vertretung mehr.
+          if (oldCoach && oldCoach.toLowerCase() !== cls.coach.toLowerCase()) {
+            const mine = await db.byIndex('choreos', 'classId', cls.id);
+            const plain = mine.filter(c => !c.coach);
+            if (plain.length && await confirmDialog({
+              title: tr('COACH GEWECHSELT'),
+              text: tr('Waren die bisherigen {n} bei {old}?', { n: tn(plain.length, 'Choreo', 'Choreos'), old: oldCoach }),
+              ok: tr('Ja, bei {old} lassen', { old: oldCoach }), cancelLabel: tr('Nein, alle bei {coach}', { coach: cls.coach || '—' }), danger: false,
+            })) for (const c of plain) { c.coach = oldCoach; await db.put('choreos', c); }
+            for (const c of mine.filter(c => c.coach && c.coach.toLowerCase() === cls.coach.toLowerCase())) { delete c.coach; await db.put('choreos', c); }
+          }
           await db.put('classes', cls);
           toast(tr('Gespeichert'));
           go(location.hash);
@@ -512,13 +532,23 @@ function classEditor(cls, header, close, allClasses = []) {
       }, tr('Abbrechen'))));
 }
 
-function choreoBlock(c, recs, sessions, urls) {
+// Link zur Song-Seite (alle Choreos zu einem Song)
+export const songHref = c => `#/song/${encodeURIComponent(c.songKey)}`;
+
+// ctx: { cls, choreos, classes } für Vertretung und „Auch in“ (gleicher Song in anderen Classes)
+function choreoBlock(c, recs, sessions, urls, { cls, choreos = [], classes = [] } = {}) {
   const practiced = sessions.filter(s => s.choreoId === c.id).reduce((a, s) => a + s.seconds, 0);
+  const sub = cls ? subLabel(c, cls) : '';
+  const also = choreos.filter(x => x.id !== c.id && fitsSong(x, c.song))
+    .map(x => classes.find(k => k.id === x.classId)).filter(Boolean);
   return h('div.choreo-block',
     c.song?.cover ? songLink(h('img', { src: c.song.cover, alt: '' }), c.song) : h('div.nocover'),
     h('div',
       h('h2.wide', { style: { fontSize: '20px', margin: '0 0 6px' } }, h('a', { href: recs.length ? `#/train/${recs[recs.length - 1].id}` : null }, (c.title || c.song?.title || tr('Ohne Song')).toUpperCase())),
       h('div.label', `${c.song?.artist || ''}${c.song?.artist ? ' · ' : ''}${tr('geübt {t} · zuletzt {when}', { t: fmtDuration(practiced), when: relDate(c.lastPracticed) })}  `, dots(latestRating(c))),
+      sub ? h('div.label.sub-label', sub.toUpperCase()) : null,
+      also.length ? h('div.label.also-in', `${tr('Auch in')}: `, ...also.flatMap((k, i) => [i ? ', ' : '', h('a', { href: `#/class/${k.id}` }, classTitle(k).toUpperCase())]),
+        ' · ', h('a', { href: songHref(c) }, tr('Song-Seite'))) : null,
       h('ul.reclist', recs.map((r, i) => {
         const title = inlineEdit(recTitle(r, i), async v => { r.title = v; await db.put('recordings', r); }, { href: `#/train/${r.id}` });
         return h('li',
@@ -550,6 +580,10 @@ function choreoBlock(c, recs, sessions, urls) {
           type: 'button',
           onclick: async () => { const to = await moveChoreo(c); if (to) { toast(tr('Verschoben nach „{name}“', { name: classTitle(to) })); go(location.hash); } },
         }, tr('Class ändern')),
+        cls ? h('button.linkbtn', {
+          type: 'button',
+          onclick: async () => { if (await coachDialog(c, cls, classes, choreos)) go(location.hash); },
+        }, tr('Coach ändern')) : null,
         h('button.linkbtn', {
           onclick: async () => {
             const name = c.title || c.song?.title || tr('Ohne Song');
@@ -559,4 +593,62 @@ function choreoBlock(c, recs, sessions, urls) {
             go(location.hash);
           },
         }, tr('Choreo löschen')))));
+}
+
+// Coach einer Choreo festlegen (Vertretung) oder zurück auf den Coach der Class. → true = geändert
+export function coachDialog(c, cls, classes = [], choreos = []) {
+  const known = [...classes.map(k => k.coach), ...choreos.map(x => x.coach)];
+  const pick = pickSelect(known.filter(x => x && x !== cls.coach), {
+    value: c.coach && c.coach !== cls.coach ? c.coach : '',
+    empty: cls.coach ? tr('wie Class ({coach})', { coach: cls.coach }) : tr('wie Class'),
+    addLabel: tr('+ Neuer Coach …'), placeholder: tr('Name'),
+  });
+  return new Promise(resolve => {
+    const close = v => { box.remove(); removeEventListener('keydown', onKey, true); resolve(v); };
+    const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(false); } };
+    const save = async () => {
+      const v = pick.value.trim();
+      if (v && v.toLowerCase() !== String(cls.coach || '').trim().toLowerCase()) c.coach = v; else delete c.coach;
+      await db.put('choreos', c);
+      toast(c.coach ? tr('Vertretung: {coach}', { coach: c.coach }) : tr('Coach wie Class'));
+      close(true);
+    };
+    const box = h('div.modal', { onclick: e => { if (e.target === box) close(false); } },
+      h('div.modal-card.share-card', h('h2.wide', tr('COACH ÄNDERN')),
+        h('p.label', c.title || c.song?.title || tr('Ohne Song')),
+        h('label.field', h('span', 'Coach'), pick),
+        h('p.hint-text', tr('Ein anderer Coach als der der Class gilt als Vertretung. Die Choreo bleibt in ihrer Class.')),
+        h('div.actions', h('button.btn.small.primary', { type: 'button', onclick: save }, tr('Speichern')),
+          h('button.linkbtn', { type: 'button', onclick: () => close(false) }, tr('Abbrechen')))));
+    addEventListener('keydown', onKey, true);
+    document.body.append(box);
+    pick.focus();
+  });
+}
+
+// ── Song-Seite: alle Choreos zu einem Song (z. B. je eine in zwei Classes) ──
+export async function renderSong(root, key) {
+  const { classes, choreos, classById, recsByChoreo, sessions } = await loadAll();
+  const first = choreos.find(c => c.songKey === key);
+  if (!first) { go('#/'); return; }
+  const mine = choreos.filter(c => fitsSong(c, first.song)).sort((a, b) => (b.lastPracticed || b.created) - (a.lastPracticed || a.created));
+  const song = first.song;
+  const withFile = [];
+  for (const c of mine) if (await db.get('videos', `song:${c.id}`)) withFile.push(c);
+  const urls = [];
+  root.append(
+    h('div.choreo-block.song-head', { style: { marginTop: '18px' } },
+      song.cover ? songLink(h('img', { src: song.cover, alt: '' }), song) : h('div.nocover'),
+      h('div',
+        h('h2.wide', { style: { fontSize: '20px', margin: '0 0 6px' } }, song.title.toUpperCase()),
+        h('div.label', [song.artist, song.duration ? fmt(song.duration) : '', song.bpm ? `${Math.round(song.bpm)} BPM` : ''].filter(Boolean).join(' · ')),
+        h('div.label', withFile.length
+          ? tr('Songdatei aus „{cls}“, gilt für alle Choreos zu diesem Song', { cls: classTitle(classById[withFile[0].classId] || {}) })
+          : tr('Keine Songdatei. In der Trainingsansicht unter SONG laden.')),
+        h('p.hint-text', tr('Gleicher Song, eigene Choreos: Marker, Loop und Status gehören je zur Choreo. Den Song korrigierst du in der Trainingsansicht, auf Wunsch für alle.')))),
+    h('div.section-head', h('h2.wide', tr('CHOREOS ZU DIESEM SONG')), h('span.label', tn(mine.length, 'Choreo', 'Choreos'))),
+    ...mine.map(c => choreoBlock(c, recsByChoreo[c.id] || [], sessions, urls, { cls: classById[c.classId], choreos: [], classes }))
+      .map((el, i) => h('div', h('div.stripes', stripe(classById[mine[i].classId], '')), el)),
+  );
+  return () => urls.forEach(u => URL.revokeObjectURL(u));
 }
