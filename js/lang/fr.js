@@ -663,4 +663,5 @@ export default {
   "Lese Link …": "Lecture du lien …",
   "von {p} übernehmen": "reprendre de {p}",
   "Kein Treffer · Titel suchen oder Link (SoundCloud, Spotify …) einfügen": "Aucun résultat · cherche un titre ou colle un lien (SoundCloud, Spotify …)",
+  "Auf SoundCloud suchen ↗ · Link kopieren und hier einfügen": "Chercher sur SoundCloud ↗ · copie le lien et colle-le ici",
 };

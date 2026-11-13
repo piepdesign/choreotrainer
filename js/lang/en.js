@@ -663,4 +663,5 @@ export default {
   "Lese Link …": "Reading link …",
   "von {p} übernehmen": "take from {p}",
   "Kein Treffer · Titel suchen oder Link (SoundCloud, Spotify …) einfügen": "No match · search a title or paste a link (SoundCloud, Spotify …)",
+  "Auf SoundCloud suchen ↗ · Link kopieren und hier einfügen": "Search on SoundCloud ↗ · copy the link and paste it here",
 };

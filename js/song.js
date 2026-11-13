@@ -197,7 +197,10 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
       h('div', h('div', s.title), h('div.label', s.artist)),
       h('span.label', s.duration ? fmt(s.duration) : ''))),
     h('button', { type: 'button', onclick: () => set({ source: 'manual', title: input.value.trim(), artist: '' }) },
-      h('div'), h('div.label', tr('„{q}“ ohne Treffer übernehmen', { q: input.value.trim() })), h('span')));
+      h('div'), h('div.label', tr('„{q}“ ohne Treffer übernehmen', { q: input.value.trim() })), h('span')),
+    // SoundCloud lässt sich ohne Schlüssel nicht durchsuchen: Suche dort öffnen, Link kopieren und hier einfügen
+    h('button', { type: 'button', onclick: () => window.open(`https://soundcloud.com/search/sounds?q=${encodeURIComponent(input.value.trim())}`, '_blank', 'noopener') },
+      h('div'), h('div.label', tr('Auf SoundCloud suchen ↗ · Link kopieren und hier einfügen')), h('span')));
     suggest.hidden = false;
   }, 300);
 
