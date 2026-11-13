@@ -5,6 +5,7 @@ import { searchSongs, songDetails } from './deezer.js';
 import { recognizeSong, scanTrack, median, enrich } from './recognize.js';
 import { songLink, stopPreview } from './providers.js';
 import { prime } from './audio.js';
+import { looksLikeLink, resolveLink } from './links.js';
 
 const norm = s => String(s || '').trim().toLowerCase();
 export const songKeyOf = s => (s.source === 'deezer' ? `dz:${s.id}` : `m:${norm(s.artist)}|${norm(s.title)}`);
@@ -36,7 +37,7 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
   let editing = !song;
   let results = [];
 
-  const input = h('input', { type: 'search', placeholder: tr('Titel oder Artist …'), autocomplete: 'off' });
+  const input = h('input', { type: 'search', placeholder: tr('Titel, Artist oder Link …'), autocomplete: 'off' });
   const suggest = h('div.suggest', { hidden: true });
   const search = h('div.song-search', input, suggest);
   const picked = h('div');
@@ -152,7 +153,37 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
     offerVersions();
   }
 
+  // Eingefügter Link (SoundCloud, Spotify, Deezer): Titel/Artist über den Link holen, dann bei Deezer suchen.
+  // Ohne Deezer-Treffer lässt sich der Song mit den Angaben aus dem Link übernehmen (z. B. Edits nur auf SoundCloud).
+  async function searchLink(q) {
+    const r = await resolveLink(q);
+    if (r?.deezer) return { list: [r.deezer] };
+    if (!r) return { list: [], error: tr('Link nicht erkannt. Unterstützt: SoundCloud, Spotify, Deezer.') };
+    const t = simple(r.title);
+    const hits = (await searchSongs(`${r.artist} ${r.title}`).catch(() => [])).filter(x => simple(x.title).startsWith(t) || t.startsWith(simple(x.title)));
+    const manual = { source: 'manual', title: r.title, artist: r.artist, cover: r.cover, url: r.url };
+    return { list: hits, manual, provider: r.provider };
+  }
+
   const runSearch = debounce(async q => {
+    if (looksLikeLink(q)) {
+      suggest.replaceChildren(h('div.label', { style: { padding: '8px' } }, tr('Lese Link …')));
+      suggest.hidden = false;
+      const { list, manual, error, provider } = await searchLink(q);
+      if (input.value !== q) return; // inzwischen weitergetippt
+      results = list.length ? list : manual ? [manual] : [];
+      suggest.replaceChildren(
+        ...(error ? [h('div.label', { style: { padding: '8px' } }, error)] : []),
+        ...list.map(s => h('button', { type: 'button', onclick: () => set(s) },
+          s.cover ? h('img', { src: s.cover, alt: '' }) : h('div'),
+          h('div', h('div', s.title), h('div.label', s.artist)),
+          h('span.label', s.duration ? fmt(s.duration) : ''))),
+        ...(manual ? [h('button', { type: 'button', onclick: () => set(manual) },
+          manual.cover ? h('img', { src: manual.cover, alt: '' }) : h('div'),
+          h('div', h('div', manual.title), h('div.label', [manual.artist, tr('von {p} übernehmen', { p: provider })].filter(Boolean).join(' · '))),
+          h('span'))] : []));
+      return;
+    }
     try {
       results = await searchSongs(q);
     } catch (e) {
@@ -184,7 +215,7 @@ export function songPicker({ song = null, getBlob, onChange, onOffset, align = n
     recBtn.disabled = true;
     try {
       const r = await recognizeSong(blob, msg => { recStatus.textContent = msg; });
-      if (!r) recStatus.textContent = tr('Kein Treffer · bitte manuell suchen');
+      if (!r) recStatus.textContent = tr('Kein Treffer · Titel suchen oder Link (SoundCloud, Spotify …) einfügen');
       else if (auto && (current || input.value.trim())) recStatus.textContent = tr('Erkannt: {song} (nicht übernommen)', { song: `${r.song.artist} — ${r.song.title}` });
       else {
         await set(r.song, r.offset);
